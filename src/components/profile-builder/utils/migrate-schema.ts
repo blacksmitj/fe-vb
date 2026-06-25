@@ -1,4 +1,4 @@
-import { Section, FieldType, MediaSubType } from "./types";
+import { Section, FieldType, MediaSubType } from "../types";
 
 const LEGACY_MEDIA_TYPES = ["image", "pdf", "video"];
 

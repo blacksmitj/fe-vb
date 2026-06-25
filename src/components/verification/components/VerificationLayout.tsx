@@ -5,9 +5,9 @@ import { useVerificationStore } from "@/stores";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { X } from "lucide-react";
-import { PhotoViewer } from "./viewers/PhotoViewer";
-import { VideoViewer } from "./viewers/VideoViewer";
-import { PdfViewer } from "./viewers/PdfViewer";
+import { PhotoViewer } from "../viewers/PhotoViewer";
+import { VideoViewer } from "../viewers/VideoViewer";
+import { PdfViewer } from "../viewers/PdfViewer";
 
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 

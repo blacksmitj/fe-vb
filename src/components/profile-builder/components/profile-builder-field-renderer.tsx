@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Field, FieldType } from "./types";
+import { Field, FieldType } from "../types";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
@@ -47,7 +47,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useSortable } from "@dnd-kit/react/sortable";
-import { detectMediaType } from "./detect-media-type";
+import { detectMediaType } from "../utils/detect-media-type";
 
 interface FieldRendererProps {
   field: Field;

@@ -5,18 +5,21 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Save, Eye, LayoutTemplateIcon, ArrowLeft, Loader2 } from "lucide-react";
-import ProfileBuilderSidebar from "@/components/profile-builder/profile-builder-sidebar";
-import ProfileBuilderCanvas from "@/components/profile-builder/profile-builder-canvas";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import { DragDropProvider } from "@dnd-kit/react";
 import { isSortable } from "@dnd-kit/react/sortable";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
-
-import { Section, Field, FieldType } from "@/components/profile-builder/types";
+import {
+  ProfileBuilderSidebar,
+  ProfileBuilderCanvas,
+  Section,
+  Field,
+  FieldType,
+  migrateSectionsSchema,
+} from "@/components/profile-builder";
 import { useProgram, useUpdateProgramSchema } from "@/hooks/use-programs";
-import { migrateSectionsSchema } from "@/components/profile-builder/migrate-schema";
 
 // Initial state is empty
 const initialSections: Section[] = [];

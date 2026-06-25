@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Section, Field } from "./types";
+import { Section, Field } from "../types";
 import ProfileBuilderFieldRenderer from "./profile-builder-field-renderer";
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";

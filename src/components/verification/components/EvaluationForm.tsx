@@ -2,13 +2,12 @@
 
 import * as React from "react";
 import { useVerificationStore } from "@/stores";
-import { Section, Field } from "../profile-builder/types";
+import { Section, Field, detectMediaType } from "@/components/profile-builder";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Calendar, FileText, Image as ImageIcon, Video, Tag, Bookmark, Hash, ArrowUpRight, Eye, Play, Globe } from "lucide-react";
-import { detectMediaType } from "../profile-builder/detect-media-type";
 
 interface EvaluationFormProps {
   sections: Section[];

@@ -24,7 +24,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { type Program } from "@/lib/program-store";
+import { type Program } from "@/types";
 import { usePrograms, useDeleteProgram } from "@/hooks/use-programs";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";

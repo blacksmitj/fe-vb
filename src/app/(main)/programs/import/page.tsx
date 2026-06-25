@@ -45,7 +45,7 @@ import {
   createColumnHelper,
 } from "@tanstack/react-table";
 import ExcelJS from "exceljs";
-import { type Program } from "@/lib/program-store";
+import { type Program } from "@/types";
 import { useProgram, useCreateProgram } from "@/hooks/use-programs";
 import { toast } from "sonner";
 

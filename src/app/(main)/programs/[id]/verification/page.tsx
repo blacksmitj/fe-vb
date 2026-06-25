@@ -1,12 +1,14 @@
 "use client";
 
 import * as React from "react";
-import { VerificationLayout } from "@/components/verification/VerificationLayout";
-import { ParticipantNavigator } from "@/components/verification/ParticipantNavigator";
-import { EvaluationForm } from "@/components/verification/EvaluationForm";
-import { EvaluationControls } from "@/components/verification/EvaluationControls";
-import { useVerificationStore } from "@/lib/verification-store";
-import { Section } from "@/components/profile-builder/types";
+import {
+  VerificationLayout,
+  ParticipantNavigator,
+  EvaluationForm,
+  EvaluationControls,
+} from "@/components/verification";
+import { useVerificationStore } from "@/stores";
+import { Section, migrateSectionsSchema } from "@/components/profile-builder";
 import { Loader2, ArrowLeft, RefreshCw } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -22,7 +24,6 @@ import {
 } from "@/components/ui/breadcrumb";
 import { useProgram } from "@/hooks/use-programs";
 import { toast } from "sonner";
-import { migrateSectionsSchema } from "@/components/profile-builder/migrate-schema";
 
 export default function VerificationPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = React.use(params);

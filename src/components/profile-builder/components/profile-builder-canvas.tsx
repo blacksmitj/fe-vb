@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Section } from "./types";
+import { Section } from "../types";
 import ProfileBuilderSection from "./profile-builder-section";
 import { Button } from "@/components/ui/button";
 import { PlusCircle } from "lucide-react";
