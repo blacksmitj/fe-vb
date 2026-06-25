@@ -46,7 +46,8 @@ import {
   FileText
 } from "lucide-react";
 import { toast } from "sonner";
-import { useDraggable } from "@dnd-kit/react";
+import { useSortable } from "@dnd-kit/react/sortable";
+import { SortableKeyboardPlugin } from "@dnd-kit/dom/sortable";
 import { detectMediaType } from "../utils/detect-media-type";
 import { Feedback } from "@dnd-kit/dom";
 
@@ -58,6 +59,7 @@ interface FieldRendererProps {
   onUpdateField: (updatedField: Field) => void;
   onDeleteField: (fieldId: string) => void;
   sampleRow?: Record<string, any>;
+  isOverlay?: boolean;
 }
 
 export default function ProfileBuilderFieldRenderer({
@@ -68,6 +70,7 @@ export default function ProfileBuilderFieldRenderer({
   onUpdateField,
   onDeleteField,
   sampleRow,
+  isOverlay = false,
 }: FieldRendererProps) {
   const [isEditingLabel, setIsEditingLabel] = useState(false);
   const [labelValue, setLabelValue] = useState(field.label);
@@ -121,18 +124,13 @@ export default function ProfileBuilderFieldRenderer({
     toast.success("Field settings updated");
   };
 
-  const { ref, handleRef } = useDraggable({
+  const { ref, handleRef, isDragging } = useSortable({
     id: field.id,
+    index,
     type: "field",
-    data: {
-      sectionId,
-      column,
-    },
-    plugins: [
-      Feedback.configure({
-        feedback: "none",
-      }),
-    ],
+    accept: "field",
+    group: `${sectionId}-${column}`,
+    disabled: isOverlay,
   });
 
   const handleSaveLabel = () => {
@@ -512,27 +510,40 @@ export default function ProfileBuilderFieldRenderer({
   return (
     <div className="w-full">
       <div 
-        ref={ref}
-        className="group/field relative flex items-start gap-1.5 rounded-lg border border-transparent p-1 hover:border-border/50 hover:bg-muted/5 transition-all"
+        ref={isOverlay ? undefined : ref}
+        className={`group/field relative flex items-start gap-1.5 rounded-lg border p-1 transition-all ${
+          isOverlay
+            ? "border-primary bg-card shadow-lg ring-1 ring-primary/20 scale-[1.02] cursor-grabbing"
+            : isDragging
+              ? "border-dashed border-border/40 bg-muted/20 opacity-30 select-none pointer-events-none"
+              : "border-transparent hover:border-border/50 hover:bg-muted/5"
+        }`}
       >
         {/* Small drag handle indicator for aesthetics */}
-        <div 
-          ref={handleRef}
-          className="mt-1.5 opacity-0 group-hover/field:opacity-40 transition-opacity cursor-grab text-muted-foreground p-0.5 z-10"
-        >
-          <GripHorizontal className="h-3.5 w-3.5" />
-        </div>
+        {!isOverlay && (
+          <div 
+            ref={handleRef}
+            className="mt-1.5 opacity-0 group-hover/field:opacity-40 transition-opacity cursor-grab text-muted-foreground p-0.5 z-10"
+          >
+            <GripHorizontal className="h-3.5 w-3.5" />
+          </div>
+        )}
+        {isOverlay && (
+          <div className="mt-1.5 text-primary/75 p-0.5 z-10 cursor-grabbing">
+            <GripHorizontal className="h-3.5 w-3.5" />
+          </div>
+        )}
 
         <div className="flex-1 space-y-1 min-w-0">
           <div className="flex items-center justify-between gap-2">
             {/* Tag & Type Label */}
             <div className="flex items-center gap-1.5 shrink-0">
               <div 
-                onClick={() => !field.locked && handleOpenEditModal()}
+                onClick={() => !field.locked && !isOverlay && handleOpenEditModal()}
                 className={`flex items-center gap-1 rounded-md bg-muted px-1.5 py-0.5 text-[9px] font-semibold uppercase text-muted-foreground tracking-wider transition-colors select-none ${
-                  field.locked ? "cursor-not-allowed" : "cursor-pointer hover:bg-muted/80 hover:text-foreground"
+                  field.locked || isOverlay ? "cursor-default" : "cursor-pointer hover:bg-muted/80 hover:text-foreground"
                 }`}
-                title={field.locked ? "Locked" : "Click to change field settings"}
+                title={field.locked ? "Locked" : isOverlay ? undefined : "Click to change field settings"}
               >
                 {getFieldIcon()}
                 <span>{field.type}</span>
@@ -569,7 +580,7 @@ export default function ProfileBuilderFieldRenderer({
                   >
                     {field.label}
                   </span>
-                  {!field.locked && (
+                  {!field.locked && !isOverlay && (
                     <Button
                       variant="ghost"
                       size="icon"
@@ -593,7 +604,7 @@ export default function ProfileBuilderFieldRenderer({
           {renderInput()}
 
           {/* Switch below the input */}
-          {!field.locked && field.type !== "media" && (
+          {!field.locked && field.type !== "media" && !isOverlay && (
             <div className="flex items-center gap-1 select-none bg-muted/20 px-1.5 py-0 rounded border border-border/30 w-fit mt-0.5">
               <span className="text-[8px] text-muted-foreground font-semibold uppercase tracking-wider scale-90 origin-left">Editable</span>
               <Switch
@@ -608,7 +619,7 @@ export default function ProfileBuilderFieldRenderer({
         </div>
 
         {/* Delete field option */}
-        {!field.locked && (
+         {!field.locked && !isOverlay && (
           <Button
             variant="ghost"
             size="icon"

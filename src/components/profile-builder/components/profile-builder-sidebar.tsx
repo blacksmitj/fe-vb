@@ -40,11 +40,6 @@ function DraggableHeaderItem({
     data: {
       label: header,
     },
-    plugins: [
-      Feedback.configure({
-        feedback: "none",
-      }),
-    ],
   });
 
   return (

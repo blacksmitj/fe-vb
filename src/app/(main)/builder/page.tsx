@@ -7,10 +7,11 @@ import { Button } from "@/components/ui/button";
 import { Save, Eye, LayoutTemplateIcon, ArrowLeft, Loader2 } from "lucide-react";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
-import { DragDropProvider } from "@dnd-kit/react";
+import { DragDropProvider, DragOverlay } from "@dnd-kit/react";
 import { isSortable } from "@dnd-kit/react/sortable";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
+import { Contact2 } from "lucide-react";
 import {
   ProfileBuilderSidebar,
   ProfileBuilderCanvas,
@@ -19,6 +20,7 @@ import {
   FieldType,
   migrateSectionsSchema,
 } from "@/components/profile-builder";
+import ProfileBuilderFieldRenderer from "@/components/profile-builder/components/profile-builder-field-renderer";
 import { useProgram, useUpdateProgramSchema } from "@/hooks/use-programs";
 
 // Initial state is empty
@@ -39,6 +41,9 @@ function BuilderPageContent() {
   const [sections, setSections] = useState<Section[]>(initialSections);
   const [isLoaded, setIsLoaded] = useState(false);
   const [hasDraft, setHasDraft] = useState(false);
+
+  const [activeField, setActiveField] = useState<Field | null>(null);
+  const [activeNewField, setActiveNewField] = useState<{ label: string } | null>(null);
 
   // Load profile schema from program details or localStorage draft if it exists
   useEffect(() => {
@@ -237,16 +242,112 @@ function BuilderPageContent() {
 
   return (
     <DragDropProvider
+      onDragStart={(event) => {
+        const { source } = event.operation;
+        if (!source) return;
+
+        if (source.type === "new-field") {
+          setActiveNewField(source.data as { label: string });
+          setActiveField(null);
+        } else if (source.type === "field") {
+          const fieldId = source.id;
+          let foundField: Field | null = null;
+          for (const sec of sections) {
+            const f = sec.fields.find((f) => f.id === fieldId);
+            if (f) {
+              foundField = f;
+              break;
+            }
+          }
+          if (foundField) {
+            setActiveField(foundField);
+            setActiveNewField(null);
+          }
+        }
+      }}
+      onDragOver={(event) => {
+        const { source, target } = event.operation;
+        if (!source || !target) return;
+
+        if (isSortable(source) && source.type === "field") {
+          let targetGroupStr: string | null = null;
+          let targetIndex = 0;
+
+          if (isSortable(target)) {
+            targetGroupStr = typeof target.group === "string" ? target.group : null;
+            targetIndex = typeof target.index === "number" ? target.index : 0;
+          } else {
+            targetGroupStr = typeof target.id === "string" ? target.id : null;
+          }
+
+          const sourceGroupStr = source.group;
+
+          if (
+            typeof sourceGroupStr === "string" &&
+            typeof targetGroupStr === "string" &&
+            sourceGroupStr !== targetGroupStr &&
+            sourceGroupStr.includes("-") &&
+            targetGroupStr.includes("-")
+          ) {
+            const splitGroup = (g: string) => {
+              const i = g.lastIndexOf("-");
+              return [g.slice(0, i), g.slice(i + 1)] as const;
+            };
+
+            const [sourceSectionId, sourceCol] = splitGroup(sourceGroupStr);
+            const [targetSectionId, targetCol] = splitGroup(targetGroupStr);
+            const fieldId = source.id;
+
+            setSections((prev) => {
+              let fieldToMove: Field | null = null;
+              
+              // 1. Remove the field from its original section
+              const cleanSections = prev.map((sec) => {
+                if (sec.id === sourceSectionId) {
+                  fieldToMove = sec.fields.find(f => f.id === fieldId) || null;
+                  return { ...sec, fields: sec.fields.filter(f => f.id !== fieldId) };
+                }
+                return sec;
+              });
+
+              if (!fieldToMove) return prev;
+
+              // 2. Insert it into the target section & column
+              return cleanSections.map((sec) => {
+                if (sec.id === targetSectionId) {
+                  const updatedField: Field = {
+                    ...fieldToMove!,
+                    column: targetCol as "left" | "right",
+                  };
+                  const leftFields = sec.fields.filter(f => f.column !== "right");
+                  const rightFields = sec.fields.filter(f => f.column === "right");
+                  const targetList = targetCol === "right" ? rightFields : leftFields;
+
+                  const insertAt = Math.min(Math.max(0, targetIndex), targetList.length);
+                  targetList.splice(insertAt, 0, updatedField);
+
+                  return { ...sec, fields: [...leftFields, ...rightFields] };
+                }
+                return sec;
+              });
+            });
+          }
+        }
+      }}
       onDragEnd={(event) => {
+        setActiveField(null);
+        setActiveNewField(null);
+
         if (event.canceled) return;
 
-        const { source, target } = event.operation;
+        const { source } = event.operation;
         if (!source) return;
 
         if (source.type === "new-field") {
           let targetGroupStr: string | null = null;
           let dropIndex = 0;
 
+          const { target } = event.operation;
           if (target) {
             if (isSortable(target)) {
               targetGroupStr = typeof target.group === "string" ? target.group : null;
@@ -293,7 +394,7 @@ function BuilderPageContent() {
         }
 
         if (isSortable(source)) {
-          const { initialIndex, index, group, type } = source;
+          const { initialIndex, index, group, type, initialGroup } = source;
 
           if (type === "section" || group === "sections") {
             if (initialIndex !== index) {
@@ -306,107 +407,31 @@ function BuilderPageContent() {
                 });
               }, 0);
             }
-          } else if (type === "field" && typeof source.initialGroup === "string") {
-            const splitGroup = (g: string) => {
-              const i = g.lastIndexOf("-");
-              return [g.slice(0, i), g.slice(i + 1)] as const;
-            };
+          } else if (type === "field" && initialGroup === group && typeof group === "string") {
+            // Same group reorder
+            if (initialIndex !== index) {
+              const splitGroup = (g: string) => {
+                const i = g.lastIndexOf("-");
+                return [g.slice(0, i), g.slice(i + 1)] as const;
+              };
+              const [sectionId, col] = splitGroup(group);
 
-            const [sourceSectionId, sourceCol] = splitGroup(source.initialGroup);
+              setTimeout(() => {
+                setSections((prev) =>
+                  prev.map((sec) => {
+                    if (sec.id !== sectionId) return sec;
 
-            let targetGroupStr: string | null = null;
-            let dropIndex = 0;
+                    const leftFields = sec.fields.filter((f) => f.column !== "right");
+                    const rightFields = sec.fields.filter((f) => f.column === "right");
+                    const targetList = col === "right" ? rightFields : leftFields;
 
-            if (target) {
-              if (isSortable(target)) {
-                targetGroupStr = typeof target.group === "string" ? target.group : null;
-                dropIndex = typeof target.index === "number" ? target.index : 0;
-              } else {
-                targetGroupStr = typeof target.id === "string" ? target.id : null;
-              }
-            }
-            if (!targetGroupStr && typeof group === "string") {
-              targetGroupStr = group;
-              dropIndex = typeof index === "number" ? index : 0;
-            }
+                    const [removed] = targetList.splice(initialIndex, 1);
+                    targetList.splice(index, 0, removed);
 
-            if (targetGroupStr && targetGroupStr.includes("-")) {
-              const [targetSectionId, targetCol] = splitGroup(targetGroupStr);
-
-              if (sourceSectionId === targetSectionId) {
-                // ── Same-section reorder / column swap ──────────────────────
-                setTimeout(() => {
-                  setSections((prev) => {
-                    console.log("DRAG SAME-SECTION - PREV:", JSON.stringify(prev));
-                    const res = prev.map((sec) => {
-                      if (sec.id !== sourceSectionId) return sec;
-
-                      const fieldId = source.id;
-                      const fieldToMove = sec.fields.find(f => f.id === fieldId);
-                      if (!fieldToMove) return sec;
-
-                      const remainingFields = sec.fields.filter(f => f.id !== fieldId);
-                      const leftFields = remainingFields.filter((f) => f.column !== "right");
-                      const rightFields = remainingFields.filter((f) => f.column === "right");
-                      const targetList = targetCol === "right" ? rightFields : leftFields;
-
-                      const updatedField = {
-                        ...fieldToMove,
-                        column: targetCol as "left" | "right",
-                      };
-                      const insertAt = Math.min(Math.max(0, dropIndex), targetList.length);
-                      targetList.splice(insertAt, 0, updatedField);
-
-                      return { ...sec, fields: [...leftFields, ...rightFields] };
-                    });
-                    console.log("DRAG SAME-SECTION - NEXT:", JSON.stringify(res));
-                    return res;
-                  });
-                }, 0);
-              } else {
-                // ── Cross-section move ────────────────────────────────────
-                setTimeout(() => {
-                  setSections((prev) => {
-                    console.log("DRAG CROSS-SECTION - PREV:", JSON.stringify(prev));
-                    const fieldId = source.id;
-
-                    // 1. Find the field in the source section
-                    const sourceSection = prev.find(s => s.id === sourceSectionId);
-                    if (!sourceSection) return prev;
-                    const fieldToMove = sourceSection.fields.find(f => f.id === fieldId);
-                    if (!fieldToMove) return prev;
-
-                    const res = prev.map((sec) => {
-                      if (sec.id === sourceSectionId) {
-                        // Remove field from source
-                        return { ...sec, fields: sec.fields.filter(f => f.id !== fieldId) };
-                      }
-
-                      if (sec.id === targetSectionId) {
-                        // Insert field into target at the correct column & index
-                        const updatedField: typeof fieldToMove = {
-                          ...fieldToMove,
-                          column: targetCol as "left" | "right",
-                        };
-
-                        const leftFields = sec.fields.filter(f => f.column !== "right");
-                        const rightFields = sec.fields.filter(f => f.column === "right");
-                        const targetList = targetCol === "right" ? rightFields : leftFields;
-
-                        // Clamp index to list bounds so the splice never goes out of range
-                        const insertAt = Math.min(Math.max(0, dropIndex), targetList.length);
-                        targetList.splice(insertAt, 0, updatedField);
-
-                        return { ...sec, fields: [...leftFields, ...rightFields] };
-                      }
-
-                      return sec;
-                    });
-                    console.log("DRAG CROSS-SECTION - NEXT:", JSON.stringify(res));
-                    return res;
-                  });
-                }, 0);
-              }
+                    return { ...sec, fields: [...leftFields, ...rightFields] };
+                  })
+                );
+              }, 0);
             }
           }
         }
@@ -458,6 +483,28 @@ function BuilderPageContent() {
         
         <Toaster position="top-right" closeButton richColors />
       </div>
+
+      <DragOverlay dropAnimation={null}>
+        {activeField ? (
+          <div className="w-[320px] pointer-events-none">
+            <ProfileBuilderFieldRenderer
+              field={activeField}
+              index={0}
+              column="left"
+              sectionId=""
+              onUpdateField={() => {}}
+              onDeleteField={() => {}}
+              sampleRow={sampleRow}
+              isOverlay
+            />
+          </div>
+        ) : activeNewField ? (
+          <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-primary bg-card shadow-lg ring-1 ring-primary/20 text-xs font-semibold w-[240px] pointer-events-none scale-102">
+            <Contact2 className="h-4 w-4 text-primary shrink-0" />
+            <span>{activeNewField.label}</span>
+          </div>
+        ) : null}
+      </DragOverlay>
     </DragDropProvider>
   );
 }
