@@ -46,16 +46,7 @@ export async function POST(req: Request) {
     const totalRowsCount = rows ? rows.length : 0;
     const fieldCount = headers ? headers.length : 0;
 
-    // 1. Dapatkan user session
-    const sessionRes = await fetch(`${process.env.BETTER_AUTH_URL || "http://localhost:3000"}/api/auth/get-session`, {
-      headers: {
-        cookie: req.headers.get("cookie") || "",
-      },
-    });
-    const session = await sessionRes.json();
-    const userId = session?.user?.id;
-
-    // 1. Buat record Program dengan metadata saja, beserta ProgramMember ADMIN jika user login
+    // 1. Buat record Program dengan metadata saja
     const program = await db.program.create({
       data: {
         name,
@@ -63,15 +54,6 @@ export async function POST(req: Request) {
         totalRows: totalRowsCount,
         fieldCount,
         errorCount: 0,
-        ...(userId ? {
-          members: {
-            create: {
-              userId,
-              role: "ADMIN",
-              status: "APPROVED",
-            }
-          }
-        } : {})
       },
     });
 
