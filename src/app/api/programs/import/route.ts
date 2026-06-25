@@ -1,117 +1,54 @@
 import { db } from "@/lib/db";
+import { auth } from "@/lib/auth/auth";
+import { pullFromSheet } from "@/lib/sync-service";
+import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 
-const BATCH_SIZE = 500;
-
-// Simple validation logic (placeholder/standard)
-function validateRows(rows: any[], headers: string[]) {
-  const validRows: any[] = [];
-  const errorDetails: any[] = [];
-  let errorCount = 0;
-
-  rows.forEach((row, index) => {
-    // Standard basic check: row must have fields mapped to headers
-    // For now we treat all rows as valid, unless they are completely empty
-    if (!row || Object.keys(row).length === 0) {
-      errorCount++;
-      errorDetails.push({
-        rowIndex: index,
-        column: "Row",
-        value: row,
-        message: "Baris kosong tidak valid.",
-      });
-    } else {
-      validRows.push(row);
-    }
+export async function POST(req: Request) {
+  const session = await auth.api.getSession({
+    headers: await headers(),
   });
 
-  return { validRows, errorDetails, errorCount };
-}
+  if (!session) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
-function chunkArray<T>(arr: T[], size: number): T[][] {
-  return Array.from({ length: Math.ceil(arr.length / size) }, (_, i) =>
-    arr.slice(i * size, i * size + size)
-  );
-}
-
-export async function POST(req: Request) {
   try {
-    const { name, description, headers, data } = await req.json();
-    const rows = data;
+    const { name, description, sheetId, sheetName, sheetUniqueKey, sheetEvalStatusCol, sheetEvalDescCol } = await req.json();
 
     if (!name) {
-      return NextResponse.json({ error: "Name is required" }, { status: 400 });
+      return NextResponse.json({ error: "Nama program wajib diisi." }, { status: 400 });
+    }
+    if (!sheetId || !sheetName || !sheetUniqueKey) {
+      return NextResponse.json({ error: "Google Sheet ID, Nama Tab, dan Kolom ID Unik wajib diisi." }, { status: 400 });
     }
 
-    const totalRowsCount = rows ? rows.length : 0;
-    const fieldCount = headers ? headers.length : 0;
-
-    // 1. Buat record Program dengan metadata saja
+    // 1. Create Program
     const program = await db.program.create({
       data: {
         name,
         description: description || "",
-        totalRows: totalRowsCount,
-        fieldCount,
-        errorCount: 0,
+        sheetId,
+        sheetName,
+        sheetUniqueKey,
+        sheetEvalStatusCol: sheetEvalStatusCol || null,
+        sheetEvalDescCol: sheetEvalDescCol || null,
       },
     });
 
-    const parsedRows = rows || [];
-    const parsedHeaders = headers || [];
+    // 2. Perform the initial pull from Sheet
+    const syncResult = await pullFromSheet(program.id, session.user.id);
 
-    // 2. Validasi setiap baris
-    const { validRows, errorDetails, errorCount } = validateRows(parsedRows, parsedHeaders);
-
-    // 3. Bagi rows menjadi chunks 500 baris
-    const chunks = chunkArray(validRows, BATCH_SIZE);
-
-    // 4. Simpan semua batch
-    if (chunks.length > 0) {
-      await db.participantData.createMany({
-        data: chunks.map((chunk, index) => ({
-          programId: program.id,
-          headers: index === 0 ? parsedHeaders : null, // headers hanya di batch 0
-          rows: chunk,
-          batchIndex: index,
-          totalInBatch: chunk.length,
-          errorDetails: index === 0 ? (errorDetails as any) : undefined,
-        }) as any),
-      });
-    } else {
-      // Jika tidak ada baris sama sekali, buat 1 batch kosong agar headers tetap tersimpan
-      await db.participantData.create({
-        data: {
-          programId: program.id,
-          headers: parsedHeaders,
-          rows: [],
-          batchIndex: 0,
-          totalInBatch: 0,
-          errorDetails: errorDetails,
-        },
-      });
+    if (!syncResult.success) {
+      // Delete the program if the initial sync fails so we don't leave orphaned programs
+      await db.program.delete({ where: { id: program.id } });
+      return NextResponse.json({ error: syncResult.error || "Gagal melakukan sinkronisasi pertama." }, { status: 400 });
     }
-
-    // 5. Update errorCount di program
-    await db.program.update({
-      where: { id: program.id },
-      data: { errorCount },
-    });
-
-    // 6. Catat log import
-    await db.importLog.create({
-      data: {
-        programId: program.id,
-        fileName: name,
-        totalRows: totalRowsCount,
-        errorCount,
-        status: errorCount > 0 ? "PARTIAL" : "COMPLETED",
-      },
-    });
 
     return NextResponse.json(program);
   } catch (error) {
     console.error("POST /api/programs/import error:", error);
-    return NextResponse.json({ error: "Failed to import program" }, { status: 500 });
+    return NextResponse.json({ error: "Gagal menghubungkan Google Sheet program." }, { status: 500 });
   }
 }
+

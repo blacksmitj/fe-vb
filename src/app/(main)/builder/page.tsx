@@ -24,7 +24,7 @@ import { useProgram, useUpdateProgramSchema } from "@/hooks/use-programs";
 // Initial state is empty
 const initialSections: Section[] = [];
 
-export default function Home() {
+function BuilderPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const programId = searchParams.get("programId");
@@ -401,5 +401,17 @@ export default function Home() {
         <Toaster position="top-right" closeButton richColors />
       </div>
     </DragDropProvider>
+  );
+}
+
+export default function BuilderPage() {
+  return (
+    <React.Suspense fallback={
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="size-6 animate-spin text-muted-foreground" />
+      </div>
+    }>
+      <BuilderPageContent />
+    </React.Suspense>
   );
 }

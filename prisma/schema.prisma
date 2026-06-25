@@ -17,11 +17,19 @@ model Program {
   fieldCount  Int      @default(0)
   errorCount  Int      @default(0)
 
+  // Google Sheet Configuration
+  sheetId            String?
+  sheetName          String?
+  sheetUniqueKey     String?   // Kolom ID unik di Sheet (misal: "NIK")
+  sheetEvalStatusCol String?   // Kolom di Sheet untuk menyimpan status evaluasi
+  sheetEvalDescCol   String?   // Kolom di Sheet untuk menyimpan deskripsi evaluasi
+  sheetLastSyncAt    DateTime?
+
   // Relasi ke tabel terpisah
   participantData ParticipantData[]
   profileSchema   ProfileSchema?
   importLogs      ImportLog[]
-  members         ProgramMember[]
+  syncLogs        SyncLog[]
 
   @@index([createdAt(sort: Desc)])
 }
@@ -89,7 +97,7 @@ enum ImportStatus {
 
 // Better Auth Models
 model User {
-  id            String          @id
+  id            String    @id
   name          String
   email         String
   emailVerified Boolean
@@ -98,7 +106,6 @@ model User {
   updatedAt     DateTime
   sessions      Session[]
   accounts      Account[]
-  programMembers ProgramMember[]
 
   @@unique([email])
   @@map("user")
@@ -149,31 +156,32 @@ model Verification {
   @@map("verification")
 }
 
-enum ProgramRole {
-  ADMIN
-  VERIFIER
-}
+// ─────────────────────────────────────────────
+// Model: SyncLog
+// ─────────────────────────────────────────────
+model SyncLog {
+  id           String        @id @default(uuid())
+  programId    String
+  program      Program       @relation(fields: [programId], references: [id], onDelete: Cascade)
+  direction    SyncDirection
+  status       SyncStatus
+  rowsAffected Int           @default(0)
+  error        String?
+  syncedAt     DateTime      @default(now())
 
-enum MemberStatus {
-  PENDING
-  APPROVED
-  REJECTED
-}
-
-model ProgramMember {
-  id        String       @id @default(uuid())
-  programId String
-  program   Program      @relation(fields: [programId], references: [id], onDelete: Cascade)
-  userId    String
-  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  role      ProgramRole  @default(VERIFIER)
-  status    MemberStatus @default(PENDING)
-  createdAt DateTime     @default(now())
-  updatedAt DateTime     @updatedAt
-
-  @@unique([programId, userId])
   @@index([programId])
-  @@index([userId])
+  @@index([syncedAt(sort: Desc)])
+}
+
+enum SyncDirection {
+  PULL
+  PUSH
+}
+
+enum SyncStatus {
+  SUCCESS
+  FAILED
+  PARTIAL
 }
 
 

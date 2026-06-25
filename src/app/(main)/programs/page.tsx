@@ -16,6 +16,7 @@ import {
   ClipboardCheckIcon,
   ArrowUpDownIcon,
   SearchIcon,
+  SettingsIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -243,6 +244,17 @@ export default function ProgramsPage() {
               <Button
                 size="icon"
                 asChild
+                title="Settings Google Sheet"
+                variant="outline"
+                className="size-8"
+              >
+                <Link href={`/programs/${program.id}/settings`}>
+                  <SettingsIcon className="size-4" />
+                </Link>
+              </Button>
+              <Button
+                size="icon"
+                asChild
                 title="Profile Builder"
                 variant="outline"
                 className="size-8"
@@ -322,7 +334,7 @@ export default function ProgramsPage() {
         <Button asChild className="gap-2" size="sm">
           <Link href="/programs/import">
             <PlusIcon className="size-4" />
-            Import Excel
+            Tambah Program Google Sheet
           </Link>
         </Button>
       </header>
@@ -334,7 +346,7 @@ export default function ProgramsPage() {
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Program List</h1>
             <p className="text-muted-foreground mt-1">
-              Kelola program atau event yang di-import melalui file Excel.
+              Kelola program atau event yang disinkronisasikan dari Google Sheets.
             </p>
           </div>
 
@@ -363,13 +375,12 @@ export default function ProgramsPage() {
                 Belum Ada Program
               </CardTitle>
               <CardDescription className="max-w-sm mt-2">
-                Silakan import data dari file Excel untuk membuat program pertama
-                Anda.
+                Silakan buat program baru dengan menghubungkan Google Sheet Anda.
               </CardDescription>
               <Button asChild className="mt-6 gap-2">
                 <Link href="/programs/import">
                   <PlusIcon className="size-4" />
-                  Import Excel Sekarang
+                  Hubungkan Google Sheet
                 </Link>
               </Button>
             </Card>

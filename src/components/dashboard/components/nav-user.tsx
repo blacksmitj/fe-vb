@@ -25,7 +25,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 
-import { useSession, signOut } from "@/lib/auth";
+import { useSession, signOut } from "@/lib/auth/auth-client";
 import { useRouter } from "next/navigation";
 
 export function NavUser() {

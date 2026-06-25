@@ -1,4 +1,7 @@
 import { db } from "@/lib/db";
+import { auth } from "@/lib/auth/auth";
+import { pushRowToSheet } from "@/lib/sync-service";
+import { headers as getHeaders } from "next/headers";
 import { NextResponse } from "next/server";
 
 export async function GET(
@@ -85,6 +88,14 @@ export async function PATCH(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const session = await auth.api.getSession({
+    headers: await getHeaders(),
+  });
+
+  if (!session) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
     const { id } = await params;
     const { searchParams } = new URL(req.url);
@@ -100,6 +111,20 @@ export async function PATCH(
     const batchIndex = Math.floor(page / 500);
     const rowIndex = page % 500;
 
+    const program = await db.program.findUnique({
+      where: { id },
+      select: { 
+        sheetId: true,
+        sheetUniqueKey: true,
+        sheetEvalStatusCol: true,
+        sheetEvalDescCol: true,
+      },
+    });
+
+    if (!program) {
+      return NextResponse.json({ error: "Program not found" }, { status: 404 });
+    }
+
     const batch = await db.participantData.findFirst({
       where: { programId: id, batchIndex },
     });
@@ -113,8 +138,8 @@ export async function PATCH(
       return NextResponse.json({ error: "Participant row not found" }, { status: 404 });
     }
 
-    // Update the row evaluation properties and merge edited fields
-    rows[rowIndex] = {
+    // Prepare updated row
+    const mergedParticipant = {
       ...rows[rowIndex],
       ...(participant || {}),
       _evaluationStatus: status,
@@ -122,13 +147,39 @@ export async function PATCH(
       _evaluatedAt: new Date().toISOString(),
     };
 
+    // If dynamic Google Sheet evaluation columns are set, map them to the values sent to sheet
+    if (program.sheetEvalStatusCol) {
+      mergedParticipant[program.sheetEvalStatusCol] = status;
+    }
+    if (program.sheetEvalDescCol) {
+      mergedParticipant[program.sheetEvalDescCol] = description || "";
+    }
+
     // Save back to db
     await db.participantData.update({
       where: { id: batch.id },
-      data: { rows },
+      data: { rows: rows.map((r, idx) => idx === rowIndex ? mergedParticipant : r) },
     });
 
-    return NextResponse.json({ success: true, participant: rows[rowIndex] });
+    // PUSH: If Google Sheet integration is configured, push the change
+    if (program.sheetId && program.sheetUniqueKey) {
+      const uniqueKeyValue = String(mergedParticipant[program.sheetUniqueKey] || "").trim();
+      if (uniqueKeyValue) {
+        try {
+          await pushRowToSheet(id, uniqueKeyValue, mergedParticipant, session.user.id);
+        } catch (sheetError: any) {
+          console.error("Error pushing to Google Sheet on save:", sheetError);
+          // Return warning in output but keep db save successful
+          return NextResponse.json({ 
+            success: true, 
+            participant: mergedParticipant,
+            warning: `Data saved locally, but failed to sync to Google Sheet: ${sheetError.message || sheetError}`
+          });
+        }
+      }
+    }
+
+    return NextResponse.json({ success: true, participant: mergedParticipant });
   } catch (error) {
     console.error("PATCH /api/programs/[id]/participants error:", error);
     return NextResponse.json({ error: "Failed to save evaluation" }, { status: 500 });

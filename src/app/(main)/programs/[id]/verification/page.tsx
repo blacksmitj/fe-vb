@@ -45,6 +45,35 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
   const [isParticipantLoading, setIsParticipantLoading] = React.useState(true);
   const [isSchemaLoading, setIsSchemaLoading] = React.useState(true);
   const [isSaving, setIsSaving] = React.useState(false);
+  const [isSyncing, setIsSyncing] = React.useState(false);
+  const [hasSynced, setHasSynced] = React.useState(false);
+
+  // Auto-sync Google Sheet on page load
+  React.useEffect(() => {
+    async function autoSync() {
+      if (!program || hasSynced) return;
+      if (program.sheetId) {
+        setIsSyncing(true);
+        try {
+          const syncRes = await fetch(`/api/programs/${id}/sheet/sync`, { method: "POST" });
+          const syncData = await syncRes.json();
+          if (syncRes.ok && syncData.success) {
+            toast.success("Data berhasil disinkronisasikan dari Google Sheet");
+          } else {
+            toast.error(syncData.error || "Gagal sinkronisasi data dari Google Sheet");
+          }
+        } catch (err) {
+          console.error("Auto-sync failed:", err);
+        } finally {
+          setIsSyncing(false);
+          setHasSynced(true);
+        }
+      } else {
+        setHasSynced(true);
+      }
+    }
+    autoSync();
+  }, [program, id, hasSynced]);
 
   // Fetch Program Profile Builder Schema
   React.useEffect(() => {
@@ -67,6 +96,9 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
 
   // Fetch Participant Data based on currentPage
   React.useEffect(() => {
+    // Only load participants AFTER initial autoSync completes
+    if (!hasSynced) return;
+
     async function loadParticipant() {
       setIsParticipantLoading(true);
       try {
@@ -93,7 +125,7 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
       }
     }
     loadParticipant();
-  }, [currentPage, id, setTotalRows, setEvaluationStatus, setApprovalDescription, resetEvaluation]);
+  }, [currentPage, id, setTotalRows, setEvaluationStatus, setApprovalDescription, resetEvaluation, hasSynced]);
 
   // Callback to update participant row locally after saving evaluation
   const handleParticipantUpdated = (updatedParticipant: Record<string, any>) => {
@@ -136,7 +168,27 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
     }
   };
 
-  const isLoading = isParticipantLoading || isSchemaLoading;
+  const handleSyncManual = async () => {
+    setIsSyncing(true);
+    try {
+      const res = await fetch(`/api/programs/${id}/sheet/sync`, { method: "POST" });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast.success(data.message || "Sinkronisasi berhasil");
+        // Force reload participant by triggering fetch state change
+        setHasSynced(false);
+      } else {
+        toast.error(data.error || "Gagal sinkronisasi");
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Terjadi kesalahan koneksi");
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const isLoading = isParticipantLoading || isSchemaLoading || isSyncing;
 
   return (
     <div className="flex flex-col h-screen bg-background overflow-hidden font-sans">
@@ -162,6 +214,25 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
                 </BreadcrumbItem>
               </BreadcrumbList>
             </Breadcrumb>
+          </div>
+          <div className="flex items-center gap-2">
+            {program?.sheetId && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5 h-8"
+                onClick={handleSyncManual}
+                disabled={isSyncing}
+              >
+                <RefreshCw className={`h-3.5 w-3.5 ${isSyncing ? "animate-spin" : ""}`} />
+                Sync Sheet
+              </Button>
+            )}
+            <Button variant="outline" size="sm" asChild className="h-8">
+              <Link href={`/programs/${id}/settings`}>
+                Config Sheet
+              </Link>
+            </Button>
           </div>
         </header>
 
