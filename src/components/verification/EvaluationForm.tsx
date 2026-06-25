@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useVerificationStore } from "@/lib/verification-store";
+import { useVerificationStore } from "@/stores";
 import { Section, Field } from "../profile-builder/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";

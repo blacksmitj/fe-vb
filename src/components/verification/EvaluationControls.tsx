@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useVerificationStore } from "@/lib/verification-store";
+import { useVerificationStore } from "@/stores";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Check, X, Flag, Loader2 } from "lucide-react";

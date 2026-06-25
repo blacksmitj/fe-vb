@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { type Program } from "@/lib/program-store";
+import { type Program } from "@/types";
 
 const API_URL = "/api/programs";
 
