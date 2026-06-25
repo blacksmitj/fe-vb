@@ -241,18 +241,70 @@ function BuilderPageContent() {
         if (event.canceled) return;
 
         const { source, target } = event.operation;
+        if (!source) return;
+
+        if (source.type === "new-field") {
+          let targetGroupStr: string | null = null;
+          let dropIndex = 0;
+
+          if (target) {
+            if (isSortable(target)) {
+              targetGroupStr = typeof target.group === "string" ? target.group : null;
+              dropIndex = typeof target.index === "number" ? target.index : 0;
+            } else {
+              targetGroupStr = typeof target.id === "string" ? target.id : null;
+            }
+          }
+
+          if (targetGroupStr && targetGroupStr.includes("-")) {
+            const splitGroup = (g: string) => {
+              const i = g.lastIndexOf("-");
+              return [g.slice(0, i), g.slice(i + 1)] as const;
+            };
+            const [targetSectionId, targetCol] = splitGroup(targetGroupStr);
+            const label = (source.data as { label?: string })?.label || "New Field";
+
+            setTimeout(() => {
+              setSections((prev) => {
+                return prev.map((sec) => {
+                  if (sec.id !== targetSectionId) return sec;
+
+                  const newField: Field = {
+                    id: `field-${crypto.randomUUID()}`,
+                    type: "text",
+                    label: label,
+                    placeholder: `Enter ${label}...`,
+                    column: targetCol as "left" | "right",
+                  };
+
+                  const leftFields = sec.fields.filter(f => f.column !== "right");
+                  const rightFields = sec.fields.filter(f => f.column === "right");
+                  const targetList = targetCol === "right" ? rightFields : leftFields;
+
+                  const insertAt = Math.min(Math.max(0, dropIndex), targetList.length);
+                  targetList.splice(insertAt, 0, newField);
+
+                  return { ...sec, fields: [...leftFields, ...rightFields] };
+                });
+              });
+            }, 0);
+          }
+          return;
+        }
 
         if (isSortable(source)) {
           const { initialIndex, index, group, type } = source;
 
           if (type === "section" || group === "sections") {
             if (initialIndex !== index) {
-              setSections((prev) => {
-                const updated = [...prev];
-                const [removed] = updated.splice(initialIndex, 1);
-                updated.splice(index, 0, removed);
-                return updated;
-              });
+              setTimeout(() => {
+                setSections((prev) => {
+                  const updated = [...prev];
+                  const [removed] = updated.splice(initialIndex, 1);
+                  updated.splice(index, 0, removed);
+                  return updated;
+                });
+              }, 0);
             }
           } else if (type === "field" && typeof source.initialGroup === "string") {
             const splitGroup = (g: string) => {
@@ -262,92 +314,98 @@ function BuilderPageContent() {
 
             const [sourceSectionId, sourceCol] = splitGroup(source.initialGroup);
 
-            // Determine the target group:
-            // Case A: dropped onto another sortable field — group is already updated
-            // Case B: dropped onto an empty column droppable — group may not have changed,
-            //         so we read the target droppable's id instead
             let targetGroupStr: string | null = null;
-            if (typeof group === "string" && group !== source.initialGroup) {
-              // Case A: sortable reported a new group
-              targetGroupStr = group;
-            } else if (target && typeof target.id === "string" && target.id.includes("-")) {
-              // Case B: dropped on a droppable column (empty column)
-              // target.id format: "${sectionId}-left" or "${sectionId}-right"
-              const lastDash = target.id.lastIndexOf("-");
-              const col = target.id.slice(lastDash + 1);
-              if (col === "left" || col === "right") {
-                targetGroupStr = target.id; // already in the right format
+            let dropIndex = 0;
+
+            if (target) {
+              if (isSortable(target)) {
+                targetGroupStr = typeof target.group === "string" ? target.group : null;
+                dropIndex = typeof target.index === "number" ? target.index : 0;
+              } else {
+                targetGroupStr = typeof target.id === "string" ? target.id : null;
               }
-            } else if (typeof group === "string") {
-              // Same group reorder
+            }
+            if (!targetGroupStr && typeof group === "string") {
               targetGroupStr = group;
+              dropIndex = typeof index === "number" ? index : 0;
             }
 
-            if (targetGroupStr) {
+            if (targetGroupStr && targetGroupStr.includes("-")) {
               const [targetSectionId, targetCol] = splitGroup(targetGroupStr);
 
               if (sourceSectionId === targetSectionId) {
                 // ── Same-section reorder / column swap ──────────────────────
-                setSections((prev) =>
-                  prev.map((sec) => {
-                    if (sec.id !== sourceSectionId) return sec;
+                setTimeout(() => {
+                  setSections((prev) => {
+                    console.log("DRAG SAME-SECTION - PREV:", JSON.stringify(prev));
+                    const res = prev.map((sec) => {
+                      if (sec.id !== sourceSectionId) return sec;
 
-                    const fieldId = source.id;
-                    const fieldToMove = sec.fields.find(f => f.id === fieldId);
-                    if (!fieldToMove) return sec;
+                      const fieldId = source.id;
+                      const fieldToMove = sec.fields.find(f => f.id === fieldId);
+                      if (!fieldToMove) return sec;
 
-                    const remainingFields = sec.fields.filter(f => f.id !== fieldId);
-                    const leftFields = remainingFields.filter((f) => f.column !== "right");
-                    const rightFields = remainingFields.filter((f) => f.column === "right");
-                    const targetList = targetCol === "right" ? rightFields : leftFields;
+                      const remainingFields = sec.fields.filter(f => f.id !== fieldId);
+                      const leftFields = remainingFields.filter((f) => f.column !== "right");
+                      const rightFields = remainingFields.filter((f) => f.column === "right");
+                      const targetList = targetCol === "right" ? rightFields : leftFields;
 
-                    const updatedField = {
-                      ...fieldToMove,
-                      column: targetCol as "left" | "right",
-                    };
-                    targetList.splice(index, 0, updatedField);
-
-                    return { ...sec, fields: [...leftFields, ...rightFields] };
-                  })
-                );
-              } else {
-                // ── Cross-section move ────────────────────────────────────
-                setSections((prev) => {
-                  const fieldId = source.id;
-
-                  // 1. Find the field in the source section
-                  const sourceSection = prev.find(s => s.id === sourceSectionId);
-                  if (!sourceSection) return prev;
-                  const fieldToMove = sourceSection.fields.find(f => f.id === fieldId);
-                  if (!fieldToMove) return prev;
-
-                  return prev.map((sec) => {
-                    if (sec.id === sourceSectionId) {
-                      // Remove field from source
-                      return { ...sec, fields: sec.fields.filter(f => f.id !== fieldId) };
-                    }
-
-                    if (sec.id === targetSectionId) {
-                      // Insert field into target at the correct column & index
-                      const updatedField: typeof fieldToMove = {
+                      const updatedField = {
                         ...fieldToMove,
                         column: targetCol as "left" | "right",
                       };
-
-                      const leftFields = sec.fields.filter(f => f.column !== "right");
-                      const rightFields = sec.fields.filter(f => f.column === "right");
-                      const targetList = targetCol === "right" ? rightFields : leftFields;
-
-                      // Clamp index to list bounds so the splice never goes out of range
-                      const insertAt = Math.min(index, targetList.length);
+                      const insertAt = Math.min(Math.max(0, dropIndex), targetList.length);
                       targetList.splice(insertAt, 0, updatedField);
 
                       return { ...sec, fields: [...leftFields, ...rightFields] };
-                    }
-
-                    return sec;
+                    });
+                    console.log("DRAG SAME-SECTION - NEXT:", JSON.stringify(res));
+                    return res;
                   });
-                });
+                }, 0);
+              } else {
+                // ── Cross-section move ────────────────────────────────────
+                setTimeout(() => {
+                  setSections((prev) => {
+                    console.log("DRAG CROSS-SECTION - PREV:", JSON.stringify(prev));
+                    const fieldId = source.id;
+
+                    // 1. Find the field in the source section
+                    const sourceSection = prev.find(s => s.id === sourceSectionId);
+                    if (!sourceSection) return prev;
+                    const fieldToMove = sourceSection.fields.find(f => f.id === fieldId);
+                    if (!fieldToMove) return prev;
+
+                    const res = prev.map((sec) => {
+                      if (sec.id === sourceSectionId) {
+                        // Remove field from source
+                        return { ...sec, fields: sec.fields.filter(f => f.id !== fieldId) };
+                      }
+
+                      if (sec.id === targetSectionId) {
+                        // Insert field into target at the correct column & index
+                        const updatedField: typeof fieldToMove = {
+                          ...fieldToMove,
+                          column: targetCol as "left" | "right",
+                        };
+
+                        const leftFields = sec.fields.filter(f => f.column !== "right");
+                        const rightFields = sec.fields.filter(f => f.column === "right");
+                        const targetList = targetCol === "right" ? rightFields : leftFields;
+
+                        // Clamp index to list bounds so the splice never goes out of range
+                        const insertAt = Math.min(Math.max(0, dropIndex), targetList.length);
+                        targetList.splice(insertAt, 0, updatedField);
+
+                        return { ...sec, fields: [...leftFields, ...rightFields] };
+                      }
+
+                      return sec;
+                    });
+                    console.log("DRAG CROSS-SECTION - NEXT:", JSON.stringify(res));
+                    return res;
+                  });
+                }, 0);
               }
             }
           }

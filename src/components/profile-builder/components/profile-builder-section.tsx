@@ -49,13 +49,13 @@ export default function ProfileBuilderSection({
   const leftCol = useDroppable({
     id: `${section.id}-left`,
     type: "column",
-    accept: "field",
+    accept: ["field", "new-field"],
   });
 
   const rightCol = useDroppable({
     id: `${section.id}-right`,
     type: "column",
-    accept: "field",
+    accept: ["field", "new-field"],
   });
 
   const leftFields = section.fields.filter((f) => f.column !== "right");

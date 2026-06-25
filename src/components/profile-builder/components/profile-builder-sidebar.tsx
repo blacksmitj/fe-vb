@@ -22,6 +22,60 @@ import {
   Loader2,
 } from "lucide-react";
 
+import { useDraggable } from "@dnd-kit/react";
+import { Feedback } from "@dnd-kit/dom";
+
+function DraggableHeaderItem({
+  header,
+  sampleVal,
+  onAddField,
+}: {
+  header: string;
+  sampleVal: any;
+  onAddField: (type: FieldType, label: string, placeholder?: string) => void;
+}) {
+  const { ref, isDragging } = useDraggable({
+    id: `sidebar-${header}`,
+    type: "new-field",
+    data: {
+      label: header,
+    },
+    plugins: [
+      Feedback.configure({
+        feedback: "none",
+      }),
+    ],
+  });
+
+  return (
+    <Button
+      ref={ref}
+      variant="ghost"
+      className={`justify-start gap-1 h-auto py-1.5 w-full hover:bg-muted font-medium text-xs text-foreground/80 px-2 flex flex-col items-start align-top select-none touch-none ${
+        isDragging ? "opacity-50 scale-95 border border-dashed border-primary bg-muted" : ""
+      }`}
+      onClick={() => {
+        onAddField("text", header, `Enter ${header}...`);
+      }}
+    >
+      <div className="flex items-center gap-2 w-full">
+        <Type className="h-3.5 w-3.5 text-primary/80 shrink-0" />
+        <span className="truncate text-left font-semibold">
+          {header}
+        </span>
+      </div>
+      {sampleVal !== undefined &&
+        sampleVal !== null &&
+        String(sampleVal).trim() !== "" && (
+          <span className="text-[10px] text-muted-foreground/60 pl-[18px] font-normal truncate max-w-full block text-left">
+            Contoh:{" "}
+            <span className="italic">"{String(sampleVal)}"</span>
+          </span>
+        )}
+    </Button>
+  );
+}
+
 interface ProfileBuilderSidebarProps {
   onAddField: (type: FieldType, label: string, placeholder?: string) => void;
   sections: Section[];
@@ -236,29 +290,12 @@ export default function ProfileBuilderSidebar({
             {filteredHeaders.map((header) => {
               const sampleVal = sampleRow?.[header];
               return (
-                <Button
+                <DraggableHeaderItem
                   key={header}
-                  variant="ghost"
-                  className="justify-start gap-1 h-auto py-1.5 w-full hover:bg-muted font-medium text-xs text-foreground/80 px-2 flex flex-col items-start align-top"
-                  onClick={() => {
-                    onAddField("text", header, `Enter ${header}...`);
-                  }}
-                >
-                  <div className="flex items-center gap-2 w-full">
-                    <Type className="h-3.5 w-3.5 text-primary/80 shrink-0" />
-                    <span className="truncate text-left font-semibold">
-                      {header}
-                    </span>
-                  </div>
-                  {sampleVal !== undefined &&
-                    sampleVal !== null &&
-                    String(sampleVal).trim() !== "" && (
-                      <span className="text-[10px] text-muted-foreground/60 pl-5.5 font-normal truncate max-w-full block text-left">
-                        Contoh:{" "}
-                        <span className="italic">"{String(sampleVal)}"</span>
-                      </span>
-                    )}
-                </Button>
+                  header={header}
+                  sampleVal={sampleVal}
+                  onAddField={onAddField}
+                />
               );
             })}
             {filteredHeaders.length === 0 && (

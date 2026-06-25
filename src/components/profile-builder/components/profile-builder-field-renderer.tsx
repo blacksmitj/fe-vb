@@ -46,8 +46,9 @@ import {
   FileText
 } from "lucide-react";
 import { toast } from "sonner";
-import { useSortable } from "@dnd-kit/react/sortable";
+import { useDraggable } from "@dnd-kit/react";
 import { detectMediaType } from "../utils/detect-media-type";
+import { Feedback } from "@dnd-kit/dom";
 
 interface FieldRendererProps {
   field: Field;
@@ -120,12 +121,18 @@ export default function ProfileBuilderFieldRenderer({
     toast.success("Field settings updated");
   };
 
-  const { ref, handleRef } = useSortable({
+  const { ref, handleRef } = useDraggable({
     id: field.id,
-    index,
     type: "field",
-    accept: "field",
-    group: `${sectionId}-${column}`,
+    data: {
+      sectionId,
+      column,
+    },
+    plugins: [
+      Feedback.configure({
+        feedback: "none",
+      }),
+    ],
   });
 
   const handleSaveLabel = () => {
