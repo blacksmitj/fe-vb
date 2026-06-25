@@ -91,12 +91,12 @@ export default function ProfileBuilderSection({
     <div>
       <Card className="group relative border border-border bg-card shadow-sm rounded-xl transition-all hover:shadow-md">
 
-      <CardHeader className="flex flex-row items-center justify-between border-b border-border px-6 py-4 bg-muted/20 rounded-t-xl shrink-0 space-y-0">
+      <CardHeader className="flex flex-row items-center justify-between border-b border-border px-4 py-2 bg-muted/20 rounded-t-xl shrink-0 space-y-0">
         <div className="flex items-center gap-2">
           {isEditingTitle ? (
             <div className="flex items-center gap-1">
               <Input
-                className="h-8 w-64 text-sm font-semibold"
+                className="h-7 w-64 text-xs font-semibold"
                 value={titleValue}
                 onChange={(e) => setTitleValue(e.target.value)}
                 autoFocus
@@ -108,98 +108,98 @@ export default function ProfileBuilderSection({
                   }
                 }}
               />
-              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleSaveTitle}>
-                <Check className="h-4 w-4 text-green-600" />
+              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleSaveTitle}>
+                <Check className="h-3.5 w-3.5 text-green-600" />
               </Button>
             </div>
           ) : (
             <div className="flex items-center gap-2">
-              <h3 className="text-sm font-semibold text-foreground">{section.title}</h3>
+              <h3 className="text-xs font-semibold text-foreground">{section.title}</h3>
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-primary"
+                className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-primary"
                 onClick={() => setIsEditingTitle(true)}
               >
-                <Edit3 className="h-3.5 w-3.5" />
+                <Edit3 className="h-3 w-3" />
               </Button>
             </div>
           )}
         </div>
 
         {/* Section Actions */}
-        <div className="flex items-center gap-1 text-muted-foreground">
+        <div className="flex items-center gap-0.5 text-muted-foreground">
           {/* Reordering */}
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8"
+            className="h-7 w-7"
             disabled={isFirst}
             onClick={onMoveUp}
             title="Move Section Up"
           >
-            <ChevronUp className="h-4 w-4" />
+            <ChevronUp className="h-3.5 w-3.5" />
           </Button>
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8"
+            className="h-7 w-7"
             disabled={isLast}
             onClick={onMoveDown}
             title="Move Section Down"
           >
-            <ChevronDown className="h-4 w-4" />
+            <ChevronDown className="h-3.5 w-3.5" />
           </Button>
 
-          <span className="w-px h-4 bg-border mx-1"></span>
+          <span className="w-px h-3.5 bg-border mx-1"></span>
 
           {/* Layout Columns toggle */}
           <Button
             variant={section.layout === "1-col" ? "secondary" : "ghost"}
             size="icon"
-            className="h-8 w-8 text-foreground"
+            className="h-7 w-7 text-foreground"
             onClick={() => toggleLayout("1-col")}
             title="1 Column Layout"
           >
-            <Grid2X2 className="h-4 w-4" />
+            <Grid2X2 className="h-3.5 w-3.5" />
           </Button>
           <Button
             variant={section.layout === "2-col" ? "secondary" : "ghost"}
             size="icon"
-            className="h-8 w-8 text-foreground"
+            className="h-7 w-7 text-foreground"
             onClick={() => toggleLayout("2-col")}
             title="2 Column Layout"
           >
-            <Columns2 className="h-4 w-4" />
+            <Columns2 className="h-3.5 w-3.5" />
           </Button>
 
-          <span className="w-px h-4 bg-border mx-1"></span>
+          <span className="w-px h-3.5 bg-border mx-1"></span>
 
           {/* Delete section */}
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+            className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
             onClick={() => onDeleteSection(section.id)}
             title="Delete Section"
           >
-            <Trash2 className="h-4 w-4" />
+            <Trash2 className="h-3.5 w-3.5" />
           </Button>
         </div>
       </CardHeader>
 
-      <CardContent className="p-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+      <CardContent className="p-3.5">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
           {/* Left panel / Fields container */}
           <div 
             ref={leftCol.ref}
-            className={section.layout === "1-col" ? "md:col-span-2 space-y-4 min-h-[150px]" : "space-y-4 min-h-[150px]"}
+            className={section.layout === "1-col" ? "md:col-span-2 space-y-2 min-h-[60px]" : "space-y-2 min-h-[60px]"}
           >
             <div 
-              className="border border-dashed border-border/50 rounded-lg p-6 flex flex-col items-center justify-center text-center text-muted-foreground/45 bg-muted/5 h-full min-h-[120px]"
+              className="border border-dashed border-border/50 rounded-lg p-3 flex flex-col items-center justify-center text-center text-muted-foreground/45 bg-muted/5 h-full min-h-[50px]"
               style={{ display: leftFields.length === 0 ? "flex" : "none" }}
             >
-              <p className="text-xs">Drag fields here</p>
+              <p className="text-[11px]">Drag fields here</p>
             </div>
             {leftFields.map((field, fieldIndex) => (
               <ProfileBuilderFieldRenderer
@@ -217,14 +217,14 @@ export default function ProfileBuilderSection({
 
           {/* Right panel (if 2-col, render either KTP Preview or second field column or empty drop zone) */}
           {section.layout === "2-col" && (
-            <div ref={rightCol.ref} className="h-full min-h-[150px]">
-              <div className="space-y-4 h-full min-h-[150px]">
+            <div ref={rightCol.ref} className="h-full min-h-[60px]">
+              <div className="space-y-2 h-full min-h-[60px]">
                 <div 
-                  className="border border-dashed border-border/75 rounded-lg p-8 flex flex-col items-center justify-center text-center text-muted-foreground/60 bg-muted/10 h-full min-h-[150px] hover:bg-muted/15 transition-all"
+                  className="border border-dashed border-border/75 rounded-lg p-4 flex flex-col items-center justify-center text-center text-muted-foreground/60 bg-muted/10 h-full min-h-[60px] hover:bg-muted/15 transition-all"
                   style={{ display: rightFields.length === 0 ? "flex" : "none" }}
                 >
-                  <p className="text-xs font-medium">Secondary column content area</p>
-                  <p className="text-[10px] text-muted-foreground/50 mt-1">
+                  <p className="text-[11px] font-medium">Secondary column content area</p>
+                  <p className="text-[9px] text-muted-foreground/50 mt-0.5">
                     Drag field elements here.
                   </p>
                 </div>

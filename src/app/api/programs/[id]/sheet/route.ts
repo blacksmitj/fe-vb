@@ -24,8 +24,6 @@ export async function GET(
         sheetId: true,
         sheetName: true,
         sheetUniqueKey: true,
-        sheetEvalStatusCol: true,
-        sheetEvalDescCol: true,
         sheetLastSyncAt: true,
       },
     });
@@ -60,8 +58,6 @@ export async function PATCH(
     sheetId,
     sheetName,
     sheetUniqueKey,
-    sheetEvalStatusCol,
-    sheetEvalDescCol,
   } = body;
 
   try {
@@ -71,8 +67,6 @@ export async function PATCH(
         sheetId: sheetId || null,
         sheetName: sheetName || null,
         sheetUniqueKey: sheetUniqueKey || null,
-        sheetEvalStatusCol: sheetEvalStatusCol || null,
-        sheetEvalDescCol: sheetEvalDescCol || null,
       },
     });
 

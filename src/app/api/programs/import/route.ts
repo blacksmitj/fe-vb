@@ -14,7 +14,7 @@ export async function POST(req: Request) {
   }
 
   try {
-    const { name, description, sheetId, sheetName, sheetUniqueKey, sheetEvalStatusCol, sheetEvalDescCol } = await req.json();
+    const { name, description, sheetId, sheetName, sheetUniqueKey } = await req.json();
 
     if (!name) {
       return NextResponse.json({ error: "Nama program wajib diisi." }, { status: 400 });
@@ -31,8 +31,6 @@ export async function POST(req: Request) {
         sheetId,
         sheetName,
         sheetUniqueKey,
-        sheetEvalStatusCol: sheetEvalStatusCol || null,
-        sheetEvalDescCol: sheetEvalDescCol || null,
       },
     });
 

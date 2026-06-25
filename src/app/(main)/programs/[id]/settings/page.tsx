@@ -35,8 +35,6 @@ interface SheetConfig {
   sheetId: string;
   sheetName: string;
   sheetUniqueKey: string;
-  sheetEvalStatusCol: string;
-  sheetEvalDescCol: string;
   sheetLastSyncAt: string | null;
 }
 
@@ -48,8 +46,6 @@ export default function ProgramSettingsPage({ params }: { params: Promise<{ id: 
   const [sheetId, setSheetId] = React.useState("");
   const [sheetName, setSheetName] = React.useState("");
   const [sheetUniqueKey, setSheetUniqueKey] = React.useState("");
-  const [sheetEvalStatusCol, setSheetEvalStatusCol] = React.useState("");
-  const [sheetEvalDescCol, setSheetEvalDescCol] = React.useState("");
   const [lastSyncAt, setLastSyncAt] = React.useState<string | null>(null);
 
   const [isSaving, setIsSaving] = React.useState(false);
@@ -65,8 +61,6 @@ export default function ProgramSettingsPage({ params }: { params: Promise<{ id: 
           setSheetId(data.sheetId || "");
           setSheetName(data.sheetName || "");
           setSheetUniqueKey(data.sheetUniqueKey || "");
-          setSheetEvalStatusCol(data.sheetEvalStatusCol || "");
-          setSheetEvalDescCol(data.sheetEvalDescCol || "");
           setLastSyncAt(data.sheetLastSyncAt);
         }
       } catch (err) {
@@ -88,8 +82,6 @@ export default function ProgramSettingsPage({ params }: { params: Promise<{ id: 
           sheetId,
           sheetName,
           sheetUniqueKey,
-          sheetEvalStatusCol,
-          sheetEvalDescCol,
         }),
       });
 
@@ -255,34 +247,7 @@ export default function ProgramSettingsPage({ params }: { params: Promise<{ id: 
                     </div>
                   </div>
 
-                  <Separator className="my-2" />
 
-                  <div className="space-y-3">
-                    <h3 className="text-sm font-semibold text-foreground">Pemetaan Kolom Evaluasi (Dinamis)</h3>
-                    <p className="text-xs text-muted-foreground">
-                      Tentukan nama kolom di Google Sheet yang akan digunakan untuk menulis status hasil verifikasi dari aplikasi. Pastikan kolom ini sudah ada di Sheet Anda.
-                    </p>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="sheetEvalStatusCol">Kolom Status Verifikasi</Label>
-                        <Input
-                          id="sheetEvalStatusCol"
-                          placeholder="Contoh: STATUS_VERIFIKASI"
-                          value={sheetEvalStatusCol}
-                          onChange={(e) => setSheetEvalStatusCol(e.target.value)}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="sheetEvalDescCol">Kolom Keterangan / Catatan</Label>
-                        <Input
-                          id="sheetEvalDescCol"
-                          placeholder="Contoh: CATATAN_VERIFIKATOR"
-                          value={sheetEvalDescCol}
-                          onChange={(e) => setSheetEvalDescCol(e.target.value)}
-                        />
-                      </div>
-                    </div>
-                  </div>
 
                   <div className="flex justify-end pt-2">
                     <Button type="submit" disabled={isSaving} className="gap-2">

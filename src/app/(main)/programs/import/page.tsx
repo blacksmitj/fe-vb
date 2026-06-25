@@ -24,22 +24,97 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 import { toast } from "sonner";
+import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 
 export default function ImportProgramPage() {
   const router = useRouter();
 
   const [name, setName] = React.useState("");
   const [description, setDescription] = React.useState("");
+  const [rawUrlOrId, setRawUrlOrId] = React.useState("");
   const [sheetId, setSheetId] = React.useState("");
   const [sheetName, setSheetName] = React.useState("");
   const [sheetUniqueKey, setSheetUniqueKey] = React.useState("");
-  const [sheetEvalStatusCol, setSheetEvalStatusCol] = React.useState("");
-  const [sheetEvalDescCol, setSheetEvalDescCol] = React.useState("");
 
+  // Loading and option states
+  const [tabs, setTabs] = React.useState<string[]>([]);
+  const [headersList, setHeadersList] = React.useState<string[]>([]);
+  const [isLoadingTabs, setIsLoadingTabs] = React.useState(false);
+  const [isLoadingHeaders, setIsLoadingHeaders] = React.useState(false);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+
+  const extractSheetId = (urlOrId: string) => {
+    const match = urlOrId.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+    return match ? match[1] : urlOrId.trim();
+  };
+
+  const handleLoadTabs = async () => {
+    const id = extractSheetId(rawUrlOrId);
+    if (!id) {
+      toast.error("Masukkan URL atau ID Spreadsheet yang valid.");
+      return;
+    }
+    setSheetId(id);
+    setIsLoadingTabs(true);
+    setTabs([]);
+    setSheetName("");
+    setHeadersList([]);
+    setSheetUniqueKey("");
+
+    try {
+      const res = await fetch(`/api/google-sheets/tabs?sheetId=${id}`);
+      const data = await res.json();
+      if (res.ok) {
+        setTabs(data.tabs || []);
+        if (data.tabs?.length > 0) {
+          toast.success("Daftar tab berhasil dimuat!");
+        } else {
+          toast.error("Spreadsheet tidak memiliki tab.");
+        }
+      } else {
+        toast.error(data.error || "Gagal memuat daftar tab.");
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Terjadi kesalahan koneksi saat memuat tab.");
+    } finally {
+      setIsLoadingTabs(false);
+    }
+  };
+
+  const handleTabChange = async (selectedTab: string) => {
+    setSheetName(selectedTab);
+    setHeadersList([]);
+    setSheetUniqueKey("");
+
+    if (!selectedTab) return;
+
+    setIsLoadingHeaders(true);
+    try {
+      const res = await fetch(`/api/google-sheets/headers?sheetId=${sheetId}&sheetName=${encodeURIComponent(selectedTab)}`);
+      const data = await res.json();
+      if (res.ok) {
+        setHeadersList(data.headers || []);
+        if (data.headers?.length > 0) {
+          setSheetUniqueKey(data.headers[0]); // Select first header as default
+        }
+      } else {
+        toast.error(data.error || "Gagal memuat daftar kolom.");
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Terjadi kesalahan koneksi saat memuat kolom.");
+    } finally {
+      setIsLoadingHeaders(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!sheetId || !sheetName || !sheetUniqueKey) {
+      toast.error("Harap lengkapi semua konfigurasi Google Sheet.");
+      return;
+    }
     setIsSubmitting(true);
 
     const toastId = toast.loading("Menghubungkan Google Sheet dan meng-import data cache...");
@@ -54,8 +129,6 @@ export default function ImportProgramPage() {
           sheetId,
           sheetName,
           sheetUniqueKey,
-          sheetEvalStatusCol: sheetEvalStatusCol || null,
-          sheetEvalDescCol: sheetEvalDescCol || null,
         }),
       });
 
@@ -150,70 +223,91 @@ export default function ImportProgramPage() {
               <Separator className="my-2" />
 
               <div className="space-y-2">
-                <Label htmlFor="sheetId">Google Spreadsheet ID</Label>
-                <Input
-                  id="sheetId"
-                  placeholder="Masukkan ID Spreadsheet"
-                  value={sheetId}
-                  onChange={(e) => setSheetId(e.target.value)}
-                  required
-                />
+                <Label htmlFor="rawUrlOrId">Google Spreadsheet URL / ID</Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="rawUrlOrId"
+                    placeholder="Masukkan URL atau ID Spreadsheet"
+                    value={rawUrlOrId}
+                    onChange={(e) => setRawUrlOrId(e.target.value)}
+                    required
+                  />
+                  <Button
+                    type="button"
+                    onClick={handleLoadTabs}
+                    disabled={isLoadingTabs || !rawUrlOrId}
+                    className="shrink-0"
+                  >
+                    {isLoadingTabs ? (
+                      <Loader2Icon className="h-4 w-4 animate-spin mr-1" />
+                    ) : null}
+                    Muat Daftar Tab
+                  </Button>
+                </div>
                 <p className="text-[11px] text-muted-foreground">
-                  Dapatkan ID ini dari URL file Sheet Anda.
+                  Tempelkan URL Google Spreadsheet Anda ke kolom di atas.
                 </p>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="sheetName">Nama Tab / Worksheet</Label>
-                  <Input
-                    id="sheetName"
-                    placeholder="Contoh: Sheet1, Peserta"
-                    value={sheetName}
-                    onChange={(e) => setSheetName(e.target.value)}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="sheetUniqueKey">Kolom ID Unik (Primary Key)</Label>
-                  <Input
-                    id="sheetUniqueKey"
-                    placeholder="Contoh: NIK, ID_PESERTA"
-                    value={sheetUniqueKey}
-                    onChange={(e) => setSheetUniqueKey(e.target.value)}
-                    required
-                  />
-                </div>
-              </div>
-
-              <Separator className="my-2" />
-
-              <div className="space-y-3">
-                <h3 className="text-sm font-semibold text-foreground">Pemetaan Kolom Evaluasi (Opsional)</h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="sheetEvalStatusCol">Kolom Status Verifikasi</Label>
-                    <Input
-                      id="sheetEvalStatusCol"
-                      placeholder="Contoh: STATUS_VERIFIKASI"
-                      value={sheetEvalStatusCol}
-                      onChange={(e) => setSheetEvalStatusCol(e.target.value)}
-                    />
+              {tabs.length > 0 && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                  <div className="space-y-2 flex flex-col">
+                    <Label htmlFor="sheetName">Nama Tab / Worksheet</Label>
+                    <NativeSelect
+                      id="sheetName"
+                      value={sheetName}
+                      onChange={(e) => handleTabChange(e.target.value)}
+                      required
+                      className="w-full"
+                    >
+                      <NativeSelectOption value="">-- Pilih Tab --</NativeSelectOption>
+                      {tabs.map((tab) => (
+                        <NativeSelectOption key={tab} value={tab}>
+                          {tab}
+                        </NativeSelectOption>
+                      ))}
+                    </NativeSelect>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="sheetEvalDescCol">Kolom Keterangan / Catatan</Label>
-                    <Input
-                      id="sheetEvalDescCol"
-                      placeholder="Contoh: CATATAN_VERIFIKATOR"
-                      value={sheetEvalDescCol}
-                      onChange={(e) => setSheetEvalDescCol(e.target.value)}
-                    />
-                  </div>
+
+                  {sheetName && (
+                    <div className="space-y-2 flex flex-col">
+                      <Label htmlFor="sheetUniqueKey">
+                        Kolom ID Unik (Primary Key)
+                        {isLoadingHeaders && (
+                          <Loader2Icon className="inline h-3.5 w-3.5 animate-spin ml-1.5 text-muted-foreground" />
+                        )}
+                      </Label>
+                      <NativeSelect
+                        id="sheetUniqueKey"
+                        value={sheetUniqueKey}
+                        onChange={(e) => setSheetUniqueKey(e.target.value)}
+                        required
+                        className="w-full"
+                        disabled={isLoadingHeaders || headersList.length === 0}
+                      >
+                        {headersList.length === 0 ? (
+                          <NativeSelectOption value="">-- Memuat Kolom... --</NativeSelectOption>
+                        ) : (
+                          <>
+                            {headersList.map((header) => (
+                              <NativeSelectOption key={header} value={header}>
+                                {header}
+                              </NativeSelectOption>
+                            ))}
+                          </>
+                        )}
+                      </NativeSelect>
+                    </div>
+                  )}
                 </div>
-              </div>
+              )}
 
               <div className="flex justify-end pt-4">
-                <Button type="submit" disabled={isSubmitting} className="w-full gap-2">
+                <Button
+                  type="submit"
+                  disabled={isSubmitting || !sheetId || !sheetName || !sheetUniqueKey}
+                  className="w-full gap-2"
+                >
                   {isSubmitting ? (
                     <Loader2Icon className="h-4 w-4 animate-spin" />
                   ) : (

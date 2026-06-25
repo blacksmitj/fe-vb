@@ -4,6 +4,24 @@ export interface SheetDataResponse {
 }
 
 /**
+ * Helper to extract friendly error message from Google API responses
+ */
+async function handleGoogleError(response: Response, defaultMsg: string): Promise<never> {
+  const errText = await response.text();
+  try {
+    const parsed = JSON.parse(errText);
+    if (parsed.error?.message) {
+      throw new Error(parsed.error.message);
+    }
+  } catch (err: any) {
+    if (err.message && !err.message.includes("JSON")) {
+      throw err;
+    }
+  }
+  throw new Error(`${defaultMsg}: Status ${response.status} - ${errText}`);
+}
+
+/**
  * Fetch rows and headers from a Google Sheet tab
  */
 export async function getSheetRows(
@@ -21,8 +39,7 @@ export async function getSheetRows(
   });
 
   if (!response.ok) {
-    const errText = await response.text();
-    throw new Error(`Google Sheet API returned status ${response.status}: ${errText}`);
+    await handleGoogleError(response, "Google Sheet API returned an error");
   }
 
   const data = await response.json();
@@ -87,7 +104,57 @@ export async function updateSheetRow(
   });
 
   if (!response.ok) {
-    const errText = await response.text();
-    throw new Error(`Failed to update Google Sheet row: ${errText}`);
+    await handleGoogleError(response, "Failed to update Google Sheet row");
   }
+}
+
+/**
+ * Fetch all sheets (tab titles) in a spreadsheet
+ */
+export async function getSpreadsheetSheets(
+  accessToken: string,
+  sheetId: string
+): Promise<string[]> {
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}?fields=sheets.properties.title`;
+
+  const response = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (!response.ok) {
+    await handleGoogleError(response, "Failed to fetch spreadsheet sheets list");
+  }
+
+  const data = await response.json();
+  const sheets = data.sheets || [];
+  return sheets.map((s: any) => s.properties?.title).filter(Boolean);
+}
+
+/**
+ * Fetch header names (first row) from a Google Sheet tab
+ */
+export async function getSheetHeadersOnly(
+  accessToken: string,
+  sheetId: string,
+  sheetName: string
+): Promise<string[]> {
+  const range = `${sheetName}!1:1`;
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${encodeURIComponent(range)}`;
+
+  const response = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (!response.ok) {
+    await handleGoogleError(response, "Failed to fetch sheet headers");
+  }
+
+  const data = await response.json();
+  const values: string[][] = data.values || [];
+  if (values.length === 0) return [];
+  return values[0].map(h => (h || "").trim()).filter(Boolean);
 }

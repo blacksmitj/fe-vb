@@ -116,8 +116,6 @@ export async function PATCH(
       select: { 
         sheetId: true,
         sheetUniqueKey: true,
-        sheetEvalStatusCol: true,
-        sheetEvalDescCol: true,
       },
     });
 
@@ -147,13 +145,7 @@ export async function PATCH(
       _evaluatedAt: new Date().toISOString(),
     };
 
-    // If dynamic Google Sheet evaluation columns are set, map them to the values sent to sheet
-    if (program.sheetEvalStatusCol) {
-      mergedParticipant[program.sheetEvalStatusCol] = status;
-    }
-    if (program.sheetEvalDescCol) {
-      mergedParticipant[program.sheetEvalDescCol] = description || "";
-    }
+
 
     // Save back to db
     await db.participantData.update({
