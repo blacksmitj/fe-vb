@@ -1,0 +1,180 @@
+datasource db {
+  provider = "postgresql"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Program {
+  id          String   @id @default(uuid())
+  name        String
+  description String   @default("")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  totalRows   Int      @default(0)
+  fieldCount  Int      @default(0)
+  errorCount  Int      @default(0)
+
+  // Relasi ke tabel terpisah
+  participantData ParticipantData[]
+  profileSchema   ProfileSchema?
+  importLogs      ImportLog[]
+  members         ProgramMember[]
+
+  @@index([createdAt(sort: Desc)])
+}
+
+// ─────────────────────────────────────────────
+// Model: ParticipantData
+// ─────────────────────────────────────────────
+model ParticipantData {
+  id           String   @id @default(uuid())
+  programId    String
+  program      Program  @relation(fields: [programId], references: [id], onDelete: Cascade)
+
+  headers      Json?    // String[] | null
+  rows         Json     // Record<string, unknown>[]
+
+  batchIndex   Int      @default(0)
+  totalInBatch Int      @default(0)
+  importedAt   DateTime @default(now())
+
+  errorDetails Json?    // ErrorDetail[] | null
+
+  @@index([programId])
+  @@index([programId, batchIndex])
+}
+
+// ─────────────────────────────────────────────
+// Model: ProfileSchema
+// ─────────────────────────────────────────────
+model ProfileSchema {
+  id        String   @id @default(uuid())
+  programId String   @unique
+  program   Program  @relation(fields: [programId], references: [id], onDelete: Cascade)
+
+  sections  Json     // Section[] — array konfigurasi layout
+  version   Int      @default(1)
+  updatedAt DateTime @updatedAt
+
+  @@index([programId])
+}
+
+// ─────────────────────────────────────────────
+// Model: ImportLog
+// ─────────────────────────────────────────────
+model ImportLog {
+  id         String       @id @default(uuid())
+  programId  String
+  program    Program      @relation(fields: [programId], references: [id], onDelete: Cascade)
+  importedAt DateTime     @default(now())
+  fileName   String
+  totalRows  Int
+  errorCount Int
+  status     ImportStatus @default(COMPLETED)
+  notes      String?
+
+  @@index([programId])
+  @@index([importedAt(sort: Desc)])
+}
+
+enum ImportStatus {
+  PROCESSING
+  COMPLETED
+  FAILED
+  PARTIAL
+}
+
+// Better Auth Models
+model User {
+  id            String          @id
+  name          String
+  email         String
+  emailVerified Boolean
+  image         String?
+  createdAt     DateTime
+  updatedAt     DateTime
+  sessions      Session[]
+  accounts      Account[]
+  programMembers ProgramMember[]
+
+  @@unique([email])
+  @@map("user")
+}
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String
+  createdAt DateTime
+  updatedAt DateTime
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([token])
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime
+  updatedAt             DateTime
+
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime?
+  updatedAt  DateTime?
+
+  @@map("verification")
+}
+
+enum ProgramRole {
+  ADMIN
+  VERIFIER
+}
+
+enum MemberStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model ProgramMember {
+  id        String       @id @default(uuid())
+  programId String
+  program   Program      @relation(fields: [programId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      ProgramRole  @default(VERIFIER)
+  status    MemberStatus @default(PENDING)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  @@unique([programId, userId])
+  @@index([programId])
+  @@index([userId])
+}
+
+
+
