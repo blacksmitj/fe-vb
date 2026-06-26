@@ -80,6 +80,63 @@ interface FieldRendererProps {
   isOverlay?: boolean;
 }
 
+interface SearchableComboboxProps {
+  value: string;
+  options: string[];
+  placeholder?: string;
+  onValueChange: (val: string) => void;
+  disabled?: boolean;
+}
+
+function SearchableCombobox({ value, options, placeholder, onValueChange, disabled }: SearchableComboboxProps) {
+  const [searchValue, setSearchValue] = React.useState("");
+
+  React.useEffect(() => {
+    setSearchValue(value);
+  }, [value]);
+
+  const filteredOptions = React.useMemo(() => {
+    if (!searchValue || searchValue === value) return options;
+    return options.filter((opt) =>
+      opt.toLowerCase().includes(searchValue.toLowerCase())
+    );
+  }, [options, searchValue, value]);
+
+  return (
+    <Combobox
+      value={value}
+      onValueChange={(val) => {
+        if (val !== null) {
+          onValueChange(val);
+          setSearchValue(val);
+        }
+      }}
+      disabled={disabled}
+    >
+      <ComboboxInput
+        placeholder={placeholder || "Select option..."}
+        className="w-full text-xs"
+        value={searchValue}
+        onChange={(e) => setSearchValue(e.target.value)}
+      />
+      <ComboboxContent>
+        <ComboboxList>
+          {filteredOptions.map((opt) => (
+            <ComboboxItem key={opt} value={opt}>
+              {opt}
+            </ComboboxItem>
+          ))}
+          {filteredOptions.length === 0 && (
+            <ComboboxEmpty className="text-[10px] text-muted-foreground p-2 text-center">
+              Tidak ditemukan
+            </ComboboxEmpty>
+          )}
+        </ComboboxList>
+      </ComboboxContent>
+    </Combobox>
+  );
+}
+
 export default function ProfileBuilderFieldRenderer({
   field,
   index,
@@ -610,34 +667,13 @@ export default function ProfileBuilderFieldRenderer({
         const selectOptions = field.options || [];
         if (field.isEditable) {
           return (
-            <Combobox
+            <SearchableCombobox
               value={dropdownVal}
+              options={selectOptions}
+              placeholder={field.placeholder}
+              onValueChange={(val) => onUpdateField({ ...field, value: val })}
               disabled={field.locked}
-              onValueChange={(val) => onUpdateField({ ...field, value: val || "" })}
-            >
-              <ComboboxInput
-                placeholder={field.placeholder || "Select option..."}
-                className="w-full text-xs"
-              />
-              <ComboboxContent>
-                <ComboboxList>
-                  {selectOptions.map((opt) => (
-                    <ComboboxItem key={opt} value={opt}>
-                      {opt}
-                    </ComboboxItem>
-                  ))}
-                  {selectOptions.length === 0 ? (
-                    <div className="text-[10px] text-muted-foreground p-2 text-center">
-                      No options defined. Edit field to add options.
-                    </div>
-                  ) : (
-                    <ComboboxEmpty className="text-[10px] text-muted-foreground p-2 text-center">
-                      Tidak ditemukan
-                    </ComboboxEmpty>
-                  )}
-                </ComboboxList>
-              </ComboboxContent>
-            </Combobox>
+            />
           );
         } else {
           const hasValue = dropdownVal !== "";

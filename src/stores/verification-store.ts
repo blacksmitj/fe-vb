@@ -21,8 +21,8 @@ interface VerificationState {
   closeMediaViewer: () => void;
 
   // Evaluation Status (Drafting)
-  evaluationStatus: 'Approve' | 'Reject' | 'Flag' | null;
-  setEvaluationStatus: (status: 'Approve' | 'Reject' | 'Flag' | null) => void;
+  evaluationStatus: string | null;
+  setEvaluationStatus: (status: string | null) => void;
   
   approvalDescription: string;
   setApprovalDescription: (desc: string) => void;

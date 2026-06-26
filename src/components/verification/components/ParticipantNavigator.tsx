@@ -219,11 +219,10 @@ export function ParticipantNavigator({
         </Button>
       </div>
 
-      {/* Save Button */}
       <Button
         type="button"
         onClick={onSave}
-        disabled={isSaving || !evaluationStatus}
+        disabled={isSaving}
         size="sm"
         className="h-8 text-xs font-semibold px-4 shrink-0 bg-emerald-600 hover:bg-emerald-700 text-white"
       >

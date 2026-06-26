@@ -16,31 +16,32 @@ export async function GET(
     
     if (searchQuery !== null) {
       const query = searchQuery.trim().toLowerCase();
-      const batches = await db.participantData.findMany({
-        where: { programId: id },
-        orderBy: { batchIndex: "asc" },
-        select: { batchIndex: true, rows: true },
-      });
-
-      const matches = [];
-      for (const batch of batches) {
-        const rows = (batch.rows as any[]) || [];
-        for (let i = 0; i < rows.length; i++) {
-          const row = rows[i];
-          const matchesQuery = Object.values(row).some((val) =>
-            String(val).toLowerCase().includes(query)
-          );
-          if (matchesQuery) {
-            matches.push({
-              globalIndex: batch.batchIndex * 500 + i,
-              row,
-            });
-          }
-          // Limit search results for performance
-          if (matches.length >= 100) break;
-        }
-        if (matches.length >= 100) break;
+      if (!query) {
+        return NextResponse.json({ matches: [] });
       }
+
+      const matchesRaw = await db.$queryRaw<Array<{
+        batchIndex: number;
+        row: any;
+        rowIndex: number;
+      }>>`
+        SELECT "batchIndex", "elem" as "row", ("idx" - 1)::int as "rowIndex"
+        FROM "ParticipantData",
+        jsonb_array_elements("rows") WITH ORDINALITY AS arr("elem", "idx")
+        WHERE "programId" = ${id}
+          AND EXISTS (
+            SELECT 1
+            FROM jsonb_each_text("elem") AS kv("key", "val")
+            WHERE LEFT("key", 1) <> '_' AND "val" ILIKE ${`%${query}%`}
+          )
+        ORDER BY "batchIndex" ASC, "rowIndex" ASC
+        LIMIT 100
+      `;
+
+      const matches = matchesRaw.map((m) => ({
+        globalIndex: m.batchIndex * 500 + m.rowIndex,
+        row: m.row,
+      }));
 
       return NextResponse.json({ matches });
     }
@@ -55,17 +56,14 @@ export async function GET(
     const batchIndex = Math.floor(page / 500);
     const rowIndex = page % 500;
 
-    const batch = await db.participantData.findFirst({
-      where: { programId: id, batchIndex },
-      select: { rows: true },
-    });
+    const result = await db.$queryRaw<Array<{ row: any }>>`
+      SELECT "rows"->CAST(${rowIndex} AS integer) as row
+      FROM "ParticipantData"
+      WHERE "programId" = ${id} AND "batchIndex" = ${batchIndex}
+      LIMIT 1
+    `;
 
-    if (!batch) {
-      return NextResponse.json({ participant: null, message: "No participant data found for this page" });
-    }
-
-    const rows = (batch.rows as any[]) || [];
-    const participant = rows[rowIndex] || null;
+    const participant = result[0]?.row || null;
 
     // Get total rows count from the program
     const program = await db.program.findUnique({
@@ -138,7 +136,8 @@ export async function PATCH(
     const mergedParticipant = {
       ...rows[rowIndex],
       ...(participant || {}),
-      _evaluationStatus: status,
+      _evaluationStatus: status || "VERIFIED",
+      _verifiedByName: session.user.name || session.user.email,
       _evaluationDescription: description || "",
       _evaluatedAt: new Date().toISOString(),
     };
@@ -153,7 +152,7 @@ export async function PATCH(
     try {
       const uniqueKey = Object.keys(mergedParticipant).find(k => !k.startsWith('_')) || "ID";
       const uniqueValue = mergedParticipant[uniqueKey] || "Unknown";
-      const details = `Mengubah status verifikasi peserta (${uniqueKey}: ${uniqueValue}) menjadi "${status}".${
+      const details = `Memverifikasi data peserta (${uniqueKey}: ${uniqueValue}).${
         description ? ` Catatan: ${description}` : ""
       }`;
 
@@ -161,7 +160,7 @@ export async function PATCH(
         data: {
           programId: id,
           userId: session.user.id,
-          action: `VERIFICATION_${status}`,
+          action: "VERIFIED",
           details,
         },
       });

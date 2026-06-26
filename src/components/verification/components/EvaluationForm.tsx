@@ -117,6 +117,63 @@ function formatDisplayDate(valueStr: string, isDateTime: boolean = false): strin
   return dateObj.toLocaleDateString("id-ID", options);
 }
 
+interface SearchableComboboxProps {
+  value: string;
+  options: string[];
+  placeholder?: string;
+  onValueChange: (val: string) => void;
+  disabled?: boolean;
+}
+
+function SearchableCombobox({ value, options, placeholder, onValueChange, disabled }: SearchableComboboxProps) {
+  const [searchValue, setSearchValue] = React.useState("");
+
+  React.useEffect(() => {
+    setSearchValue(value);
+  }, [value]);
+
+  const filteredOptions = React.useMemo(() => {
+    if (!searchValue || searchValue === value) return options;
+    return options.filter((opt) =>
+      opt.toLowerCase().includes(searchValue.toLowerCase())
+    );
+  }, [options, searchValue, value]);
+
+  return (
+    <Combobox
+      value={value}
+      onValueChange={(val) => {
+        if (val !== null) {
+          onValueChange(val);
+          setSearchValue(val);
+        }
+      }}
+      disabled={disabled}
+    >
+      <ComboboxInput
+        placeholder={placeholder || "Select option..."}
+        className="w-full text-sm"
+        value={searchValue}
+        onChange={(e) => setSearchValue(e.target.value)}
+      />
+      <ComboboxContent>
+        <ComboboxList>
+          {filteredOptions.map((opt) => (
+            <ComboboxItem key={opt} value={opt}>
+              {opt}
+            </ComboboxItem>
+          ))}
+          {filteredOptions.length === 0 && (
+            <ComboboxEmpty className="text-[10px] text-muted-foreground p-2 text-center">
+              Tidak ditemukan
+            </ComboboxEmpty>
+          )}
+        </ComboboxList>
+      </ComboboxContent>
+    </Combobox>
+  );
+}
+
 interface EvaluationFormProps {
   sections: Section[];
   participant: Record<string, any>;
@@ -414,33 +471,12 @@ export function EvaluationForm({ sections, participant, onFieldChange }: Evaluat
         if (field.isEditable) {
           const selectOptions = field.options || [];
           return (
-            <Combobox
+            <SearchableCombobox
               value={valueStr}
-              onValueChange={(val) => onFieldChange?.(field.label, val || "")}
-            >
-              <ComboboxInput
-                placeholder={field.placeholder || "Select option..."}
-                className="w-full text-sm"
-              />
-              <ComboboxContent>
-                <ComboboxList>
-                  {selectOptions.map((opt) => (
-                    <ComboboxItem key={opt} value={opt}>
-                      {opt}
-                    </ComboboxItem>
-                  ))}
-                  {selectOptions.length === 0 ? (
-                    <div className="text-[10px] text-muted-foreground p-2 text-center">
-                      No options defined for this dropdown.
-                    </div>
-                  ) : (
-                    <ComboboxEmpty className="text-[10px] text-muted-foreground p-2 text-center">
-                      Tidak ditemukan
-                    </ComboboxEmpty>
-                  )}
-                </ComboboxList>
-              </ComboboxContent>
-            </Combobox>
+              options={selectOptions}
+              placeholder={field.placeholder}
+              onValueChange={(val) => onFieldChange?.(field.label, val)}
+            />
           );
         }
         return (

@@ -2,11 +2,9 @@
 
 import * as React from "react";
 import { useVerificationStore } from "@/stores";
-import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Check, X, Flag, Loader2 } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
+import { CheckCircle2, AlertCircle, User, Calendar } from "lucide-react";
 
 interface EvaluationControlsProps {
   programId: string;
@@ -24,114 +22,66 @@ export function EvaluationControls({
   isSaving = false,
 }: EvaluationControlsProps) {
   const {
-    currentPage,
     evaluationStatus,
-    setEvaluationStatus,
     approvalDescription,
     setApprovalDescription,
   } = useVerificationStore();
 
-  const [isSavingLocal, setIsSavingLocal] = React.useState(false);
-
-  const handleSave = async () => {
-    if (!evaluationStatus) {
-      toast.error("Please select an evaluation status (Approve, Reject, or Flag)");
-      return;
-    }
-
-    setIsSavingLocal(true);
-    try {
-      const res = await fetch(`/api/programs/${programId}/participants?page=${currentPage}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          status: evaluationStatus,
-          description: approvalDescription,
-          participant,
-        }),
-      });
-      const data = await res.json();
-      if (res.ok && data.success) {
-        toast.success(`Evaluation saved as ${evaluationStatus}`);
-        onSaved(data.participant);
-      } else {
-        toast.error(data.error || "Failed to save evaluation");
-      }
-    } catch (err) {
-      console.error(err);
-      toast.error("An error occurred while saving the evaluation");
-    } finally {
-      setIsSavingLocal(false);
-    }
-  };
+  const isVerified = evaluationStatus === "VERIFIED" || participant?._evaluationStatus === "VERIFIED";
+  const verifiedBy = participant?._verifiedByName || null;
+  const verifiedAt = participant?._evaluatedAt ? new Date(participant._evaluatedAt).toLocaleString("id-ID") : null;
 
   return (
-    <div className="border rounded-xl p-5 bg-card shadow-xs space-y-4">
-      <h3 className="text-sm font-semibold text-foreground uppercase tracking-wide border-b pb-2">
-        Evaluation Action
-      </h3>
-
-      {/* Action Buttons */}
-      <div className="flex flex-wrap gap-2">
-        <Button
-          type="button"
-          variant={evaluationStatus === "Approve" ? "default" : "outline"}
-          size="sm"
-          onClick={() => setEvaluationStatus("Approve")}
-          className={cn(
-            "flex items-center gap-1.5 font-medium transition-all duration-200",
-            evaluationStatus === "Approve"
-              ? "bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs"
-              : "hover:bg-emerald-50 hover:text-emerald-600 dark:hover:bg-emerald-950/30 border-muted"
-          )}
-        >
-          <Check className="h-3.5 w-3.5" />
-          Approve
-        </Button>
-        
-        <Button
-          type="button"
-          variant={evaluationStatus === "Reject" ? "default" : "outline"}
-          size="sm"
-          onClick={() => setEvaluationStatus("Reject")}
-          className={cn(
-            "flex items-center gap-1.5 font-medium transition-all duration-200",
-            evaluationStatus === "Reject"
-              ? "bg-red-600 hover:bg-red-700 text-white shadow-xs"
-              : "hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/30 border-muted"
-          )}
-        >
-          <X className="h-3.5 w-3.5" />
-          Reject
-        </Button>
-
-        <Button
-          type="button"
-          variant={evaluationStatus === "Flag" ? "default" : "outline"}
-          size="sm"
-          onClick={() => setEvaluationStatus("Flag")}
-          className={cn(
-            "flex items-center gap-1.5 font-medium transition-all duration-200",
-            evaluationStatus === "Flag"
-              ? "bg-amber-500 hover:bg-amber-600 text-white shadow-xs"
-              : "hover:bg-amber-50 hover:text-amber-600 dark:hover:bg-amber-950/30 border-muted"
-          )}
-        >
-          <Flag className="h-3.5 w-3.5" />
-          Flag
-        </Button>
+    <div className="border rounded-xl p-5 bg-card shadow-xs space-y-4 border-muted/80">
+      <div className="flex items-center justify-between border-b pb-3 border-muted">
+        <h3 className="text-sm font-semibold text-foreground uppercase tracking-wide">
+          Status Verifikasi
+        </h3>
+        {isVerified ? (
+          <Badge className="bg-emerald-500 hover:bg-emerald-600 text-white flex items-center gap-1">
+            <CheckCircle2 className="h-3 w-3" />
+            Telah Diverifikasi
+          </Badge>
+        ) : (
+          <Badge variant="secondary" className="text-muted-foreground flex items-center gap-1">
+            <AlertCircle className="h-3 w-3" />
+            Belum Diverifikasi
+          </Badge>
+        )}
       </div>
 
+      {/* Verifier details if verified */}
+      {isVerified && (verifiedBy || verifiedAt) && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs bg-muted/30 p-3 rounded-lg border">
+          {verifiedBy && (
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <User className="h-3.5 w-3.5 text-primary/80" />
+              <span>
+                <strong>Pemverifikasi:</strong> {verifiedBy}
+              </span>
+            </div>
+          )}
+          {verifiedAt && (
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <Calendar className="h-3.5 w-3.5 text-primary/80" />
+              <span>
+                <strong>Waktu:</strong> {verifiedAt}
+              </span>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Description / Remarks */}
-      <div className="space-y-1.5">
-        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block">
-          Approval Description / Remarks
-        </span>
+      <div className="space-y-2">
+        <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block">
+          Catatan / Keterangan Verifikasi
+        </label>
         <Textarea
-          placeholder="Write evaluation remarks (e.g. reasons for rejection or flagging details)..."
+          placeholder="Tulis keterangan verifikasi di sini..."
           value={approvalDescription}
           onChange={(e) => setApprovalDescription(e.target.value)}
-          className="min-h-[80px] text-sm"
+          className="min-h-[80px] text-sm bg-background border-muted/80 focus-visible:ring-emerald-500"
         />
       </div>
     </div>

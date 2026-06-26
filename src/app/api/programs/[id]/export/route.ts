@@ -75,12 +75,13 @@ export async function GET(
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet("Participants Evaluation");
 
-    // We add evaluation status and description headers at the end
+    // We add verification status and details headers at the end
     const finalHeaders = [
       ...headersList.filter(h => !h.startsWith("__") && !h.startsWith("_")),
-      "Status Evaluasi",
-      "Catatan Evaluasi",
-      "Waktu Evaluasi"
+      "Status Verifikasi",
+      "Diverifikasi Oleh",
+      "Waktu Verifikasi",
+      "Keterangan Verifikasi"
     ];
 
     // Define columns
@@ -102,11 +103,12 @@ export async function GET(
       });
 
       // Populate verification results
-      rowData["Status Evaluasi"] = row["_evaluationStatus"] || "BELUM DIVERIFIKASI";
-      rowData["Catatan Evaluasi"] = row["_evaluationDescription"] || "";
-      rowData["Waktu Evaluasi"] = row["_evaluatedAt"] 
+      rowData["Status Verifikasi"] = row["_evaluationStatus"] === "VERIFIED" ? "SUDAH DIVERIFIKASI" : "BELUM DIVERIFIKASI";
+      rowData["Diverifikasi Oleh"] = row["_verifiedByName"] || "";
+      rowData["Waktu Verifikasi"] = row["_evaluatedAt"] 
         ? new Date(row["_evaluatedAt"]).toLocaleString("id-ID")
         : "";
+      rowData["Keterangan Verifikasi"] = row["_evaluationDescription"] || "";
 
       worksheet.addRow(rowData);
     });

@@ -106,32 +106,27 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
   };
 
   const handleSave = async () => {
-    if (!evaluationStatus) {
-      toast.error("Please select an evaluation status (Approve, Reject, or Flag)");
-      return;
-    }
-
     setIsSaving(true);
     try {
       const res = await fetch(`/api/programs/${id}/participants?page=${currentPage}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          status: evaluationStatus,
+          status: "VERIFIED",
           description: approvalDescription,
           participant,
         }),
       });
       const data = await res.json();
       if (res.ok && data.success) {
-        toast.success(`Evaluation saved as ${evaluationStatus}`);
+        toast.success(`Data saved successfully`);
         setParticipant(data.participant);
       } else {
-        toast.error(data.error || "Failed to save evaluation");
+        toast.error(data.error || "Failed to save data");
       }
     } catch (err) {
       console.error(err);
-      toast.error("An error occurred while saving the evaluation");
+      toast.error("An error occurred while saving the data");
     } finally {
       setIsSaving(false);
     }
@@ -194,7 +189,7 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
                 </div>
               ) : participant ? (
                 <div className="flex flex-col gap-6">
-                  {/* Participant fields based on Schema */}
+                   {/* Participant fields based on Schema */}
                   <div className="w-full">
                     {sections.length > 0 ? (
                       <EvaluationForm
@@ -229,6 +224,15 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
                         </div>
                       </div>
                     )}
+                  </div>
+
+                  {/* Verification Controls & Remarks Panel */}
+                  <div className="w-full">
+                    <EvaluationControls
+                      programId={id}
+                      participant={participant}
+                      onSaved={handleParticipantUpdated}
+                    />
                   </div>
                 </div>
               ) : (
