@@ -14,12 +14,13 @@ export function usePrograms() {
   });
 }
 
-export function useProgram(id: string | null) {
+export function useProgram(id: string | null, includePreview = false) {
   return useQuery<Program>({
-    queryKey: ["programs", id],
+    queryKey: ["programs", id, { preview: includePreview }],
     queryFn: async () => {
       if (!id) throw new Error("ID is required");
-      const res = await fetch(`${API_URL}/${id}`);
+      const url = includePreview ? `${API_URL}/${id}?preview=true` : `${API_URL}/${id}`;
+      const res = await fetch(url);
       if (!res.ok) throw new Error("Failed to fetch program");
       return res.json();
     },

@@ -29,7 +29,7 @@ function BuilderPageContent() {
   const searchParams = useSearchParams();
   const programId = searchParams.get("programId");
 
-  const { data: program, isLoading: isProgramLoading } = useProgram(programId);
+  const { data: program, isLoading: isProgramLoading } = useProgram(programId, true);
   const updateSchemaMutation = useUpdateProgramSchema();
 
   const sampleRow = (program?.data && Array.isArray(program.data) && program.data.length > 0)

@@ -18,23 +18,31 @@ export async function GET(
       return NextResponse.json({ error: "Program not found" }, { status: 404 });
     }
 
-    // Fetch only the first batch for headers and preview data (sliced to 10 rows on DB side)
-    const previewResult = await db.$queryRaw<Array<{ headers: string; previewRows: string }>>`
-      SELECT "headers", jsonb_path_query_array("rows"::jsonb, '$[0 to 9]') as "previewRows"
-      FROM "ParticipantData"
-      WHERE "programId" = ${id} AND "batchIndex" = 0
-      LIMIT 1
-    `;
-    const firstBatch = previewResult[0] || null;
-    
-    // Parse headers and preview rows safely
-    const headers = typeof firstBatch?.headers === 'string'
-      ? JSON.parse(firstBatch.headers)
-      : (firstBatch?.headers as unknown as string[]) ?? [];
+    const { searchParams } = new URL(request.url);
+    const includePreview = searchParams.get("preview") === "true";
+
+    let headers: string[] = [];
+    let data: Record<string, any>[] = [];
+
+    if (includePreview) {
+      // Fetch only the first batch for headers and preview data (sliced to 10 rows on DB side)
+      const previewResult = await db.$queryRaw<Array<{ headers: string; previewRows: string }>>`
+        SELECT "headers", jsonb_path_query_array("rows"::jsonb, '$[0 to 9]') as "previewRows"
+        FROM "ParticipantData"
+        WHERE "programId" = ${id} AND "batchIndex" = 0
+        LIMIT 1
+      `;
+      const firstBatch = previewResult[0] || null;
       
-    const data = typeof firstBatch?.previewRows === 'string'
-      ? JSON.parse(firstBatch.previewRows)
-      : (firstBatch?.previewRows as unknown as Record<string, any>[]) ?? [];
+      // Parse headers and preview rows safely
+      headers = typeof firstBatch?.headers === 'string'
+        ? JSON.parse(firstBatch.headers)
+        : (firstBatch?.headers as unknown as string[]) ?? [];
+        
+      data = typeof firstBatch?.previewRows === 'string'
+        ? JSON.parse(firstBatch.previewRows)
+        : (firstBatch?.previewRows as unknown as Record<string, any>[]) ?? [];
+    }
 
     return NextResponse.json({
       id: program.id,
