@@ -6,7 +6,8 @@ export type FieldType =
   | 'date' 
   | 'badge-status' 
   | 'array-pills'
-  | 'dropdown';
+  | 'dropdown'
+  | 'checkbox';
 
 export type MediaSubType = 'image' | 'video' | 'pdf' | 'link';
 

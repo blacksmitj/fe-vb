@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Sheet,
   SheetContent,
@@ -48,7 +49,8 @@ import {
   ChevronLeft,
   ChevronRight,
   List,
-  Plus
+  Plus,
+  CheckSquare
 } from "lucide-react";
 import { toast } from "sonner";
 import { detectMediaType } from "../utils/detect-media-type";
@@ -201,6 +203,8 @@ export default function ProfileBuilderFieldRenderer({
         return <Bookmark className="h-4.5 w-4.5 text-emerald-500" />;
       case "dropdown":
         return <List className="h-4.5 w-4.5 text-indigo-500" />;
+      case "checkbox":
+        return <CheckSquare className="h-4.5 w-4.5 text-emerald-500" />;
     }
   };
 
@@ -556,6 +560,43 @@ export default function ProfileBuilderFieldRenderer({
             </div>
           );
         }
+      case "checkbox":
+        const checkboxVal = field.value !== undefined && field.value !== "" ? field.value : (sampleValue !== undefined && sampleValue !== null ? String(sampleValue) : "false");
+        const isChecked = checkboxVal === "true";
+        if (field.isEditable) {
+          return (
+            <div className="flex items-center gap-2 py-1">
+              <Checkbox
+                id={`pb-checkbox-${field.id}`}
+                checked={isChecked}
+                disabled={field.locked}
+                onCheckedChange={(checked) => {
+                  onUpdateField({ ...field, value: checked ? "true" : "false" });
+                }}
+              />
+              <Label
+                htmlFor={`pb-checkbox-${field.id}`}
+                className="text-xs text-muted-foreground font-normal cursor-pointer select-none"
+              >
+                {field.placeholder || "Ceklis item ini"}
+              </Label>
+            </div>
+          );
+        } else {
+          const isCheckedPreview = checkboxVal === "true" || sampleValue === true || sampleValue === "true";
+          return (
+            <div className="flex items-center gap-2 py-1 bg-muted/40 border border-border/50 rounded-lg px-2.5 min-h-7 w-full">
+              <Checkbox
+                checked={isCheckedPreview}
+                disabled
+                className="opacity-70"
+              />
+              <span className={`text-xs ${isCheckedPreview ? "text-foreground font-medium" : "text-muted-foreground/50 italic"}`}>
+                {isCheckedPreview ? (field.placeholder || "Terceklis") : (field.placeholder || "Tidak terceklis")}
+              </span>
+            </div>
+          );
+        }
       case "dropdown":
         const dropdownVal = field.value !== undefined && field.value !== "" ? field.value : (sampleValue !== undefined && sampleValue !== null ? String(sampleValue) : "");
         const selectOptions = field.options || [];
@@ -784,6 +825,7 @@ export default function ProfileBuilderFieldRenderer({
                         <SelectItem value="array-pills">Array Pills</SelectItem>
                         <SelectItem value="media">Media / Dokumen (Auto-detect)</SelectItem>
                         <SelectItem value="dropdown">Dropdown Input</SelectItem>
+                        <SelectItem value="checkbox">Ceklis / Checkbox</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -828,14 +870,16 @@ export default function ProfileBuilderFieldRenderer({
                       placeholder="e.g. Hint or helper text for this field"
                     />
                   </div>
-                  {(editType === "text" || editType === "textarea" || editType === "number") && (
+                  {(editType === "text" || editType === "textarea" || editType === "number" || editType === "checkbox") && (
                     <div className="grid gap-2">
-                      <Label htmlFor="editPlaceholder">Placeholder Text</Label>
+                      <Label htmlFor="editPlaceholder">
+                        {editType === "checkbox" ? "Label Samping Ceklis" : "Placeholder Text"}
+                      </Label>
                       <Input
                         id="editPlaceholder"
                         value={editPlaceholder}
                         onChange={(e) => setEditPlaceholder(e.target.value)}
-                        placeholder="e.g. Enter value..."
+                        placeholder={editType === "checkbox" ? "e.g. Setuju / Selesai" : "e.g. Enter value..."}
                       />
                     </div>
                   )}

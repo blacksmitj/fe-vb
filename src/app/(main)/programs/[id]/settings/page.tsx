@@ -16,6 +16,11 @@ import {
   ActivityIcon,
   CheckIcon,
   XIcon,
+  UploadCloudIcon,
+  PlayIcon,
+  Loader2Icon,
+  EyeIcon,
+  InfoIcon,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -46,12 +51,126 @@ import {
 } from "@/components/ui/table";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { MembershipGate } from "@/components/programs/membership-gate";
+import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-interface SheetConfig {
-  sheetId: string;
-  sheetName: string;
-  sheetUniqueKey: string;
-  sheetLastSyncAt: string | null;
+interface DryRunResult {
+  stats: {
+    totalRows: number;
+    totalColumns: number;
+    errorCount: number;
+  };
+  previewRows: Record<string, any>[];
+  errors: {
+    row: number;
+    column: string;
+    message: string;
+  }[];
+}
+
+function parseCSV(text: string): string[][] {
+  const result: string[][] = [];
+  let row: string[] = [];
+  let inQuotes = false;
+  let entry = "";
+
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+    const nextChar = text[i + 1];
+
+    if (char === '"') {
+      if (inQuotes && nextChar === '"') {
+        entry += '"';
+        i++;
+      } else {
+        inQuotes = !inQuotes;
+      }
+    } else if (char === ',' && !inQuotes) {
+      row.push(entry);
+      entry = "";
+    } else if ((char === '\r' || char === '\n') && !inQuotes) {
+      row.push(entry);
+      if (row.some(val => val.trim() !== "")) {
+        result.push(row);
+      }
+      row = [];
+      entry = "";
+      if (char === '\r' && nextChar === '\n') {
+        i++;
+      }
+    } else {
+      entry += char;
+    }
+  }
+  if (entry || row.length > 0) {
+    row.push(entry);
+    if (row.some(val => val.trim() !== "")) {
+      result.push(row);
+    }
+  }
+  return result;
+}
+
+function parseWorksheet(worksheet: any): { headers: string[]; rows: Record<string, any>[] } {
+  const headers: string[] = [];
+  let headerRow = worksheet.getRow(1);
+  let headerRowNumber = 1;
+
+  for (let i = 1; i <= Math.min(worksheet.rowCount, 10); i++) {
+    const row = worksheet.getRow(i);
+    const rowValues = row.values;
+    if (rowValues && (Array.isArray(rowValues) ? rowValues.some((v: any) => v !== null && v !== undefined) : Object.keys(rowValues).length > 0)) {
+      headerRow = row;
+      headerRowNumber = i;
+      break;
+    }
+  }
+
+  headerRow.eachCell({ includeEmpty: false }, (cell: any) => {
+    const value = cell.value;
+    if (value !== null && value !== undefined) {
+      if (typeof value === "object" && "text" in value) {
+        headers.push(String(value.text).trim());
+      } else {
+        headers.push(String(value).trim());
+      }
+    }
+  });
+
+  const cleanHeaders = Array.from(new Set(headers.filter(h => h.length > 0)));
+
+  const rows: Record<string, any>[] = [];
+  worksheet.eachRow({ includeEmpty: false }, (row: any, rowNumber: number) => {
+    if (rowNumber <= (headerRowNumber || 1)) return;
+
+    const rowData: Record<string, any> = {};
+    cleanHeaders.forEach((header, idx) => {
+      const cell = row.getCell(idx + 1);
+      let val = cell.value;
+      if (val !== null && val !== undefined) {
+        if (typeof val === "object") {
+          if ("text" in val) {
+            val = val.text;
+          } else if ("result" in val) {
+            val = val.result;
+          } else if (val instanceof Date) {
+            // Keep date
+          } else {
+            val = JSON.stringify(val);
+          }
+        }
+        rowData[header] = typeof val === "string" ? val.trim() : val;
+      } else {
+        rowData[header] = "";
+      }
+    });
+
+    rowData["__sheetRowIndex"] = rowNumber;
+    rows.push(rowData);
+  });
+
+  return { headers: cleanHeaders, rows };
 }
 
 export default function ProgramSettingsPage({ params }: { params: Promise<{ id: string }> }) {
@@ -60,6 +179,251 @@ export default function ProgramSettingsPage({ params }: { params: Promise<{ id: 
   const { data: program, isLoading: isProgramLoading, refetch: refetchProgram } = useProgram(id);
 
   const [isExporting, setIsExporting] = React.useState(false);
+
+  // Reupload states
+  const [reuploadFile, setReuploadFile] = React.useState<File | null>(null);
+  const [reuploadSheets, setReuploadSheets] = React.useState<string[]>([]);
+  const [reuploadSheetName, setReuploadSheetName] = React.useState("");
+  const [reuploadHeadersList, setReuploadHeadersList] = React.useState<string[]>([]);
+  const [reuploadSheetUniqueKey, setReuploadSheetUniqueKey] = React.useState("");
+  const [isReuploadPreviewLoading, setIsReuploadPreviewLoading] = React.useState(false);
+  const [isReuploadDryRunning, setIsReuploadDryRunning] = React.useState(false);
+  const [isReuploadSubmitting, setIsReuploadSubmitting] = React.useState(false);
+  const [reuploadDryRunResult, setReuploadDryRunResult] = React.useState<DryRunResult | null>(null);
+  const reuploadWorkbookRef = React.useRef<any>(null);
+  const [reuploadCurrentSheetRows, setReuploadCurrentSheetRows] = React.useState<Record<string, any>[]>([]);
+
+  const handleReuploadFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = e.target.files?.[0];
+    if (!selectedFile) return;
+
+    setReuploadFile(selectedFile);
+    setIsReuploadPreviewLoading(true);
+    setReuploadSheets([]);
+    setReuploadHeadersList([]);
+    setReuploadSheetName("");
+    setReuploadSheetUniqueKey("");
+    setReuploadDryRunResult(null);
+    setReuploadCurrentSheetRows([]);
+    reuploadWorkbookRef.current = null;
+
+    try {
+      const nameLower = selectedFile.name.toLowerCase();
+      let sheetNamesList: string[] = [];
+      let initialHeaders: string[] = [];
+      let parsedRows: Record<string, any>[] = [];
+
+      if (nameLower.endsWith(".csv")) {
+        const text = await selectedFile.text();
+        const csvData = parseCSV(text);
+        if (csvData.length === 0) {
+          throw new Error("File CSV kosong.");
+        }
+        sheetNamesList = ["CSV Data"];
+        initialHeaders = csvData[0].map(h => h.trim()).filter(h => h.length > 0);
+        parsedRows = csvData.slice(1).map((row, idx) => {
+          const rowData: Record<string, any> = {};
+          initialHeaders.forEach((header, colIdx) => {
+            rowData[header] = (row[colIdx] || "").trim();
+          });
+          rowData["__sheetRowIndex"] = idx + 2;
+          return rowData;
+        });
+      } else {
+        const ExcelJS = await import("exceljs");
+        const workbook = new ExcelJS.Workbook();
+        const buffer = await selectedFile.arrayBuffer();
+        await workbook.xlsx.load(buffer);
+        reuploadWorkbookRef.current = workbook;
+
+        sheetNamesList = workbook.worksheets.map(s => s.name);
+        if (sheetNamesList.length === 0) {
+          throw new Error("File spreadsheet kosong.");
+        }
+
+        const worksheet = workbook.worksheets[0];
+        const parsed = parseWorksheet(worksheet);
+        initialHeaders = parsed.headers;
+        parsedRows = parsed.rows;
+      }
+
+      setReuploadSheets(sheetNamesList);
+      if (sheetNamesList.length > 0) {
+        setReuploadSheetName(sheetNamesList[0]);
+      }
+      setReuploadHeadersList(initialHeaders);
+      if (initialHeaders.length > 0) {
+        setReuploadSheetUniqueKey(initialHeaders[0]);
+      }
+      setReuploadCurrentSheetRows(parsedRows);
+      toast.success("File reupload berhasil di-parse!");
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || "Terjadi kesalahan saat membaca file.");
+      setReuploadFile(null);
+    } finally {
+      setIsReuploadPreviewLoading(false);
+    }
+  };
+
+  const handleReuploadSheetChange = async (selectedSheetName: string) => {
+    setReuploadSheetName(selectedSheetName);
+    if (!reuploadFile) return;
+
+    setIsReuploadPreviewLoading(true);
+    setReuploadHeadersList([]);
+    setReuploadSheetUniqueKey("");
+    setReuploadDryRunResult(null);
+    setReuploadCurrentSheetRows([]);
+
+    try {
+      let initialHeaders: string[] = [];
+      let parsedRows: Record<string, any>[] = [];
+
+      if (reuploadFile.name.toLowerCase().endsWith(".csv")) {
+        const text = await reuploadFile.text();
+        const csvData = parseCSV(text);
+        initialHeaders = csvData[0].map(h => h.trim()).filter(h => h.length > 0);
+        parsedRows = csvData.slice(1).map((row, idx) => {
+          const rowData: Record<string, any> = {};
+          initialHeaders.forEach((header, colIdx) => {
+            rowData[header] = (row[colIdx] || "").trim();
+          });
+          rowData["__sheetRowIndex"] = idx + 2;
+          return rowData;
+        });
+      } else {
+        const workbook = reuploadWorkbookRef.current;
+        if (!workbook) throw new Error("Workbook tidak ditemukan.");
+
+        const worksheet = workbook.worksheets.find((s: any) => s.name === selectedSheetName);
+        if (!worksheet) throw new Error("Sheet tidak ditemukan.");
+
+        const parsed = parseWorksheet(worksheet);
+        initialHeaders = parsed.headers;
+        parsedRows = parsed.rows;
+      }
+
+      setReuploadHeadersList(initialHeaders);
+      if (initialHeaders.length > 0) {
+        setReuploadSheetUniqueKey(initialHeaders[0]);
+      }
+      setReuploadCurrentSheetRows(parsedRows);
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || "Gagal memuat kolom dari sheet ini.");
+    } finally {
+      setIsReuploadPreviewLoading(false);
+    }
+  };
+
+  const handleReuploadDryRun = async () => {
+    if (!reuploadFile || !reuploadSheetUniqueKey) {
+      toast.error("Harap unggah file dan pilih kolom ID Unik.");
+      return;
+    }
+
+    setIsReuploadDryRunning(true);
+    setReuploadDryRunResult(null);
+
+    setTimeout(() => {
+      try {
+        const errors: any[] = [];
+        const keyMap = new Map<string, number>();
+
+        reuploadCurrentSheetRows.forEach((row) => {
+          const keyValue = String(row[reuploadSheetUniqueKey] || "").trim();
+          const currentSheetRow = row["__sheetRowIndex"];
+          if (!keyValue) {
+            errors.push({
+              row: currentSheetRow,
+              column: reuploadSheetUniqueKey,
+              message: "Unique Key kosong."
+            });
+          } else if (keyMap.has(keyValue)) {
+            errors.push({
+              row: currentSheetRow,
+              column: reuploadSheetUniqueKey,
+              message: `Duplikasi Unique Key: "${keyValue}" (sudah ada di baris ${keyMap.get(keyValue)})`
+            });
+          } else {
+            keyMap.set(keyValue, currentSheetRow);
+          }
+        });
+
+        const stats = {
+          totalRows: reuploadCurrentSheetRows.length,
+          totalColumns: reuploadHeadersList.length,
+          errorCount: errors.length,
+        };
+
+        const previewRows = reuploadCurrentSheetRows.slice(0, 10);
+
+        setReuploadDryRunResult({
+          stats,
+          previewRows,
+          errors,
+        });
+
+        toast.success("Uji coba reupload (Dry Run) selesai!");
+      } catch (err) {
+        console.error(err);
+        toast.error("Terjadi kesalahan saat memproses uji coba.");
+      } finally {
+        setIsReuploadDryRunning(false);
+      }
+    }, 50);
+  };
+
+  const handleReuploadSubmit = async () => {
+    if (!reuploadFile || !reuploadSheetUniqueKey) {
+      toast.error("Harap lengkapi semua konfigurasi reupload.");
+      return;
+    }
+
+    const confirmReplace = window.confirm(
+      "Apakah Anda yakin ingin menghapus seluruh data peserta yang lama dan menggantinya dengan data baru? Tindakan ini tidak dapat dibatalkan."
+    );
+    if (!confirmReplace) return;
+
+    setIsReuploadSubmitting(true);
+    const toastId = toast.loading("Sedang memperbarui data peserta...");
+
+    const formData = new FormData();
+    formData.append("file", reuploadFile);
+    formData.append("sheetName", reuploadSheetName);
+    formData.append("sheetUniqueKey", reuploadSheetUniqueKey);
+
+    try {
+      const res = await fetch(`/api/programs/${id}/reupload`, {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        toast.success("Data peserta berhasil diperbarui!", { id: toastId });
+        refetchProgram();
+        // Reset states
+        setReuploadFile(null);
+        setReuploadSheets([]);
+        setReuploadHeadersList([]);
+        setReuploadSheetName("");
+        setReuploadSheetUniqueKey("");
+        setReuploadDryRunResult(null);
+        setReuploadCurrentSheetRows([]);
+        reuploadWorkbookRef.current = null;
+      } else {
+        toast.error(data.error || "Gagal memperbarui data peserta.", { id: toastId });
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Terjadi kesalahan saat memperbarui data.", { id: toastId });
+    } finally {
+      setIsReuploadSubmitting(false);
+    }
+  };
 
   // Tabs state
   const [activeTab, setActiveTab] = React.useState("export"); // "export" | "members" | "logs"
@@ -237,7 +601,7 @@ export default function ProgramSettingsPage({ params }: { params: Promise<{ id: 
         </header>
 
         {/* ── Content ────────────────────────────────────────── */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6 max-w-5xl mx-auto w-full">
+        <div className="flex-1 overflow-y-auto p-6 space-y-6 w-full max-w-[1600px] mx-auto">
           <div className="flex items-center gap-3">
             <Button variant="outline" size="icon" asChild className="h-8 w-8">
               <Link href={`/programs/${id}/verification`}>
@@ -341,6 +705,189 @@ export default function ProgramSettingsPage({ params }: { params: Promise<{ id: 
                         Export Data ke Excel (.xlsx)
                       </Button>
                     </div>
+                  </CardContent>
+                </Card>
+
+                {/* Reupload & Ganti Data Card */}
+                <Card className="shadow-sm">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-lg">
+                      <UploadCloudIcon className="h-5 w-5 text-primary" />
+                      Reupload & Ganti Data Peserta
+                    </CardTitle>
+                    <CardDescription>
+                      Unggah berkas Excel/CSV baru untuk menggantikan seluruh data peserta yang ada saat ini.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="reupload-file">File Spreadsheet (.xlsx, .xls, .csv)</Label>
+                      <div className="relative">
+                        <Input
+                          id="reupload-file"
+                          type="file"
+                          accept=".xlsx,.xls,.csv"
+                          onChange={handleReuploadFileChange}
+                          required
+                          className="pr-10"
+                          disabled={isReuploadPreviewLoading || isReuploadSubmitting || isReuploadDryRunning}
+                        />
+                        {isReuploadPreviewLoading && (
+                          <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                            <Loader2Icon className="size-4 animate-spin text-primary" />
+                          </div>
+                        )}
+                      </div>
+                      {isReuploadPreviewLoading && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Membaca metadata & sheet file...
+                        </p>
+                      )}
+                    </div>
+
+                    {reuploadFile && (
+                      <>
+                        {reuploadSheets.length > 1 && (
+                          <div className="space-y-2">
+                            <Label htmlFor="reuploadSheetName">Pilih Sheet (Tab)</Label>
+                            <NativeSelect
+                              id="reuploadSheetName"
+                              value={reuploadSheetName}
+                              onChange={(e) => handleReuploadSheetChange(e.target.value)}
+                              disabled={isReuploadPreviewLoading || isReuploadSubmitting || isReuploadDryRunning}
+                              className="w-full"
+                            >
+                              {reuploadSheets.map((s) => (
+                                <NativeSelectOption key={s} value={s}>
+                                  {s}
+                                </NativeSelectOption>
+                              ))}
+                            </NativeSelect>
+                          </div>
+                        )}
+
+                        <div className="space-y-2">
+                          <Label htmlFor="reuploadSheetUniqueKey">Kolom ID Unik (Unique Key)</Label>
+                          <div className="relative">
+                            <NativeSelect
+                              id="reuploadSheetUniqueKey"
+                              value={reuploadSheetUniqueKey}
+                              onChange={(e) => {
+                                setReuploadSheetUniqueKey(e.target.value);
+                                setReuploadDryRunResult(null);
+                              }}
+                              required
+                              disabled={isReuploadPreviewLoading || isReuploadSubmitting || isReuploadDryRunning || reuploadHeadersList.length === 0}
+                              className="w-full pr-10"
+                            >
+                              {reuploadHeadersList.length === 0 ? (
+                                <NativeSelectOption value="">
+                                  {isReuploadPreviewLoading ? "Memuat kolom..." : "Tidak ada kolom tersedia"}
+                                </NativeSelectOption>
+                              ) : (
+                                reuploadHeadersList.map((h) => (
+                                  <NativeSelectOption key={h} value={h}>
+                                    {h}
+                                  </NativeSelectOption>
+                                ))
+                              )}
+                            </NativeSelect>
+                            {isReuploadPreviewLoading && (
+                              <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                                <Loader2Icon className="size-4 animate-spin text-primary" />
+                              </div>
+                            )}
+                          </div>
+                          <p className="text-[11px] text-muted-foreground leading-snug">
+                            Pilih kolom dengan nilai unik (contoh: NIK, NIM, Email) untuk mengidentifikasi setiap peserta secara akurat.
+                          </p>
+                        </div>
+
+                        <div className="pt-2">
+                          <Button
+                            type="button"
+                            className="w-full flex items-center justify-center gap-2"
+                            variant="secondary"
+                            onClick={handleReuploadDryRun}
+                            disabled={!reuploadFile || !reuploadSheetUniqueKey || isReuploadPreviewLoading || isReuploadSubmitting || isReuploadDryRunning}
+                          >
+                            {isReuploadDryRunning ? (
+                              <>
+                                <Loader2Icon className="h-4 w-4 animate-spin" />
+                                Menguji Data...
+                              </>
+                            ) : (
+                              <>
+                                <PlayIcon className="h-4 w-4 text-emerald-600" />
+                                Jalankan Uji Coba (Dry Run)
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      </>
+                    )}
+
+                    {/* Dry Run Result UI inside Settings */}
+                    {reuploadDryRunResult && (
+                      <div className="mt-4 border-t pt-4 space-y-4">
+                        <div className="flex items-start gap-3">
+                          <CheckCircle2Icon className="h-5 w-5 text-emerald-600 shrink-0 mt-0.5" />
+                          <div>
+                            <h4 className="font-semibold text-emerald-900 text-sm">Uji Coba Dry Run Selesai</h4>
+                            <p className="text-xs text-emerald-700 mt-0.5">
+                              Silakan periksa rangkuman data di bawah ini.
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-3 gap-2 text-center">
+                          <div className="p-2 border rounded bg-muted/30">
+                            <p className="text-[10px] text-muted-foreground">Baris</p>
+                            <p className="text-sm font-bold">{reuploadDryRunResult.stats.totalRows}</p>
+                          </div>
+                          <div className="p-2 border rounded bg-muted/30">
+                            <p className="text-[10px] text-muted-foreground">Kolom</p>
+                            <p className="text-sm font-bold">{reuploadDryRunResult.stats.totalColumns}</p>
+                          </div>
+                          <div className="p-2 border rounded bg-muted/30">
+                            <p className="text-[10px] text-muted-foreground">Error</p>
+                            <p className={`text-sm font-bold ${reuploadDryRunResult.stats.errorCount > 0 ? "text-rose-500" : "text-emerald-600"}`}>
+                              {reuploadDryRunResult.stats.errorCount}
+                            </p>
+                          </div>
+                        </div>
+
+                        {reuploadDryRunResult.stats.errorCount > 0 && (
+                          <Alert variant="destructive" className="bg-destructive/5 py-2 border-destructive/20 text-destructive-foreground text-[11px]">
+                            <AlertTriangleIcon className="h-3.5 w-3.5 shrink-0" />
+                            <AlertDescription>
+                              Terdapat {reuploadDryRunResult.stats.errorCount} masalah validasi duplikasi. Baris bermasalah akan tetap dimasukkan tapi ditandai error di dashboard.
+                            </AlertDescription>
+                          </Alert>
+                        )}
+
+                        <div className="flex justify-end gap-3 pt-2">
+                          <Button
+                            type="button"
+                            onClick={handleReuploadSubmit}
+                            disabled={isReuploadSubmitting}
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-2 w-full justify-center"
+                          >
+                            {isReuploadSubmitting ? (
+                              <>
+                                <Loader2Icon className="h-4 w-4 animate-spin" />
+                                Meng-update...
+                              </>
+                            ) : (
+                              <>
+                                <DatabaseIcon className="h-4 w-4" />
+                                Reupload & Ganti Data
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               </div>

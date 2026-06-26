@@ -29,7 +29,7 @@ function BuilderPageContent() {
   const searchParams = useSearchParams();
   const programId = searchParams.get("programId");
 
-  const { data: program, isLoading: isProgramLoading, refetch, isRefetching } = useProgram(programId);
+  const { data: program, isLoading: isProgramLoading } = useProgram(programId);
   const updateSchemaMutation = useUpdateProgramSchema();
 
   const sampleRow = (program?.data && Array.isArray(program.data) && program.data.length > 0)
@@ -138,15 +138,7 @@ function BuilderPageContent() {
     toast.success("Draf dibuang, kembali ke konfigurasi tersimpan.");
   };
 
-  const handleRefreshHeaders = async () => {
-    try {
-      await refetch();
-      toast.success("Header & sample data program berhasil diperbarui dari database.");
-    } catch (err) {
-      toast.error("Gagal memperbarui data program.");
-      console.error(err);
-    }
-  };
+
 
   const handleUpdateSection = (index: number, updatedSection: Section) => {
     const updated = [...sections];
@@ -367,8 +359,6 @@ function BuilderPageContent() {
           onDiscardDraft={handleDiscardDraft}
           hasDraft={hasDraft}
           programId={programId}
-          onRefresh={handleRefreshHeaders}
-          isRefreshing={isRefetching}
         />
         
         <ProfileBuilderCanvas

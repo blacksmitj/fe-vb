@@ -20,8 +20,11 @@ import {
   ArrowLeft,
   RotateCcw,
   Loader2,
-  RefreshCw,
+  Plus,
 } from "lucide-react";
+import { toast } from "sonner";
+
+
 
 function HeaderItem({
   header,
@@ -69,8 +72,6 @@ interface ProfileBuilderSidebarProps {
   onDiscardDraft?: () => void;
   hasDraft?: boolean;
   programId?: string | null;
-  onRefresh?: () => void;
-  isRefreshing?: boolean;
 }
 
 export default function ProfileBuilderSidebar({
@@ -84,8 +85,6 @@ export default function ProfileBuilderSidebar({
   onDiscardDraft,
   hasDraft = false,
   programId,
-  onRefresh,
-  isRefreshing = false,
 }: ProfileBuilderSidebarProps) {
   const EXCEL_HEADERS = [
     "NIK",
@@ -145,6 +144,7 @@ export default function ProfileBuilderSidebar({
   ];
 
   const [searchQuery, setSearchQuery] = useState("");
+  const [newHeaderName, setNewHeaderName] = useState("");
 
   const usedLabels = new Set(
     sections.flatMap((section) =>
@@ -156,7 +156,28 @@ export default function ProfileBuilderSidebar({
     Array.isArray(programHeaders) && programHeaders.length > 0;
   const sourceHeaders = hasDbHeaders ? programHeaders : EXCEL_HEADERS;
 
+  const handleAddNewHeader = () => {
+    if (!newHeaderName.trim()) return;
+    if (sections.length === 0) {
+      toast.error("Silakan buat section terlebih dahulu!");
+      return;
+    }
+
+    const fieldName = newHeaderName.trim();
+
+    // Check locally if it already exists in the canvas
+    if (usedLabels.has(fieldName.toLowerCase())) {
+      toast.error(`Field "${fieldName}" sudah ada di canvas.`);
+      return;
+    }
+
+    onAddField("text", fieldName, `Enter ${fieldName}...`);
+    setNewHeaderName("");
+  };
+
+
   const filteredHeaders = sourceHeaders.filter(
+
     (header) =>
       header.toLowerCase().includes(searchQuery.toLowerCase()) &&
       !usedLabels.has(header.toLowerCase()),
@@ -245,30 +266,6 @@ export default function ProfileBuilderSidebar({
               <span className="text-[11px] font-bold text-muted-foreground/85 uppercase tracking-wider">
                 Excel Headers ({filteredHeaders.length})
               </span>
-              {onRefresh && (
-                <TooltipProvider delayDuration={300}>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <button
-                        onClick={onRefresh}
-                        disabled={isRefreshing}
-                        className="p-1 rounded hover:bg-muted text-muted-foreground/75 hover:text-foreground transition-colors disabled:opacity-50"
-                        type="button"
-                        aria-label="Refresh headers"
-                      >
-                        {isRefreshing ? (
-                          <Loader2 className="h-3 w-3 animate-spin" />
-                        ) : (
-                          <RefreshCw className="h-3 w-3" />
-                        )}
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom">
-                      Refresh header terbaru
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              )}
             </div>
             {hasDbHeaders && (
               <span className="text-[9px] bg-emerald-500/10 text-emerald-600 px-1.5 py-0.5 rounded font-bold border border-emerald-500/20 shrink-0">
@@ -297,6 +294,32 @@ export default function ProfileBuilderSidebar({
               </button>
             )}
           </div>
+
+          {/* Add Custom Field Input */}
+          <div className="px-2 mb-2 flex items-center gap-1.5 shrink-0">
+            <Input
+              placeholder="Add custom field..."
+              value={newHeaderName}
+              onChange={(e) => setNewHeaderName(e.target.value)}
+              className="h-8 text-xs font-sans"
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  handleAddNewHeader();
+                }
+              }}
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 px-2.5 shrink-0"
+              onClick={handleAddNewHeader}
+              disabled={!newHeaderName.trim()}
+              aria-label="Add custom field"
+            >
+              <Plus className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+
 
           <div className="flex-1 overflow-y-auto min-h-0 grid grid-cols-1 gap-1 pr-1 border border-border/40 rounded-lg p-1.5 bg-muted/10 content-start">
             {filteredHeaders.map((header) => {

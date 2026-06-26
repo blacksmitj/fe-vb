@@ -354,7 +354,7 @@ export default function ProgramsPage() {
         <Button asChild className="gap-2" size="sm">
           <Link href="/programs/import">
             <PlusIcon className="size-4" />
-            Tambah Program Google Sheet
+            Tambah Program
           </Link>
         </Button>
       </header>
@@ -366,7 +366,7 @@ export default function ProgramsPage() {
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Program List</h1>
             <p className="text-muted-foreground mt-1">
-              Kelola program atau event yang disinkronisasikan dari Google Sheets.
+              Kelola program atau event verifikasi data Anda.
             </p>
           </div>
 
@@ -395,12 +395,12 @@ export default function ProgramsPage() {
                 Belum Ada Program
               </CardTitle>
               <CardDescription className="max-w-sm mt-2">
-                Silakan buat program baru dengan menghubungkan Google Sheet Anda.
+                Silakan buat program baru dengan mengunggah file Excel atau CSV Anda.
               </CardDescription>
               <Button asChild className="mt-6 gap-2">
                 <Link href="/programs/import">
                   <PlusIcon className="size-4" />
-                  Hubungkan Google Sheet
+                  Tambah Program
                 </Link>
               </Button>
             </Card>

@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Calendar, FileText, Image as ImageIcon, Video, Tag, Bookmark, Hash, ArrowUpRight, Eye, Play, Globe } from "lucide-react";
 import {
   Select,
@@ -272,6 +273,40 @@ export function EvaluationForm({ sections, participant, onFieldChange }: Evaluat
         return (
           <div className="py-2.5 px-3 bg-muted/40 border border-border/50 rounded-lg text-sm select-all whitespace-pre-wrap text-foreground/80 font-medium">
             {valueStr}
+          </div>
+        );
+      case "checkbox":
+        const isChecked = valueStr === "true";
+        if (field.isEditable) {
+          return (
+            <div className="flex items-center gap-2 py-1">
+              <Checkbox
+                id={`eval-checkbox-${field.id}`}
+                checked={isChecked}
+                onCheckedChange={(checked) => {
+                  onFieldChange?.(field.label, checked ? "true" : "false");
+                }}
+              />
+              <label
+                htmlFor={`eval-checkbox-${field.id}`}
+                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer select-none text-foreground/80"
+              >
+                {field.placeholder || "Ceklis item ini"}
+              </label>
+            </div>
+          );
+        }
+        const isCheckedPreview = valueStr === "true";
+        return (
+          <div className="flex items-center gap-2 py-2 px-3 bg-muted/40 border border-border/50 rounded-lg text-sm w-full">
+            <Checkbox
+              checked={isCheckedPreview}
+              disabled
+              className="opacity-70"
+            />
+            <span className={`text-sm ${isCheckedPreview ? "text-foreground font-medium" : "text-muted-foreground/50 italic"}`}>
+              {isCheckedPreview ? (field.placeholder || "Terceklis") : (field.placeholder || "Tidak terceklis")}
+            </span>
           </div>
         );
       case "dropdown":

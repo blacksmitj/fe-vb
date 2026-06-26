@@ -5,7 +5,10 @@ import { NextResponse } from "next/server";
 import ExcelJS from "exceljs";
 import { Readable } from "stream";
 
-export async function POST(req: Request) {
+export async function POST(
+  req: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
   const session = await auth.api.getSession({
     headers: await getHeaders(),
   });
@@ -15,16 +18,30 @@ export async function POST(req: Request) {
   }
 
   try {
+    const { id } = await params;
+
+    // Check if program exists and user is ADMIN
+    const membership = await db.programMember.findUnique({
+      where: {
+        programId_userId: {
+          programId: id,
+          userId: session.user.id,
+        },
+      },
+    });
+
+    if (!membership || membership.role !== "ADMIN" || membership.status !== "APPROVED") {
+      return NextResponse.json(
+        { error: "Hanya Admin program yang diperbolehkan meng-reupload data." },
+        { status: 403 }
+      );
+    }
+
     const formData = await req.formData();
-    const name = formData.get("name") as string | null;
-    const description = formData.get("description") as string | null;
     const sheetName = formData.get("sheetName") as string | null;
     const sheetUniqueKey = formData.get("sheetUniqueKey") as string | null;
     const file = formData.get("file") as File | null;
 
-    if (!name) {
-      return NextResponse.json({ error: "Nama program wajib diisi." }, { status: 400 });
-    }
     if (!sheetUniqueKey) {
       return NextResponse.json({ error: "Kolom ID Unik wajib diisi." }, { status: 400 });
     }
@@ -82,7 +99,10 @@ export async function POST(req: Request) {
     const cleanHeaders = Array.from(new Set(headersList.filter(h => h.length > 0)));
 
     if (!cleanHeaders.includes(sheetUniqueKey)) {
-      return NextResponse.json({ error: `Kolom ID Unik "${sheetUniqueKey}" tidak ditemukan di file.` }, { status: 400 });
+      return NextResponse.json(
+        { error: `Kolom ID Unik "${sheetUniqueKey}" tidak ditemukan di file.` },
+        { status: 400 }
+      );
     }
 
     // 2. Parse Rows
@@ -101,7 +121,7 @@ export async function POST(req: Request) {
             } else if ("result" in val) {
               val = val.result;
             } else if (val instanceof Date) {
-              // Let's keep Date
+              // Keep Date
             } else {
               val = JSON.stringify(val);
             }
@@ -124,7 +144,7 @@ export async function POST(req: Request) {
     const errorsList: any[] = [];
     const keyMap = new Map<string, number>();
 
-    rows.forEach((row, i) => {
+    rows.forEach((row) => {
       const keyValue = String(row[sheetUniqueKey] || "").trim();
       const currentSheetRow = row["__sheetRowIndex"];
       if (!keyValue) {
@@ -144,23 +164,20 @@ export async function POST(req: Request) {
       }
     });
 
-    // 4. Create Program in Transaction
-    const program = await db.$transaction(async (tx) => {
-      // Create program metadata
-      const prog = await tx.program.create({
+    // 4. Update Program in Transaction (Delete old and replace)
+    const updatedProgram = await db.$transaction(async (tx) => {
+      // Delete old ParticipantData
+      await tx.participantData.deleteMany({
+        where: { programId: id },
+      });
+
+      // Update program metadata
+      const prog = await tx.program.update({
+        where: { id },
         data: {
-          name,
-          description: description || "",
           totalRows: rows.length,
           fieldCount: cleanHeaders.length,
           errorCount: errorsList.length,
-          programMembers: {
-            create: {
-              userId: session.user.id,
-              role: "ADMIN",
-              status: "APPROVED",
-            },
-          },
         },
       });
 
@@ -177,7 +194,7 @@ export async function POST(req: Request) {
         const batchErrors = errorsList.filter(e => e.row >= startRow && e.row <= endRow);
 
         participantDataRecords.push({
-          programId: prog.id,
+          programId: id,
           headers: cleanHeaders as any,
           rows: chunk as any,
           batchIndex,
@@ -186,41 +203,44 @@ export async function POST(req: Request) {
         });
       }
 
-      // Insert all batches in a single operation
+      // Insert new batches
       await tx.participantData.createMany({
         data: participantDataRecords,
       });
 
-      // Initialize empty profile schema
-      await tx.profileSchema.create({
-        data: {
-          programId: prog.id,
-          sections: [],
-          version: 1,
-        },
-      });
-
-      // Create Import Log
+      // Create Reupload Import Log
       await tx.importLog.create({
         data: {
-          programId: prog.id,
+          programId: id,
           fileName: file.name,
           totalRows: rows.length,
           errorCount: errorsList.length,
           status: errorsList.length > 0 ? "PARTIAL" : "COMPLETED",
-          notes: errorsList.length > 0 ? `${errorsList.length} baris memiliki masalah validasi.` : "Berhasil di-import dengan bersih.",
+          notes: `Reupload data. ${
+            errorsList.length > 0 ? `${errorsList.length} baris memiliki masalah validasi.` : "Berhasil diperbarui dengan bersih."
+          }`,
+        },
+      });
+
+      // Create Activity Log
+      await tx.activityLog.create({
+        data: {
+          programId: id,
+          userId: session.user.id,
+          action: "REUPLOAD_DATA",
+          details: `Meng-upload ulang database peserta menggunakan file "${file.name}" (${rows.length} baris, ${errorsList.length} validasi error).`,
         },
       });
 
       return prog;
     }, {
-      maxWait: 15000, // 15 seconds max wait to acquire connection
-      timeout: 30000,  // 30 seconds max execution time
+      maxWait: 15000,
+      timeout: 30000,
     });
 
-    return NextResponse.json(program);
+    return NextResponse.json(updatedProgram);
   } catch (error: any) {
-    console.error("POST /api/programs/import error:", error);
-    return NextResponse.json({ error: error.message || "Gagal meng-import program." }, { status: 500 });
+    console.error("POST /api/programs/[id]/reupload error:", error);
+    return NextResponse.json({ error: error.message || "Gagal meng-update program data." }, { status: 500 });
   }
 }
