@@ -17,6 +17,105 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
+function formatDateForInput(valueStr: string, isDateTime: boolean = false): string {
+  if (!valueStr) return "";
+  
+  const str = valueStr.trim();
+  
+  // 1. If it's already in the expected format, return as is
+  if (!isDateTime && /^\d{4}-\d{2}-\d{2}$/.test(str)) {
+    return str;
+  }
+  if (isDateTime && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(str)) {
+    return str;
+  }
+  
+  // 2. Handle DD/MM/YYYY or DD-MM-YYYY (with optional time)
+  const dmyMatch = str.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/);
+  if (dmyMatch) {
+    const [_, d, m, y, hr, min] = dmyMatch;
+    const formattedDay = d.padStart(2, '0');
+    const formattedMonth = m.padStart(2, '0');
+    if (isDateTime) {
+      const formattedHr = (hr || "00").padStart(2, '0');
+      const formattedMin = (min || "00").padStart(2, '0');
+      return `${y}-${formattedMonth}-${formattedDay}T${formattedHr}:${formattedMin}`;
+    }
+    return `${y}-${formattedMonth}-${formattedDay}`;
+  }
+
+  // 3. Handle Indonesian month names (e.g. "26 Juni 2026" or "26 Jun 2026")
+  let normalizedStr = str.toLowerCase();
+  const monthsIndonesian = ["januari", "februari", "maret", "april", "mei", "juni", "juli", "agustus", "september", "oktober", "november", "desember"];
+  const monthsIndonesianShort = ["jan", "feb", "mar", "apr", "mei", "jun", "jul", "agu", "sep", "okt", "nov", "des"];
+  const monthsEnglish = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"];
+  
+  let foundMonthIdx = -1;
+  // Look for long names
+  for (let i = 0; i < 12; i++) {
+    if (normalizedStr.includes(monthsIndonesian[i])) {
+      foundMonthIdx = i;
+      normalizedStr = normalizedStr.replace(monthsIndonesian[i], monthsEnglish[i]);
+      break;
+    }
+  }
+  // If not found, look for short names
+  if (foundMonthIdx === -1) {
+    for (let i = 0; i < 12; i++) {
+      if (normalizedStr.includes(monthsIndonesianShort[i])) {
+        foundMonthIdx = i;
+        normalizedStr = normalizedStr.replace(monthsIndonesianShort[i], monthsEnglish[i]);
+        break;
+      }
+    }
+  }
+
+  // 4. Try JS Date parsing
+  const dateObj = new Date(normalizedStr);
+  if (!isNaN(dateObj.getTime())) {
+    const year = dateObj.getFullYear();
+    const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+    const day = String(dateObj.getDate()).padStart(2, '0');
+    if (isDateTime) {
+      const hours = String(dateObj.getHours()).padStart(2, '0');
+      const minutes = String(dateObj.getMinutes()).padStart(2, '0');
+      return `${year}-${month}-${day}T${hours}:${minutes}`;
+    }
+    return `${year}-${month}-${day}`;
+  }
+
+  return "";
+}
+
+function formatDisplayDate(valueStr: string, isDateTime: boolean = false): string {
+  if (!valueStr) return "";
+  
+  // If it contains Indonesian month names, it's already localized, so return it
+  const monthsIndonesian = ["januari", "februari", "maret", "april", "mei", "juni", "juli", "agustus", "september", "oktober", "november", "desember", "jan", "feb", "mar", "apr", "jun", "jul", "agu", "sep", "okt", "nov", "des"];
+  const lower = valueStr.toLowerCase();
+  if (monthsIndonesian.some(m => lower.includes(m))) {
+    return valueStr;
+  }
+
+  const inputFormatted = formatDateForInput(valueStr, isDateTime);
+  if (!inputFormatted) return valueStr;
+
+  const dateObj = new Date(inputFormatted);
+  if (isNaN(dateObj.getTime())) return valueStr;
+
+  const options: Intl.DateTimeFormatOptions = {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  };
+  if (isDateTime) {
+    options.hour = "2-digit";
+    options.minute = "2-digit";
+  }
+
+  return dateObj.toLocaleDateString("id-ID", options);
+}
+
 interface EvaluationFormProps {
   sections: Section[];
   participant: Record<string, any>;
@@ -227,11 +326,12 @@ export function EvaluationForm({ sections, participant, onFieldChange }: Evaluat
           </div>
         );
       case "date":
+        const formattedDateValue = formatDateForInput(valueStr, field.dateMode === "date-time");
         if (field.isEditable) {
           return (
             <Input
               type={field.dateMode === "date-time" ? "datetime-local" : "date"}
-              value={valueStr}
+              value={formattedDateValue}
               onChange={(e) => onFieldChange?.(field.label, e.target.value)}
               className="w-full text-sm"
             />
@@ -240,7 +340,7 @@ export function EvaluationForm({ sections, participant, onFieldChange }: Evaluat
         return (
           <div className="flex items-center gap-1.5 text-sm font-medium bg-muted/40 border px-3 py-2 rounded-lg text-foreground/80">
             <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
-            <span>{valueStr}</span>
+            <span>{formatDisplayDate(valueStr, field.dateMode === "date-time") || valueStr}</span>
           </div>
         );
       case "number":

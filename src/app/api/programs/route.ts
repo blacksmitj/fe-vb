@@ -1,9 +1,27 @@
 import { db } from "@/lib/db";
+import { auth } from "@/lib/auth/auth";
+import { headers as getHeaders } from "next/headers";
 import { NextResponse } from "next/server";
 
 export async function GET() {
   try {
+    const session = await auth.api.getSession({
+      headers: await getHeaders(),
+    });
+
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const programs = await db.program.findMany({
+      where: {
+        programMembers: {
+          some: {
+            userId: session.user.id,
+            status: "APPROVED",
+          },
+        },
+      },
       select: {
         id: true,
         name: true,
