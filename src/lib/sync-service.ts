@@ -14,6 +14,7 @@ export interface SyncResult {
  * Uses sheetUniqueKey as unique identifier for upsert.
  */
 export async function pullFromSheet(programId: string, userId: string): Promise<SyncResult> {
+  const t0 = performance.now();
   try {
     const program = await db.program.findUnique({
       where: { id: programId },
@@ -42,8 +43,10 @@ export async function pullFromSheet(programId: string, userId: string): Promise<
       };
     }
 
-    console.log(`Starting Sheet -> DB Pull for program: ${program.name}`);
+    console.log(`[sync] Starting Sheet -> DB Pull for program: "${program.name}" (programId: ${programId})`);
+    const tFetch0 = performance.now();
     const { headers, rows } = await getSheetRows(token, sheetId, sheetName);
+    console.log(`[sync] Google Sheets API fetch done in ${(performance.now() - tFetch0).toFixed(0)}ms | rows=${rows.length} headers=${headers.length}`);
 
     if (headers.length === 0 || rows.length === 0) {
       return { success: true, rowsSynced: 0, message: "Sheet is empty." };
@@ -89,35 +92,36 @@ export async function pullFromSheet(programId: string, userId: string): Promise<
     });
 
     // Update database
-    await db.$transaction(async (tx) => {
-      // Clear old data
-      await tx.participantData.deleteMany({
-        where: { programId },
-      });
-
-      // Insert new parsed data from sheet
-      await tx.participantData.create({
-        data: {
-          programId,
-          headers: headers as any,
-          rows: rows as any,
-          batchIndex: 0,
-          totalInBatch: rows.length,
-          errorDetails: errorsList.length > 0 ? (errorsList as any) : null,
-        },
-      });
-
-      // Update program stats
-      await tx.program.update({
-        where: { id: programId },
-        data: {
-          totalRows: rows.length,
-          fieldCount: headers.length,
-          errorCount: errorsList.length,
-          sheetLastSyncAt: new Date(),
-        },
-      });
+    const tDb0 = performance.now();
+    
+    // Clear old data
+    await db.participantData.deleteMany({
+      where: { programId },
     });
+
+    // Insert new parsed data from sheet
+    await db.participantData.create({
+      data: {
+        programId,
+        headers: headers as any,
+        rows: rows as any,
+        batchIndex: 0,
+        totalInBatch: rows.length,
+        errorDetails: errorsList.length > 0 ? (errorsList as any) : null,
+      },
+    });
+
+    // Update program stats
+    await db.program.update({
+      where: { id: programId },
+      data: {
+        totalRows: rows.length,
+        fieldCount: headers.length,
+        errorCount: errorsList.length,
+        sheetLastSyncAt: new Date(),
+      },
+    });
+    console.log(`[sync] DB sequential updates done in ${(performance.now() - tDb0).toFixed(0)}ms`);
 
     // Create sync log
     await db.syncLog.create({
@@ -130,6 +134,7 @@ export async function pullFromSheet(programId: string, userId: string): Promise<
       },
     });
 
+    console.log(`[sync] pullFromSheet completed in ${(performance.now() - t0).toFixed(0)}ms total`);
     return { 
       success: true, 
       rowsSynced: rows.length, 
@@ -137,7 +142,7 @@ export async function pullFromSheet(programId: string, userId: string): Promise<
     };
 
   } catch (error: any) {
-    console.error("Error pulling from Google Sheet:", error);
+    console.error(`[sync] pullFromSheet FAILED after ${(performance.now() - t0).toFixed(0)}ms:`, error);
     
     // Attempt to log failure
     try {

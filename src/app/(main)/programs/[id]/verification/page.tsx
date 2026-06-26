@@ -55,16 +55,25 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
       if (!program || hasSynced) return;
       if (program.sheetId) {
         setIsSyncing(true);
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30_000);
         try {
-          const syncRes = await fetch(`/api/programs/${id}/sheet/sync`, { method: "POST" });
+          const syncRes = await fetch(`/api/programs/${id}/sheet/sync`, { method: "POST", signal: controller.signal });
+          clearTimeout(timeoutId);
           const syncData = await syncRes.json();
           if (syncRes.ok && syncData.success) {
             toast.success("Data berhasil disinkronisasikan dari Google Sheet");
           } else {
             toast.error(syncData.error || "Gagal sinkronisasi data dari Google Sheet");
           }
-        } catch (err) {
-          console.error("Auto-sync failed:", err);
+        } catch (err: any) {
+          clearTimeout(timeoutId);
+          if (err.name === "AbortError") {
+            console.error("[verification/autoSync] Timed out after 30s:", err);
+            toast.error("Auto-sinkronisasi memakan waktu terlalu lama (timeout 30 detik).");
+          } else {
+            console.error("[verification/autoSync] Fetch error:", err);
+          }
         } finally {
           setIsSyncing(false);
           setHasSynced(true);
@@ -171,8 +180,11 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
 
   const handleSyncManual = async () => {
     setIsSyncing(true);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30_000);
     try {
-      const res = await fetch(`/api/programs/${id}/sheet/sync`, { method: "POST" });
+      const res = await fetch(`/api/programs/${id}/sheet/sync`, { method: "POST", signal: controller.signal });
+      clearTimeout(timeoutId);
       const data = await res.json();
       if (res.ok && data.success) {
         toast.success(data.message || "Sinkronisasi berhasil");
@@ -181,9 +193,15 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
       } else {
         toast.error(data.error || "Gagal sinkronisasi");
       }
-    } catch (err) {
-      console.error(err);
-      toast.error("Terjadi kesalahan koneksi");
+    } catch (err: any) {
+      clearTimeout(timeoutId);
+      if (err.name === "AbortError") {
+        console.error("[verification/manualSync] Timed out after 30s:", err);
+        toast.error("Sinkronisasi memakan waktu terlalu lama (timeout 30 detik). Coba lagi.");
+      } else {
+        console.error("[verification/manualSync] Fetch error:", err);
+        toast.error("Terjadi kesalahan koneksi");
+      }
     } finally {
       setIsSyncing(false);
     }

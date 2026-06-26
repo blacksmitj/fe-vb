@@ -192,10 +192,15 @@ export default function ProgramSettingsPage({ params }: { params: Promise<{ id: 
     setIsSyncing(true);
     const toastId = toast.loading("Mensinkronisasikan data dari Google Sheet...");
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30_000);
+
     try {
       const res = await fetch(`/api/programs/${id}/sheet/sync`, {
         method: "POST",
+        signal: controller.signal,
       });
+      clearTimeout(timeoutId);
       const data = await res.json();
 
       if (res.ok && data.success) {
@@ -205,9 +210,15 @@ export default function ProgramSettingsPage({ params }: { params: Promise<{ id: 
       } else {
         toast.error(data.error || "Gagal melakukan sinkronisasi", { id: toastId });
       }
-    } catch (err) {
-      console.error(err);
-      toast.error("Terjadi kesalahan koneksi saat sinkronisasi", { id: toastId });
+    } catch (err: any) {
+      clearTimeout(timeoutId);
+      if (err.name === "AbortError") {
+        console.error("[settings/sync] Request timed out after 30s:", err);
+        toast.error("Sinkronisasi memakan waktu terlalu lama (timeout 30 detik). Coba lagi.", { id: toastId });
+      } else {
+        console.error("[settings/sync] Fetch error:", err);
+        toast.error("Terjadi kesalahan koneksi saat sinkronisasi", { id: toastId });
+      }
     } finally {
       setIsSyncing(false);
     }

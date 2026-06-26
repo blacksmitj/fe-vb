@@ -119,10 +119,14 @@ export default function ImportProgramPage() {
 
     const toastId = toast.loading("Menghubungkan Google Sheet dan meng-import data cache...");
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30_000);
+
     try {
       const res = await fetch("/api/programs/import", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
         body: JSON.stringify({
           name,
           description,
@@ -132,6 +136,7 @@ export default function ImportProgramPage() {
         }),
       });
 
+      clearTimeout(timeoutId);
       const data = await res.json();
 
       if (res.ok) {
@@ -140,9 +145,15 @@ export default function ImportProgramPage() {
       } else {
         toast.error(data.error || "Gagal menghubungkan Google Sheet.", { id: toastId });
       }
-    } catch (err) {
-      console.error(err);
-      toast.error("Terjadi kesalahan koneksi saat membuat program.", { id: toastId });
+    } catch (err: any) {
+      clearTimeout(timeoutId);
+      if (err.name === "AbortError") {
+        console.error("[import] Request timed out after 30s:", err);
+        toast.error("Permintaan memakan waktu terlalu lama (timeout 30 detik). Coba lagi atau periksa ukuran data Sheet.", { id: toastId });
+      } else {
+        console.error("[import] Fetch error:", err);
+        toast.error("Terjadi kesalahan koneksi saat membuat program.", { id: toastId });
+      }
     } finally {
       setIsSubmitting(false);
     }
