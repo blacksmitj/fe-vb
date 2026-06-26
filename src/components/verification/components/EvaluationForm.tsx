@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Calendar, FileText, Image as ImageIcon, Video, Tag, Bookmark, Hash, ArrowUpRight, Eye, Play, Globe } from "lucide-react";
+import { Calendar, FileText, Image as ImageIcon, Video, Tag, Bookmark, Hash, ArrowUpRight, Eye, Play, Globe, X } from "lucide-react";
 import {
   Combobox,
   ComboboxInput,
@@ -171,6 +171,92 @@ function SearchableCombobox({ value, options, placeholder, onValueChange, disabl
         </ComboboxList>
       </ComboboxContent>
     </Combobox>
+  );
+}
+
+interface PillsInputProps {
+  value: string;
+  separator: string;
+  onValueChange: (val: string) => void;
+  placeholder?: string;
+  disabled?: boolean;
+}
+
+function PillsInput({ value, separator, onValueChange, placeholder, disabled }: PillsInputProps) {
+  const [inputValue, setInputValue] = React.useState("");
+
+  const items = React.useMemo(() => {
+    if (!value) return [];
+    if (value.startsWith("[") && value.endsWith("]")) {
+      try {
+        const parsed = JSON.parse(value);
+        if (Array.isArray(parsed)) return parsed.map(i => String(i).trim()).filter(Boolean);
+      } catch (e) {}
+    }
+    return value.split(separator).map(i => i.trim()).filter(Boolean);
+  }, [value, separator]);
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === " " || e.key === "," || e.key === "Enter") {
+      e.preventDefault();
+      const trimmed = inputValue.trim().replace(/,/g, "");
+      if (trimmed && !items.includes(trimmed)) {
+        const newItems = [...items, trimmed];
+        onValueChange(newItems.join(separator));
+      }
+      setInputValue("");
+    } else if (e.key === "Backspace" && !inputValue && items.length > 0) {
+      e.preventDefault();
+      const newItems = items.slice(0, -1);
+      onValueChange(newItems.join(separator));
+    }
+  };
+
+  const handlePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    e.preventDefault();
+    const pastedText = e.clipboardData.getData("text");
+    const pastedItems = pastedText
+      .split(new RegExp(`[\\s,${separator}]+`))
+      .map(i => i.trim())
+      .filter(i => i.length > 0);
+
+    if (pastedItems.length > 0) {
+      const uniqueNewItems = Array.from(new Set([...items, ...pastedItems]));
+      onValueChange(uniqueNewItems.join(separator));
+    }
+  };
+
+  const removeItem = (itemToRemove: string) => {
+    const newItems = items.filter(i => i !== itemToRemove);
+    onValueChange(newItems.join(separator));
+  };
+
+  return (
+    <div className="flex flex-wrap gap-1.5 items-center p-1.5 w-full rounded-lg border border-input bg-background text-sm ring-offset-background focus-within:ring-1 focus-within:ring-ring">
+      {items.map((item, idx) => (
+        <Badge key={idx} variant="secondary" className="flex items-center gap-1 text-[10px] px-2 py-0.5 font-medium border pr-1">
+          <span>{item}</span>
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={() => removeItem(item)}
+            className="rounded-full outline-hidden hover:bg-muted p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-50"
+          >
+            <X className="h-3 w-3" />
+          </button>
+        </Badge>
+      ))}
+      <input
+        type="text"
+        value={inputValue}
+        onChange={(e) => setInputValue(e.target.value)}
+        onKeyDown={handleKeyDown}
+        onPaste={handlePaste}
+        disabled={disabled}
+        placeholder={items.length === 0 ? (placeholder || "Ketik dan tekan Spasi/Enter...") : ""}
+        className="flex-1 min-w-[120px] bg-transparent outline-hidden text-sm py-0.5 px-1 placeholder:text-muted-foreground/60 disabled:opacity-50"
+      />
+    </div>
   );
 }
 
@@ -350,11 +436,11 @@ export function EvaluationForm({ sections, participant, onFieldChange }: Evaluat
       case "array-pills":
         if (field.isEditable) {
           return (
-            <Input
+            <PillsInput
               value={valueStr}
-              onChange={(e) => onFieldChange?.(field.label, e.target.value)}
-              className="w-full text-sm"
-              placeholder={`Enter items separated by "${field.pillsSeparator || ","}"`}
+              separator={field.pillsSeparator || ","}
+              onValueChange={(val) => onFieldChange?.(field.label, val)}
+              placeholder={field.placeholder || `Ketik item...`}
             />
           );
         }
@@ -523,6 +609,11 @@ export function EvaluationForm({ sections, participant, onFieldChange }: Evaluat
                       <div className="pt-0.5">
                         {renderFieldValue(field)}
                       </div>
+                      {field.description && (
+                        <p className="text-xs italic text-muted-foreground/80 mt-1 pl-0.5 leading-relaxed">
+                          {field.description}
+                        </p>
+                      )}
                     </div>
                   ))}
               </div>
@@ -538,6 +629,11 @@ export function EvaluationForm({ sections, participant, onFieldChange }: Evaluat
                       <div className="pt-0.5">
                         {renderFieldValue(field)}
                       </div>
+                      {field.description && (
+                        <p className="text-xs italic text-muted-foreground/80 mt-1 pl-0.5 leading-relaxed">
+                          {field.description}
+                        </p>
+                      )}
                     </div>
                   ))}
               </div>
@@ -552,6 +648,11 @@ export function EvaluationForm({ sections, participant, onFieldChange }: Evaluat
                   <div className="pt-0.5">
                     {renderFieldValue(field)}
                   </div>
+                  {field.description && (
+                    <p className="text-xs italic text-muted-foreground/80 mt-1 pl-0.5 leading-relaxed">
+                      {field.description}
+                    </p>
+                  )}
                 </div>
               ))}
             </div>

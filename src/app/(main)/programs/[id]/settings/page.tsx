@@ -920,14 +920,26 @@ export default function ProgramSettingsPage({ params }: { params: Promise<{ id: 
           {/* TAB 2: MEMBERS APPROVAL LIST */}
           {activeTab === "members" && userRole === "ADMIN" && (
             <Card className="border border-border/50 shadow-sm">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-lg font-bold">
-                  <UsersIcon className="h-5 w-5 text-primary" />
-                  Daftar Pendaftar & Verifikator
-                </CardTitle>
-                <CardDescription>
-                  Kelola pendaftar baru yang ingin berkontribusi melakukan verifikasi data pada program ini.
-                </CardDescription>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+                <div className="space-y-1.5">
+                  <CardTitle className="flex items-center gap-2 text-lg font-bold">
+                    <UsersIcon className="h-5 w-5 text-primary" />
+                    Daftar Pendaftar & Verifikator
+                  </CardTitle>
+                  <CardDescription>
+                    Kelola pendaftar baru yang ingin berkontribusi melakukan verifikasi data pada program ini.
+                  </CardDescription>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={fetchMembers}
+                  disabled={isMembersLoading}
+                  className="h-8 gap-1.5"
+                >
+                  <RefreshCwIcon className={cn("h-3.5 w-3.5", isMembersLoading && "animate-spin")} />
+                  Refresh
+                </Button>
               </CardHeader>
               <CardContent>
                 {isMembersLoading ? (

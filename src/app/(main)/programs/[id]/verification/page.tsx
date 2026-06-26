@@ -169,6 +169,13 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
             </div>
           </header>
 
+          {program?.description && (
+            <div className="px-6 py-2.5 bg-muted/30 border-b text-xs text-muted-foreground flex items-center gap-2">
+              <span className="font-semibold text-foreground/80 shrink-0">Deskripsi:</span>
+              <span className="truncate" title={program.description}>{program.description}</span>
+            </div>
+          )}
+
           <div className="p-6 flex flex-col gap-6">
             {/* Sticky Navigator Container */}
             <div className="sticky top-0 z-20 bg-background/95 backdrop-blur-md pb-2.5 border-b pt-4 px-6 -mt-6 -mx-6">

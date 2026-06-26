@@ -11,4 +11,5 @@ export interface Program {
   data: Record<string, any>[];
   profileSchema?: any;
   status?: "PROCESSING" | "COMPLETED" | "FAILED" | "PARTIAL";
+  userRole?: "ADMIN" | "VERIFIER";
 }

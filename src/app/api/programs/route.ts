@@ -40,6 +40,15 @@ export async function GET() {
           },
           take: 1,
         },
+        programMembers: {
+          where: {
+            userId: session.user.id,
+          },
+          select: {
+            role: true,
+          },
+          take: 1,
+        },
       },
       orderBy: { createdAt: "desc" },
     });
@@ -54,6 +63,7 @@ export async function GET() {
       createdAt: p.createdAt,
       updatedAt: p.updatedAt,
       status: p.importLogs[0]?.status || "COMPLETED",
+      userRole: (p.programMembers[0]?.role ?? "VERIFIER") as "ADMIN" | "VERIFIER",
     }));
 
     return NextResponse.json(formattedPrograms);

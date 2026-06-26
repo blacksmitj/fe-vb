@@ -119,22 +119,23 @@ export async function PATCH(
       return NextResponse.json({ error: "Program not found" }, { status: 404 });
     }
 
-    const batch = await db.participantData.findFirst({
-      where: { programId: id, batchIndex },
-    });
+    // Fetch only the batch ID and the specific participant row
+    const result = await db.$queryRaw<Array<{ id: string; row: any }>>`
+      SELECT id, "rows"->CAST(${rowIndex} AS integer) as row
+      FROM "ParticipantData"
+      WHERE "programId" = ${id} AND "batchIndex" = ${batchIndex}
+      LIMIT 1
+    `;
 
-    if (!batch) {
+    const batch = result[0];
+
+    if (!batch || !batch.row) {
       return NextResponse.json({ error: "Participant data not found" }, { status: 404 });
-    }
-
-    const rows = (batch.rows as any[]) || [];
-    if (!rows[rowIndex]) {
-      return NextResponse.json({ error: "Participant row not found" }, { status: 404 });
     }
 
     // Prepare updated row
     const mergedParticipant = {
-      ...rows[rowIndex],
+      ...batch.row,
       ...(participant || {}),
       _evaluationStatus: status || "VERIFIED",
       _verifiedByName: session.user.name || session.user.email,
@@ -142,11 +143,12 @@ export async function PATCH(
       _evaluatedAt: new Date().toISOString(),
     };
 
-    // Save back to db
-    await db.participantData.update({
-      where: { id: batch.id },
-      data: { rows: rows.map((r, idx) => idx === rowIndex ? mergedParticipant : r) },
-    });
+    // Save back to db in-place using PostgreSQL jsonb_set
+    await db.$executeRaw`
+      UPDATE "ParticipantData"
+      SET "rows" = jsonb_set("rows", ARRAY[CAST(${rowIndex} AS text)], ${JSON.stringify(mergedParticipant)}::jsonb)
+      WHERE "id" = ${batch.id}
+    `;
 
     // Create activity log
     try {

@@ -229,41 +229,48 @@ export default function ProgramsPage() {
         header: () => <span className="sr-only">Aksi</span>,
         cell: ({ row }) => {
           const program = row.original;
+          const isAdmin = program.userRole === "ADMIN";
           return (
             <div className="flex items-center justify-end gap-2">
-              <Button
-                size="icon"
-                asChild
-                title="Lihat Detail"
-                variant="outline"
-                className="size-8"
-              >
-                <Link href={`/programs/import?edit=${program.id}`}>
-                  <EyeIcon className="size-4" />
-                </Link>
-              </Button>
-              <Button
-                size="icon"
-                asChild
-                title="Settings Google Sheet"
-                variant="outline"
-                className="size-8"
-              >
-                <Link href={`/programs/${program.id}/settings`}>
-                  <SettingsIcon className="size-4" />
-                </Link>
-              </Button>
-              <Button
-                size="icon"
-                asChild
-                title="Profile Builder"
-                variant="outline"
-                className="size-8"
-              >
-                <Link href={`/builder?programId=${program.id}`}>
-                  <LayoutTemplateIcon className="size-4" />
-                </Link>
-              </Button>
+              {isAdmin && (
+                <Button
+                  size="icon"
+                  asChild
+                  title="Lihat Detail"
+                  variant="outline"
+                  className="size-8"
+                >
+                  <Link href={`/programs/import?edit=${program.id}`}>
+                    <EyeIcon className="size-4" />
+                  </Link>
+                </Button>
+              )}
+              {isAdmin && (
+                <Button
+                  size="icon"
+                  asChild
+                  title="Settings"
+                  variant="outline"
+                  className="size-8"
+                >
+                  <Link href={`/programs/${program.id}/settings`}>
+                    <SettingsIcon className="size-4" />
+                  </Link>
+                </Button>
+              )}
+              {isAdmin && (
+                <Button
+                  size="icon"
+                  asChild
+                  title="Profile Builder"
+                  variant="outline"
+                  className="size-8"
+                >
+                  <Link href={`/builder?programId=${program.id}`}>
+                    <LayoutTemplateIcon className="size-4" />
+                  </Link>
+                </Button>
+              )}
               <Button
                 variant="secondary"
                 size="icon"
@@ -294,15 +301,17 @@ export default function ProgramsPage() {
               >
                 <Share2Icon className="size-4" />
               </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 size-8"
-                onClick={() => handleDelete(program.id, program.name)}
-                title="Hapus Program"
-              >
-                <Trash2Icon className="size-4" />
-              </Button>
+              {isAdmin && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 size-8"
+                  onClick={() => handleDelete(program.id, program.name)}
+                  title="Hapus Program"
+                >
+                  <Trash2Icon className="size-4" />
+                </Button>
+              )}
             </div>
           );
         },
