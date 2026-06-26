@@ -11,12 +11,4 @@ export interface Program {
   data: Record<string, any>[];
   profileSchema?: any;
   status?: "PROCESSING" | "COMPLETED" | "FAILED" | "PARTIAL";
-
-  // Google Sheet Config fields
-  sheetId?: string | null;
-  sheetName?: string | null;
-  sheetUniqueKey?: string | null;
-  sheetEvalStatusCol?: string | null;
-  sheetEvalDescCol?: string | null;
-  sheetLastSyncAt?: string | null;
 }

@@ -20,6 +20,7 @@ import {
   ArrowLeft,
   RotateCcw,
   Loader2,
+  RefreshCw,
 } from "lucide-react";
 
 function HeaderItem({
@@ -46,13 +47,13 @@ function HeaderItem({
         </span>
       </div>
       {sampleVal !== undefined &&
-        sampleVal !== null &&
-        String(sampleVal).trim() !== "" && (
-          <span className="text-[10px] text-muted-foreground/60 pl-[18px] font-normal truncate max-w-full block text-left">
-            Contoh:{" "}
-            <span className="italic">"{String(sampleVal)}"</span>
-          </span>
-        )}
+          sampleVal !== null &&
+          String(sampleVal).trim() !== "" && (
+            <span className="text-[10px] text-muted-foreground/60 pl-[18px] font-normal truncate max-w-full block text-left">
+              Contoh:{" "}
+              <span className="italic">"{String(sampleVal)}"</span>
+            </span>
+          )}
     </Button>
   );
 }
@@ -68,6 +69,8 @@ interface ProfileBuilderSidebarProps {
   onDiscardDraft?: () => void;
   hasDraft?: boolean;
   programId?: string | null;
+  onRefresh?: () => void;
+  isRefreshing?: boolean;
 }
 
 export default function ProfileBuilderSidebar({
@@ -81,6 +84,8 @@ export default function ProfileBuilderSidebar({
   onDiscardDraft,
   hasDraft = false,
   programId,
+  onRefresh,
+  isRefreshing = false,
 }: ProfileBuilderSidebarProps) {
   const EXCEL_HEADERS = [
     "NIK",
@@ -236,11 +241,37 @@ export default function ProfileBuilderSidebar({
           </div>
 
           <div className="flex items-center justify-between px-2 mb-1 shrink-0">
-            <div className="text-[11px] font-bold text-muted-foreground/85 uppercase tracking-wider">
-              Excel Headers ({filteredHeaders.length})
+            <div className="flex items-center gap-1.5">
+              <span className="text-[11px] font-bold text-muted-foreground/85 uppercase tracking-wider">
+                Excel Headers ({filteredHeaders.length})
+              </span>
+              {onRefresh && (
+                <TooltipProvider delayDuration={300}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        onClick={onRefresh}
+                        disabled={isRefreshing}
+                        className="p-1 rounded hover:bg-muted text-muted-foreground/75 hover:text-foreground transition-colors disabled:opacity-50"
+                        type="button"
+                        aria-label="Refresh headers"
+                      >
+                        {isRefreshing ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <RefreshCw className="h-3 w-3" />
+                        )}
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom">
+                      Refresh header terbaru
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
             </div>
             {hasDbHeaders && (
-              <span className="text-[9px] bg-emerald-500/10 text-emerald-600 px-1.5 py-0.5 rounded font-bold border border-emerald-500/20">
+              <span className="text-[9px] bg-emerald-500/10 text-emerald-600 px-1.5 py-0.5 rounded font-bold border border-emerald-500/20 shrink-0">
                 DATABASE
               </span>
             )}

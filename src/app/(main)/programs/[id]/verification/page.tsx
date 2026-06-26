@@ -46,44 +46,6 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
   const [isParticipantLoading, setIsParticipantLoading] = React.useState(true);
   const [isSchemaLoading, setIsSchemaLoading] = React.useState(true);
   const [isSaving, setIsSaving] = React.useState(false);
-  const [isSyncing, setIsSyncing] = React.useState(false);
-  const [hasSynced, setHasSynced] = React.useState(false);
-
-  // Auto-sync Google Sheet on page load
-  React.useEffect(() => {
-    async function autoSync() {
-      if (!program || hasSynced) return;
-      if (program.sheetId) {
-        setIsSyncing(true);
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 30_000);
-        try {
-          const syncRes = await fetch(`/api/programs/${id}/sheet/sync`, { method: "POST", signal: controller.signal });
-          clearTimeout(timeoutId);
-          const syncData = await syncRes.json();
-          if (syncRes.ok && syncData.success) {
-            toast.success("Data berhasil disinkronisasikan dari Google Sheet");
-          } else {
-            toast.error(syncData.error || "Gagal sinkronisasi data dari Google Sheet");
-          }
-        } catch (err: any) {
-          clearTimeout(timeoutId);
-          if (err.name === "AbortError") {
-            console.error("[verification/autoSync] Timed out after 30s:", err);
-            toast.error("Auto-sinkronisasi memakan waktu terlalu lama (timeout 30 detik).");
-          } else {
-            console.error("[verification/autoSync] Fetch error:", err);
-          }
-        } finally {
-          setIsSyncing(false);
-          setHasSynced(true);
-        }
-      } else {
-        setHasSynced(true);
-      }
-    }
-    autoSync();
-  }, [program, id, hasSynced]);
 
   // Fetch Program Profile Builder Schema
   React.useEffect(() => {
@@ -106,9 +68,6 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
 
   // Fetch Participant Data based on currentPage
   React.useEffect(() => {
-    // Only load participants AFTER initial autoSync completes
-    if (!hasSynced) return;
-
     async function loadParticipant() {
       setIsParticipantLoading(true);
       try {
@@ -135,7 +94,7 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
       }
     }
     loadParticipant();
-  }, [currentPage, id, setTotalRows, setEvaluationStatus, setApprovalDescription, resetEvaluation, hasSynced]);
+  }, [currentPage, id, setTotalRows, setEvaluationStatus, setApprovalDescription, resetEvaluation]);
 
   // Callback to update participant row locally after saving evaluation
   const handleParticipantUpdated = (updatedParticipant: Record<string, any>) => {
@@ -178,36 +137,7 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
     }
   };
 
-  const handleSyncManual = async () => {
-    setIsSyncing(true);
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30_000);
-    try {
-      const res = await fetch(`/api/programs/${id}/sheet/sync`, { method: "POST", signal: controller.signal });
-      clearTimeout(timeoutId);
-      const data = await res.json();
-      if (res.ok && data.success) {
-        toast.success(data.message || "Sinkronisasi berhasil");
-        // Force reload participant by triggering fetch state change
-        setHasSynced(false);
-      } else {
-        toast.error(data.error || "Gagal sinkronisasi");
-      }
-    } catch (err: any) {
-      clearTimeout(timeoutId);
-      if (err.name === "AbortError") {
-        console.error("[verification/manualSync] Timed out after 30s:", err);
-        toast.error("Sinkronisasi memakan waktu terlalu lama (timeout 30 detik). Coba lagi.");
-      } else {
-        console.error("[verification/manualSync] Fetch error:", err);
-        toast.error("Terjadi kesalahan koneksi");
-      }
-    } finally {
-      setIsSyncing(false);
-    }
-  };
-
-  const isLoading = isParticipantLoading || isSchemaLoading || isSyncing;
+  const isLoading = isParticipantLoading || isSchemaLoading;
 
   return (
     <MembershipGate programId={id}>
@@ -236,21 +166,9 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
               </Breadcrumb>
             </div>
             <div className="flex items-center gap-2">
-              {program?.sheetId && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-1.5 h-8"
-                  onClick={handleSyncManual}
-                  disabled={isSyncing}
-                >
-                  <RefreshCw className={`h-3.5 w-3.5 ${isSyncing ? "animate-spin" : ""}`} />
-                  Sync Sheet
-                </Button>
-              )}
               <Button variant="outline" size="sm" asChild className="h-8">
                 <Link href={`/programs/${id}/settings`}>
-                  Config Sheet
+                  Settings
                 </Link>
               </Button>
             </div>

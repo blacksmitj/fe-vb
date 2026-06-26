@@ -94,6 +94,7 @@ export default function ProfileBuilderFieldRenderer({
   const [editType, setEditType] = useState<FieldType>(field.type);
   const [editLabel, setEditLabel] = useState(field.label);
   const [editPlaceholder, setEditPlaceholder] = useState(field.placeholder || "");
+  const [editDescription, setEditDescription] = useState(field.description || "");
   const [editDateMode, setEditDateMode] = useState<'date-only' | 'date-time'>(field.dateMode || 'date-only');
   const [editDateLocale, setEditDateLocale] = useState<'id' | 'en'>(field.dateLocale || 'id');
   const [editPreviewFontMode, setEditPreviewFontMode] = useState<'sans' | 'mono'>(field.previewFontMode || 'sans');
@@ -110,6 +111,7 @@ export default function ProfileBuilderFieldRenderer({
     setEditType(field.type);
     setEditLabel(field.label);
     setEditPlaceholder(field.placeholder || "");
+    setEditDescription(field.description || "");
     setEditDateMode(field.dateMode || 'date-only');
     setEditDateLocale(field.dateLocale || 'id');
     setEditPreviewFontMode(field.previewFontMode || 'sans');
@@ -159,6 +161,7 @@ export default function ProfileBuilderFieldRenderer({
       type: editType,
       label: editLabel,
       placeholder: editPlaceholder,
+      description: editDescription.trim() || undefined,
       dateMode: editDateMode,
       dateLocale: editDateLocale,
       previewFontMode: editPreviewFontMode,
@@ -717,6 +720,13 @@ export default function ProfileBuilderFieldRenderer({
           {/* Render actual Input/Select/Upload Box */}
           {renderInput()}
 
+          {/* Optional field description */}
+          {field.description && (
+            <p className="text-[10px] text-muted-foreground/70 leading-snug px-0.5 mt-0.5 italic">
+              {field.description}
+            </p>
+          )}
+
           {/* Switch below the input */}
           {!field.locked && field.type !== "media" && !isOverlay && (
             <div className="flex items-center gap-1 select-none bg-muted/20 px-1.5 py-0 rounded border border-border/30 w-fit mt-0.5">
@@ -804,6 +814,18 @@ export default function ProfileBuilderFieldRenderer({
                       value={editLabel}
                       onChange={(e) => setEditLabel(e.target.value)}
                       placeholder="e.g. Phone Number, Date of Birth"
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="editDescription">
+                      Description
+                      <span className="ml-1.5 text-[10px] text-muted-foreground font-normal normal-case tracking-normal">(optional)</span>
+                    </Label>
+                    <Input
+                      id="editDescription"
+                      value={editDescription}
+                      onChange={(e) => setEditDescription(e.target.value)}
+                      placeholder="e.g. Hint or helper text for this field"
                     />
                   </div>
                   {(editType === "text" || editType === "textarea" || editType === "number") && (

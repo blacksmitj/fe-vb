@@ -17,19 +17,10 @@ model Program {
   fieldCount  Int      @default(0)
   errorCount  Int      @default(0)
 
-  // Google Sheet Configuration
-  sheetId            String?
-  sheetName          String?
-  sheetUniqueKey     String?   // Kolom ID unik di Sheet (misal: "NIK")
-  sheetEvalStatusCol String?   // Kolom di Sheet untuk menyimpan status evaluasi
-  sheetEvalDescCol   String?   // Kolom di Sheet untuk menyimpan deskripsi evaluasi
-  sheetLastSyncAt    DateTime?
-
   // Relasi ke tabel terpisah
   participantData ParticipantData[]
   profileSchema   ProfileSchema?
   importLogs      ImportLog[]
-  syncLogs        SyncLog[]
   programMembers  ProgramMember[]
   activityLogs    ActivityLog[]
 
@@ -160,33 +151,6 @@ model Verification {
   @@map("verification")
 }
 
-// ─────────────────────────────────────────────
-// Model: SyncLog
-// ─────────────────────────────────────────────
-model SyncLog {
-  id           String        @id @default(uuid())
-  programId    String
-  program      Program       @relation(fields: [programId], references: [id], onDelete: Cascade)
-  direction    SyncDirection
-  status       SyncStatus
-  rowsAffected Int           @default(0)
-  error        String?
-  syncedAt     DateTime      @default(now())
-
-  @@index([programId])
-  @@index([syncedAt(sort: Desc)])
-}
-
-enum SyncDirection {
-  PULL
-  PUSH
-}
-
-enum SyncStatus {
-  SUCCESS
-  FAILED
-  PARTIAL
-}
 
 // ─────────────────────────────────────────────
 // Model: ProgramMember

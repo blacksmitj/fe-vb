@@ -10,9 +10,6 @@ export async function GET(
     const program = await db.program.findUnique({
       where: { id },
       include: {
-        participantData: {
-          orderBy: { batchIndex: "asc" }
-        },
         profileSchema: true,
       }
     });
@@ -21,12 +18,23 @@ export async function GET(
       return NextResponse.json({ error: "Program not found" }, { status: 404 });
     }
 
-    // Combine headers and rows from participantData (only up to 10 rows for preview)
-    const firstBatch = program.participantData.find((p) => p.batchIndex === 0);
-    const headers = (firstBatch?.headers as string[]) ?? [];
+    // Fetch only the first batch for headers and preview data (sliced to 10 rows on DB side)
+    const previewResult = await db.$queryRaw<Array<{ headers: string; previewRows: string }>>`
+      SELECT "headers", jsonb_path_query_array("rows"::jsonb, '$[0 to 9]') as "previewRows"
+      FROM "ParticipantData"
+      WHERE "programId" = ${id} AND "batchIndex" = 0
+      LIMIT 1
+    `;
+    const firstBatch = previewResult[0] || null;
     
-    // Return only the first 10 rows for preview/builder page sample usage
-    const data = firstBatch ? ((firstBatch.rows as Record<string, any>[]) ?? []).slice(0, 10) : [];
+    // Parse headers and preview rows safely
+    const headers = typeof firstBatch?.headers === 'string'
+      ? JSON.parse(firstBatch.headers)
+      : (firstBatch?.headers as unknown as string[]) ?? [];
+      
+    const data = typeof firstBatch?.previewRows === 'string'
+      ? JSON.parse(firstBatch.previewRows)
+      : (firstBatch?.previewRows as unknown as Record<string, any>[]) ?? [];
 
     return NextResponse.json({
       id: program.id,

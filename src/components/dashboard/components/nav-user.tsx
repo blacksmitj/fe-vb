@@ -36,7 +36,7 @@ export function NavUser() {
   const user = {
     name: session?.user?.name || "Admin User",
     email: session?.user?.email || "admin@verif-builder.io",
-    avatar: session?.user?.image || "",
+    avatar: session?.user?.image || undefined,
   };
 
   const handleLogout = async () => {

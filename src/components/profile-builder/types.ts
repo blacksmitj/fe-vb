@@ -15,6 +15,7 @@ export interface Field {
   type: FieldType;
   label: string;
   placeholder?: string;
+  description?: string; // Optional helper text shown below the field input
   value?: string;
   locked?: boolean;
   column?: 'left' | 'right';

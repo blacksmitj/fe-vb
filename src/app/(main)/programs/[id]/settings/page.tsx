@@ -59,16 +59,10 @@ export default function ProgramSettingsPage({ params }: { params: Promise<{ id: 
   const router = useRouter();
   const { data: program, isLoading: isProgramLoading, refetch: refetchProgram } = useProgram(id);
 
-  const [sheetId, setSheetId] = React.useState("");
-  const [sheetName, setSheetName] = React.useState("");
-  const [sheetUniqueKey, setSheetUniqueKey] = React.useState("");
-  const [lastSyncAt, setLastSyncAt] = React.useState<string | null>(null);
-
-  const [isSaving, setIsSaving] = React.useState(false);
-  const [isSyncing, setIsSyncing] = React.useState(false);
+  const [isExporting, setIsExporting] = React.useState(false);
 
   // Tabs state
-  const [activeTab, setActiveTab] = React.useState("integration"); // "integration" | "members" | "logs"
+  const [activeTab, setActiveTab] = React.useState("export"); // "export" | "members" | "logs"
   const [userRole, setUserRole] = React.useState<string | null>(null);
   const [members, setMembers] = React.useState<any[]>([]);
   const [isMembersLoading, setIsMembersLoading] = React.useState(false);
@@ -83,31 +77,15 @@ export default function ProgramSettingsPage({ params }: { params: Promise<{ id: 
         if (res.ok) {
           const data = await res.json();
           setUserRole(data.role);
+          if (data.role !== "ADMIN") {
+            setActiveTab("logs");
+          }
         }
       } catch (err) {
         console.error("Failed to fetch user role", err);
       }
     }
     fetchRole();
-  }, [id]);
-
-  // Load existing config
-  React.useEffect(() => {
-    async function loadConfig() {
-      try {
-        const res = await fetch(`/api/programs/${id}/sheet`);
-        if (res.ok) {
-          const data: SheetConfig = await res.json();
-          setSheetId(data.sheetId || "");
-          setSheetName(data.sheetName || "");
-          setSheetUniqueKey(data.sheetUniqueKey || "");
-          setLastSyncAt(data.sheetLastSyncAt);
-        }
-      } catch (err) {
-        console.error("Failed to load sheet config", err);
-      }
-    }
-    loadConfig();
   }, [id]);
 
   // Fetch program members
@@ -153,74 +131,40 @@ export default function ProgramSettingsPage({ params }: { params: Promise<{ id: 
     }
   }, [activeTab, userRole, fetchMembers, fetchLogs]);
 
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSaving(true);
-
+  const handleExport = async () => {
+    setIsExporting(true);
+    const toastId = toast.loading("Sedang menyiapkan file Excel...");
     try {
-      const res = await fetch(`/api/programs/${id}/sheet`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          sheetId,
-          sheetName,
-          sheetUniqueKey,
-        }),
-      });
-
-      if (res.ok) {
-        toast.success("Konfigurasi Google Sheet berhasil disimpan");
-        refetchProgram();
-      } else {
-        const data = await res.json();
-        toast.error(data.error || "Gagal menyimpan konfigurasi");
+      const response = await fetch(`/api/programs/${id}/export`);
+      if (!response.ok) {
+        const errData = await response.json();
+        throw new Error(errData.error || "Gagal mengunduh file.");
       }
-    } catch (err) {
-      console.error(err);
-      toast.error("Terjadi kesalahan saat menyimpan konfigurasi");
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const handleSync = async () => {
-    if (!sheetId || !sheetName || !sheetUniqueKey) {
-      toast.error("Mohon lengkapi konfigurasi Sheet ID, Nama Tab, dan Kolom ID Unik sebelum melakukan sinkronisasi.");
-      return;
-    }
-
-    setIsSyncing(true);
-    const toastId = toast.loading("Mensinkronisasikan data dari Google Sheet...");
-
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30_000);
-
-    try {
-      const res = await fetch(`/api/programs/${id}/sheet/sync`, {
-        method: "POST",
-        signal: controller.signal,
-      });
-      clearTimeout(timeoutId);
-      const data = await res.json();
-
-      if (res.ok && data.success) {
-        toast.success(data.message || "Sinkronisasi berhasil", { id: toastId });
-        setLastSyncAt(new Date().toISOString());
-        refetchProgram();
-      } else {
-        toast.error(data.error || "Gagal melakukan sinkronisasi", { id: toastId });
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      
+      const contentDisposition = response.headers.get("Content-Disposition");
+      let fileName = `export_${program?.name?.replace(/[^a-z0-9]/gi, "_").toLowerCase() || id}.xlsx`;
+      if (contentDisposition) {
+        const match = contentDisposition.match(/filename="?([^"]+)"?/);
+        if (match && match[1]) fileName = match[1];
       }
+      
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+      
+      toast.success("Data berhasil diekspor ke Excel!", { id: toastId });
     } catch (err: any) {
-      clearTimeout(timeoutId);
-      if (err.name === "AbortError") {
-        console.error("[settings/sync] Request timed out after 30s:", err);
-        toast.error("Sinkronisasi memakan waktu terlalu lama (timeout 30 detik). Coba lagi.", { id: toastId });
-      } else {
-        console.error("[settings/sync] Fetch error:", err);
-        toast.error("Terjadi kesalahan koneksi saat sinkronisasi", { id: toastId });
-      }
+      console.error(err);
+      toast.error(err.message || "Gagal melakukan export data.", { id: toastId });
     } finally {
-      setIsSyncing(false);
+      setIsExporting(false);
     }
   };
 
@@ -242,18 +186,6 @@ export default function ProgramSettingsPage({ params }: { params: Promise<{ id: 
       console.error(err);
       toast.error("Terjadi kesalahan saat memproses status keanggotaan");
     }
-  };
-
-  const formatLastSync = (dateString: string | null) => {
-    if (!dateString) return "Belum pernah disinkronisasikan";
-    return new Date(dateString).toLocaleString("id-ID", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-    });
   };
 
   const formatTimestamp = (dateString: string) => {
@@ -322,18 +254,20 @@ export default function ProgramSettingsPage({ params }: { params: Promise<{ id: 
 
           {/* Tab Navigation */}
           <div className="flex border-b border-border/60 pb-px gap-1">
-            <Button
-              variant="ghost"
-              onClick={() => setActiveTab("integration")}
-              className={`h-9 px-4 rounded-none border-b-2 font-medium text-sm transition-all ${
-                activeTab === "integration"
-                  ? "border-primary text-foreground bg-muted/40"
-                  : "border-transparent text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <SettingsIcon className="h-4 w-4 mr-2" />
-              Integrasi Sheet
-            </Button>
+            {userRole === "ADMIN" && (
+              <Button
+                variant="ghost"
+                onClick={() => setActiveTab("export")}
+                className={`h-9 px-4 rounded-none border-b-2 font-medium text-sm transition-all ${
+                  activeTab === "export"
+                    ? "border-primary text-foreground bg-muted/40"
+                    : "border-transparent text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <DatabaseIcon className="h-4 w-4 mr-2" />
+                Data & Export
+              </Button>
+            )}
 
             {userRole === "ADMIN" && (
               <Button
@@ -364,128 +298,55 @@ export default function ProgramSettingsPage({ params }: { params: Promise<{ id: 
             </Button>
           </div>
 
-          {/* TAB 1: INTEGRATION CONFIG */}
-          {activeTab === "integration" && (
+          {/* TAB 1: DATA & EXPORT */}
+          {userRole === "ADMIN" && activeTab === "export" && (
             <div className="grid gap-6 md:grid-cols-3">
-              {/* Form Config */}
+              {/* Main Export Card */}
               <div className="md:col-span-2 space-y-6">
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
-                      <SettingsIcon className="h-5 w-5 text-primary" />
-                      Google Sheet Integration
+                      <DatabaseIcon className="h-5 w-5 text-primary" />
+                      Export Data Peserta
                     </CardTitle>
                     <CardDescription>
-                      Hubungkan Google Sheet sebagai basis data (master). Perubahan data evaluasi akan otomatis ditulis kembali ke kolom Sheet yang terdaftar.
+                      Unduh hasil akhir verifikasi program ini. Hasil unduhan berupa file Excel (.xlsx) yang berisi data asli peserta beserta status evaluasi, catatan verifikator, dan waktu evaluasi.
                     </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <form onSubmit={handleSave} className="space-y-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="sheetId">Google Spreadsheet ID</Label>
-                        <Input
-                          id="sheetId"
-                          placeholder="Masukkan ID Spreadsheet (contoh: 1aBcDeFgHiJkLmNoP...)"
-                          value={sheetId}
-                          onChange={(e) => setSheetId(e.target.value)}
-                          required
-                        />
-                        <p className="text-[11px] text-muted-foreground">
-                          Dapatkan ID ini dari URL spreadsheet Anda: https://docs.google.com/spreadsheets/d/<span className="font-bold text-foreground">[Spreadsheet-ID]</span>/edit
-                        </p>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="sheetName">Nama Tab / Worksheet</Label>
-                          <Input
-                            id="sheetName"
-                            placeholder="Contoh: Sheet1, Peserta"
-                            value={sheetName}
-                            onChange={(e) => setSheetName(e.target.value)}
-                            required
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="sheetUniqueKey">Kolom ID Unik (Primary Key)</Label>
-                          <Input
-                            id="sheetUniqueKey"
-                            placeholder="Contoh: NIK, ID_PESERTA"
-                            value={sheetUniqueKey}
-                            onChange={(e) => setSheetUniqueKey(e.target.value)}
-                            required
-                          />
-                        </div>
-                      </div>
-
-                      <div className="flex justify-end pt-2">
-                        <Button type="submit" disabled={isSaving} className="gap-2">
-                          {isSaving ? (
-                            <RefreshCwIcon className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <SaveIcon className="h-4 w-4" />
-                          )}
-                          Simpan Konfigurasi
-                        </Button>
-                      </div>
-                    </form>
-                  </CardContent>
-                </Card>
-              </div>
-
-              {/* Sync Stats panel */}
-              <div className="space-y-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <DatabaseIcon className="h-5 w-5 text-primary" />
-                      Status Cache & Sync
-                    </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="rounded-lg bg-muted/50 p-4 border space-y-3">
                       <div className="flex justify-between items-center text-xs">
-                        <span className="text-muted-foreground font-medium">Jumlah Baris Cache:</span>
+                        <span className="text-muted-foreground font-medium">Total Baris Data:</span>
                         <span className="font-bold text-foreground">{(program?.totalRows ?? 0).toLocaleString("id-ID")} baris</span>
                       </div>
                       <div className="flex justify-between items-center text-xs">
-                        <span className="text-muted-foreground font-medium">Jumlah Kolom Cache:</span>
+                        <span className="text-muted-foreground font-medium">Jumlah Kolom:</span>
                         <span className="font-bold text-foreground">{program?.fieldCount ?? 0} kolom</span>
                       </div>
                       <div className="flex justify-between items-center text-xs">
-                        <span className="text-muted-foreground font-medium">Jumlah Validation Error:</span>
+                        <span className="text-muted-foreground font-medium">Jumlah Validation Error (Import):</span>
                         <span className={`font-bold ${program?.errorCount && program.errorCount > 0 ? "text-rose-500" : "text-emerald-500"}`}>
                           {program?.errorCount ?? 0} baris
                         </span>
                       </div>
                     </div>
 
-                    <div className="space-y-2">
-                      <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider block">Sync Terakhir</span>
-                      <div className="flex items-start gap-2 text-xs">
-                        {lastSyncAt ? (
-                          <CheckCircle2Icon className="h-4 w-4 text-emerald-500 mt-0.5 shrink-0" />
+                    <div className="flex justify-end">
+                      <Button onClick={handleExport} disabled={isExporting || !program?.totalRows} className="gap-2 w-full md:w-auto">
+                        {isExporting ? (
+                          <RefreshCwIcon className="h-4 w-4 animate-spin" />
                         ) : (
-                          <AlertTriangleIcon className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
+                          <DatabaseIcon className="h-4 w-4" />
                         )}
-                        <span className="font-medium text-foreground/80 break-all">
-                          {formatLastSync(lastSyncAt)}
-                        </span>
-                      </div>
+                        Export Data ke Excel (.xlsx)
+                      </Button>
                     </div>
-
-                    <Button
-                      onClick={handleSync}
-                      disabled={isSyncing}
-                      className="w-full gap-2"
-                      variant="outline"
-                    >
-                      <RefreshCwIcon className={`h-4 w-4 ${isSyncing ? "animate-spin" : ""}`} />
-                      Sync / Tarik Data Sekarang
-                    </Button>
                   </CardContent>
                 </Card>
+              </div>
 
+              {/* Instructions Panel */}
+              <div className="space-y-6">
                 <Card>
                   <CardHeader className="pb-2">
                     <CardTitle className="flex items-center gap-2 text-sm">
@@ -495,13 +356,13 @@ export default function ProgramSettingsPage({ params }: { params: Promise<{ id: 
                   </CardHeader>
                   <CardContent className="text-xs text-muted-foreground leading-relaxed space-y-2">
                     <p>
-                      1. Pastikan Anda sudah memberikan akses edit ke file Google Sheet untuk verifikator Anda.
+                      1. Data peserta diimpor dari file Excel eksternal melalui menu <strong>Import Data</strong> di dashboard program.
                     </p>
                     <p>
-                      2. Kolom ID unik diisi persis seperti header kolom di Google Sheet. Nama bersifat case-sensitive.
+                      2. Verifikator akan memproses status kelayakan masing-masing peserta (Approve / Reject) secara langsung melalui antarmuka web.
                     </p>
                     <p>
-                      3. Saat halaman verifikasi dibuka, program otomatis menarik data paling baru dari Sheet ke database cache lokal.
+                      3. Hasil akhir dapat Anda ekspor kapan saja untuk pelaporan. Tiga kolom tambahan akan otomatis disematkan di bagian kanan kolom Excel: <strong>Status Evaluasi</strong>, <strong>Catatan Evaluasi</strong>, dan <strong>Waktu Evaluasi</strong>.
                     </p>
                   </CardContent>
                 </Card>
@@ -547,7 +408,7 @@ export default function ProgramSettingsPage({ params }: { params: Promise<{ id: 
                           <TableRow key={member.id}>
                             <TableCell className="flex items-center gap-3">
                               <Avatar className="h-8 w-8">
-                                <AvatarImage src={member.user.image || ""} />
+                                <AvatarImage src={member.user.image || undefined} />
                                 <AvatarFallback className="text-[10px] bg-primary/10 text-primary">
                                   {member.user.name?.slice(0, 2).toUpperCase() || "US"}
                                 </AvatarFallback>

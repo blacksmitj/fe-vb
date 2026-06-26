@@ -1,6 +1,5 @@
 import { db } from "@/lib/db";
 import { auth } from "@/lib/auth/auth";
-import { pushRowToSheet } from "@/lib/sync-service";
 import { headers as getHeaders } from "next/headers";
 import { NextResponse } from "next/server";
 
@@ -114,8 +113,7 @@ export async function PATCH(
     const program = await db.program.findUnique({
       where: { id },
       select: { 
-        sheetId: true,
-        sheetUniqueKey: true,
+        name: true,
       },
     });
 
@@ -145,8 +143,6 @@ export async function PATCH(
       _evaluatedAt: new Date().toISOString(),
     };
 
-
-
     // Save back to db
     await db.participantData.update({
       where: { id: batch.id },
@@ -155,7 +151,7 @@ export async function PATCH(
 
     // Create activity log
     try {
-      const uniqueKey = program.sheetUniqueKey || Object.keys(mergedParticipant)[0] || "ID";
+      const uniqueKey = Object.keys(mergedParticipant).find(k => !k.startsWith('_')) || "ID";
       const uniqueValue = mergedParticipant[uniqueKey] || "Unknown";
       const details = `Mengubah status verifikasi peserta (${uniqueKey}: ${uniqueValue}) menjadi "${status}".${
         description ? ` Catatan: ${description}` : ""
@@ -171,24 +167,6 @@ export async function PATCH(
       });
     } catch (logError) {
       console.error("Failed to write activity log:", logError);
-    }
-
-    // PUSH: If Google Sheet integration is configured, push the change
-    if (program.sheetId && program.sheetUniqueKey) {
-      const uniqueKeyValue = String(mergedParticipant[program.sheetUniqueKey] || "").trim();
-      if (uniqueKeyValue) {
-        try {
-          await pushRowToSheet(id, uniqueKeyValue, mergedParticipant, session.user.id);
-        } catch (sheetError: any) {
-          console.error("Error pushing to Google Sheet on save:", sheetError);
-          // Return warning in output but keep db save successful
-          return NextResponse.json({ 
-            success: true, 
-            participant: mergedParticipant,
-            warning: `Data saved locally, but failed to sync to Google Sheet: ${sheetError.message || sheetError}`
-          });
-        }
-      }
     }
 
     return NextResponse.json({ success: true, participant: mergedParticipant });
