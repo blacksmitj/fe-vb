@@ -8,7 +8,7 @@ export async function GET(
   try {
     const { id } = await params;
 
-    const [program, firstBatch, schema] = await Promise.all([
+    const [program, firstParticipant, schema] = await Promise.all([
       // Metadata saja — tanpa relasi berat
       db.program.findUnique({
         where: { id },
@@ -23,10 +23,11 @@ export async function GET(
         },
       }),
 
-      // Hanya batch pertama untuk headers + satu sampleRow
-      db.participantData.findFirst({
-        where: { programId: id, batchIndex: 0 },
-        select: { headers: true, rows: true },
+      // Hanya ambil headers dan data dari participant pertama
+      db.participant.findFirst({
+        where: { programId: id },
+        orderBy: { rowIndex: "asc" },
+        select: { headers: true, data: true },
       }),
 
       // Konfigurasi layout
@@ -40,13 +41,13 @@ export async function GET(
       return NextResponse.json({ error: "Program not found" }, { status: 404 });
     }
 
-    const headers = (firstBatch?.headers as string[]) ?? [];
-    const allRows = (firstBatch?.rows as Record<string, unknown>[]) ?? [];
+    const headers = (firstParticipant?.headers as string[]) ?? [];
+    const sampleRow = (firstParticipant?.data as Record<string, unknown>) ?? {};
 
     return NextResponse.json({
       program,
       headers,
-      sampleRow: allRows[0] ?? {}, // hanya baris pertama untuk preview field
+      sampleRow, // hanya baris pertama untuk preview field
       schema: schema?.sections ?? [],
       schemaVersion: schema?.version ?? 0,
     });

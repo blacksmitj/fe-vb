@@ -27,10 +27,9 @@ export function ParticipantNavigator({
   evaluationStatus = null,
 }: ParticipantNavigatorProps) {
   const {
-    currentPage,
-    setCurrentPage,
+    currentRowIndex,
+    setCurrentRowIndex,
     totalRows,
-    setTotalRows,
   } = useVerificationStore();
 
   const [searchVal, setSearchVal] = React.useState("");
@@ -79,19 +78,19 @@ export function ParticipantNavigator({
   }, []);
 
   const handleNext = () => {
-    if (currentPage < totalRows - 1) {
-      setCurrentPage(currentPage + 1);
+    if (currentRowIndex < totalRows - 1) {
+      setCurrentRowIndex(currentRowIndex + 1);
     }
   };
 
   const handlePrev = () => {
-    if (currentPage > 0) {
-      setCurrentPage(currentPage - 1);
+    if (currentRowIndex > 0) {
+      setCurrentRowIndex(currentRowIndex - 1);
     }
   };
 
   const selectParticipant = (globalIndex: number) => {
-    setCurrentPage(globalIndex);
+    setCurrentRowIndex(globalIndex);
     setSearchVal("");
     setResults([]);
     setShowDropdown(false);
@@ -107,8 +106,8 @@ export function ParticipantNavigator({
     if (nameKey && row[nameKey]) return String(row[nameKey]);
     
     // Fallback: use first string field
-    const stringVal = Object.values(row).find(val => typeof val === "string" && val.length > 0);
-    return stringVal ? String(stringVal) : `Participant ${keys[0] ? row[keys[0]] : ""}`;
+    const stringVal = Object.values(row).find(val => typeof val === "string" && val.length > 0 && !val.startsWith("cl") && val.length !== 25);
+    return stringVal ? String(stringVal) : `Participant ${keys[0] && row[keys[0]] ? row[keys[0]] : ""}`;
   };
 
   // Helper to find which field matched the search query
@@ -116,7 +115,7 @@ export function ParticipantNavigator({
     if (!query) return null;
     const q = query.toLowerCase();
     for (const [key, val] of Object.entries(row)) {
-      if (key.startsWith("_")) continue;
+      if (key.startsWith("_") || key === "id" || key === "uniqueKey") continue;
       const valStr = String(val);
       if (valStr.toLowerCase().includes(q)) {
         return { key, value: valStr };
@@ -166,7 +165,7 @@ export function ParticipantNavigator({
                     onClick={() => selectParticipant(res.globalIndex)}
                     className={cn(
                       "flex flex-col w-full text-left p-2.5 hover:bg-accent hover:text-accent-foreground transition-colors",
-                      res.globalIndex === currentPage && "bg-accent/50"
+                      res.globalIndex === currentRowIndex && "bg-accent/50"
                     )}
                   >
                     <div className="flex items-center justify-between gap-2 w-full">
@@ -200,19 +199,19 @@ export function ParticipantNavigator({
           variant="outline"
           size="icon"
           onClick={handlePrev}
-          disabled={currentPage === 0}
+          disabled={currentRowIndex === 0}
           className="h-8 w-8"
         >
           <ChevronLeft className="h-4 w-4" />
         </Button>
         <span className="text-xs font-semibold min-w-[70px] text-center select-none text-muted-foreground">
-          {totalRows > 0 ? `${currentPage + 1} / ${totalRows}` : "0 / 0"}
+          {totalRows > 0 ? `${currentRowIndex + 1} / ${totalRows}` : "0 / 0"}
         </span>
         <Button
           variant="outline"
           size="icon"
           onClick={handleNext}
-          disabled={currentPage >= totalRows - 1}
+          disabled={currentRowIndex >= totalRows - 1}
           className="h-8 w-8"
         >
           <ChevronRight className="h-4 w-4" />

@@ -13,12 +13,13 @@ model Program {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  totalRows   Int      @default(0)
-  fieldCount  Int      @default(0)
-  errorCount  Int      @default(0)
+  totalRows       Int      @default(0)
+  fieldCount      Int      @default(0)
+  errorCount      Int      @default(0)
+  uniqueKeyColumn String   @default("")  // nama kolom ID unik, contoh: "NIK"
 
   // Relasi ke tabel terpisah
-  participantData ParticipantData[]
+  participants    Participant[]
   profileSchema   ProfileSchema?
   importLogs      ImportLog[]
   programMembers  ProgramMember[]
@@ -28,24 +29,36 @@ model Program {
 }
 
 // ─────────────────────────────────────────────
-// Model: ParticipantData
+// Model: Participant
 // ─────────────────────────────────────────────
-model ParticipantData {
-  id           String   @id @default(uuid())
-  programId    String
-  program      Program  @relation(fields: [programId], references: [id], onDelete: Cascade)
+model Participant {
+  id              String   @id @default(cuid())
+  programId       String
+  program         Program  @relation(fields: [programId], references: [id], onDelete: Cascade)
 
-  headers      Json?    // String[] | null
-  rows         Json     // Record<string, unknown>[]
+  rowIndex        Int      // urutan asli dari Excel (0-based)
+  uniqueKey       String   // nilai kolom ID unik (contoh: NIK, No. Peserta)
 
-  batchIndex   Int      @default(0)
-  totalInBatch Int      @default(0)
-  importedAt   DateTime @default(now())
+  data            Json     // semua field Excel: { "Nama": "...", "Alamat": "...", ... }
+  headers         String[] // daftar header kolom program ini
 
-  errorDetails Json?    // ErrorDetail[] | null
+  // Kolom evaluasi — terpisah dari data{}, bisa di-index dan query langsung
+  evalStatus      String?   // "VERIFIED" | "REJECTED" | null (belum)
+  evalDescription String?
+  evalByUserId    String?
+  evalByUserName  String?
+  evalAt          DateTime?
 
+  // Untuk full-text search: concat semua value dari data{}
+  searchText      String   @default("")
+
+  importedAt      DateTime @default(now())
+
+  @@unique([programId, uniqueKey])       // enforce unique key per program di DB level
+  @@unique([programId, rowIndex])        // enforce urutan unik per program
   @@index([programId])
-  @@index([programId, batchIndex])
+  @@index([programId, evalStatus])       // filter/stats by status
+  @@index([programId, rowIndex])         // navigasi prev/next
 }
 
 // ─────────────────────────────────────────────

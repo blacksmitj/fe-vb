@@ -34,47 +34,24 @@ export async function POST(
       return NextResponse.json({ error: "Program not found" }, { status: 404 });
     }
 
-    // Find all participant data batches
-    const batches = await db.participantData.findMany({
+    // Find first participant to check current headers
+    const firstParticipant = await db.participant.findFirst({
       where: { programId: id },
-      select: {
-        id: true,
-        headers: true,
-        batchIndex: true,
-      },
+      select: { headers: true },
     });
 
-    if (batches.length === 0) {
-      // Create a default batch index 0 if no participant data exists yet
-      await db.participantData.create({
-        data: {
-          programId: id,
-          batchIndex: 0,
-          headers: [cleanHeader],
-          rows: [],
-        },
-      });
-      return NextResponse.json({ success: true, headers: [cleanHeader] });
-    }
+    let updatedHeaders: string[] = [cleanHeader];
 
-    let updatedHeaders: string[] = [];
-
-    // Update headers in all batches
-    for (const batch of batches) {
-      const currentHeaders = (batch.headers as string[]) || [];
+    if (firstParticipant) {
+      const currentHeaders = (firstParticipant.headers as string[]) || [];
       if (!currentHeaders.map(h => h.toLowerCase()).includes(cleanHeader.toLowerCase())) {
-        const nextHeaders = [...currentHeaders, cleanHeader];
-        await db.participantData.update({
-          where: { id: batch.id },
-          data: { headers: nextHeaders },
+        updatedHeaders = [...currentHeaders, cleanHeader];
+        await db.participant.updateMany({
+          where: { programId: id },
+          data: { headers: updatedHeaders },
         });
-        if (batch.batchIndex === 0) {
-          updatedHeaders = nextHeaders;
-        }
       } else {
-        if (batch.batchIndex === 0) {
-          updatedHeaders = currentHeaders;
-        }
+        updatedHeaders = currentHeaders;
       }
     }
 

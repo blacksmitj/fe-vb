@@ -62,41 +62,26 @@ export async function PATCH(
       select: { version: true },
     });
 
-    // Synchronize layout headers to ParticipantData headers
+    // Synchronize layout headers to Participant headers
     if (layoutHeaders.length > 0) {
-      const batches = await db.participantData.findMany({
+      const firstParticipant = await db.participant.findFirst({
         where: { programId: id },
-        select: {
-          id: true,
-          headers: true,
-        },
+        select: { headers: true },
       });
 
-      if (batches.length > 0) {
-        for (const batch of batches) {
-          const currentHeaders = (batch.headers as string[]) || [];
-          const missingHeaders = layoutHeaders.filter(
-            (lh) => !currentHeaders.map((ch) => ch.toLowerCase()).includes(lh.toLowerCase())
-          );
+      if (firstParticipant) {
+        const currentHeaders = (firstParticipant.headers as string[]) || [];
+        const missingHeaders = layoutHeaders.filter(
+          (lh) => !currentHeaders.map((ch) => ch.toLowerCase()).includes(lh.toLowerCase())
+        );
 
-          if (missingHeaders.length > 0) {
-            const nextHeaders = [...currentHeaders, ...missingHeaders];
-            await db.participantData.update({
-              where: { id: batch.id },
-              data: { headers: nextHeaders },
-            });
-          }
+        if (missingHeaders.length > 0) {
+          const nextHeaders = [...currentHeaders, ...missingHeaders];
+          await db.participant.updateMany({
+            where: { programId: id },
+            data: { headers: nextHeaders },
+          });
         }
-      } else {
-        // If there are no participant data batches yet, initialize batch 0
-        await db.participantData.create({
-          data: {
-            programId: id,
-            batchIndex: 0,
-            headers: layoutHeaders,
-            rows: [],
-          },
-        });
       }
     }
 

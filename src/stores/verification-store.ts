@@ -7,8 +7,11 @@ interface VerificationState {
   searchQuery: string;
   setSearchQuery: (query: string) => void;
   
-  currentPage: number;
-  setCurrentPage: (page: number) => void;
+  currentRowIndex: number;
+  setCurrentRowIndex: (index: number) => void;
+
+  currentParticipantId: string | null;
+  setCurrentParticipantId: (id: string | null) => void;
   
   totalRows: number;
   setTotalRows: (total: number) => void;
@@ -34,8 +37,11 @@ export const useVerificationStore = create<VerificationState>()((set) => ({
   searchQuery: '',
   setSearchQuery: (query) => set({ searchQuery: query }),
 
-  currentPage: 0,
-  setCurrentPage: (page) => set({ currentPage: page }),
+  currentRowIndex: 0,
+  setCurrentRowIndex: (index) => set({ currentRowIndex: index }),
+
+  currentParticipantId: null,
+  setCurrentParticipantId: (id) => set({ currentParticipantId: id }),
 
   totalRows: 0,
   setTotalRows: (total) => set({ totalRows: total }),
@@ -52,5 +58,5 @@ export const useVerificationStore = create<VerificationState>()((set) => ({
   approvalDescription: '',
   setApprovalDescription: (desc) => set({ approvalDescription: desc }),
 
-  resetEvaluation: () => set({ evaluationStatus: null, approvalDescription: '' }),
+  resetEvaluation: () => set({ evaluationStatus: null, approvalDescription: '', currentParticipantId: null }),
 }));

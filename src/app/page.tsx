@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { signIn } from "@/lib/auth/auth-client";
 import { Button } from "@/components/ui/button";
@@ -8,7 +8,7 @@ import { Spinner } from "@/components/ui/spinner";
 
 import { toast } from "sonner";
 
-export default function Home() {
+function HomeContent() {
   const [isLoading, setIsLoading] = useState(false);
   const searchParams = useSearchParams();
   const callbackURL = searchParams.get("callbackURL") || "/dashboard";
@@ -147,5 +147,13 @@ export default function Home() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function Home() {
+  return (
+    <Suspense fallback={null}>
+      <HomeContent />
+    </Suspense>
   );
 }

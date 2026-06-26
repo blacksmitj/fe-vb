@@ -31,7 +31,9 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
   const { data: program } = useProgram(id);
   
   const {
-    currentPage,
+    currentRowIndex,
+    setCurrentParticipantId,
+    currentParticipantId,
     setTotalRows,
     setEvaluationStatus,
     setApprovalDescription,
@@ -66,12 +68,12 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
     loadSchema();
   }, [id]);
 
-  // Fetch Participant Data based on currentPage
+  // Fetch Participant Data based on currentRowIndex
   React.useEffect(() => {
     async function loadParticipant() {
       setIsParticipantLoading(true);
       try {
-        const res = await fetch(`/api/programs/${id}/participants?page=${currentPage}`);
+        const res = await fetch(`/api/programs/${id}/participants?page=${currentRowIndex}`);
         const data = await res.json();
         setParticipant(data.participant);
         
@@ -81,6 +83,7 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
 
         // Sync local store evaluation state with the fetched participant's evaluation
         if (data.participant) {
+          setCurrentParticipantId(data.participant.id || null);
           setEvaluationStatus(data.participant._evaluationStatus || null);
           setApprovalDescription(data.participant._evaluationDescription || "");
         } else {
@@ -94,7 +97,7 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
       }
     }
     loadParticipant();
-  }, [currentPage, id, setTotalRows, setEvaluationStatus, setApprovalDescription, resetEvaluation]);
+  }, [currentRowIndex, id, setTotalRows, setEvaluationStatus, setApprovalDescription, resetEvaluation, setCurrentParticipantId]);
 
   // Callback to update participant row locally after saving evaluation
   const handleParticipantUpdated = (updatedParticipant: Record<string, any>) => {
@@ -108,7 +111,11 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      const res = await fetch(`/api/programs/${id}/participants?page=${currentPage}`, {
+      const url = currentParticipantId 
+        ? `/api/programs/${id}/participants?participantId=${currentParticipantId}`
+        : `/api/programs/${id}/participants?page=${currentRowIndex}`;
+
+      const res = await fetch(url, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -217,7 +224,7 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           {Object.entries(participant)
-                            .filter(([key]) => !key.startsWith("_")) // Hide internal evaluation fields
+                            .filter(([key]) => !key.startsWith("_") && key !== "id" && key !== "uniqueKey") // Hide internal evaluation fields
                             .map(([key, val]) => (
                               <div key={key} className="border-b pb-2">
                                 <span className="text-[10px] text-muted-foreground block font-bold uppercase tracking-wider">

@@ -2,8 +2,14 @@ import { db } from "@/lib/db";
 import { auth } from "@/lib/auth/auth";
 import { headers as getHeaders } from "next/headers";
 import { NextResponse } from "next/server";
-import ExcelJS from "exceljs";
-import { Readable } from "stream";
+import { parseExcelFile } from "@/lib/excel-parser";
+
+function buildSearchText(data: Record<string, any>): string {
+  return Object.values(data)
+    .filter((v) => v != null && v !== "")
+    .map((v) => String(v))
+    .join(" ");
+}
 
 export async function POST(req: Request) {
   const session = await auth.api.getSession({
@@ -33,120 +39,22 @@ export async function POST(req: Request) {
     }
 
     const buffer = Buffer.from(await file.arrayBuffer());
-    const workbook = new ExcelJS.Workbook();
-    const filename = file.name.toLowerCase();
-
-    if (filename.endsWith(".csv")) {
-      const stream = Readable.from(buffer);
-      await workbook.csv.read(stream);
-    } else {
-      await workbook.xlsx.load(buffer as any);
-    }
-
-    // Find the correct worksheet
-    let worksheet = workbook.worksheets[0];
-    if (sheetName) {
-      const found = workbook.worksheets.find(s => s.name === sheetName);
-      if (found) worksheet = found;
-    }
-
-    if (!worksheet) {
-      return NextResponse.json({ error: "Spreadsheet tidak memiliki worksheet." }, { status: 400 });
-    }
-
-    // 1. Find Header Row
-    let headerRow = worksheet.getRow(1);
-    let headerRowNumber = 1;
-    for (let i = 1; i <= Math.min(worksheet.rowCount, 10); i++) {
-      const row = worksheet.getRow(i);
-      const rowValues = row.values;
-      if (rowValues && (Array.isArray(rowValues) ? rowValues.some(v => v !== null && v !== undefined) : Object.keys(rowValues).length > 0)) {
-        headerRow = row;
-        headerRowNumber = i;
-        break;
-      }
-    }
-
-    const headersList: string[] = [];
-    headerRow.eachCell({ includeEmpty: false }, (cell) => {
-      const value = cell.value;
-      if (value !== null && value !== undefined) {
-        if (typeof value === "object" && "text" in value) {
-          headersList.push(String(value.text).trim());
-        } else {
-          headersList.push(String(value).trim());
-        }
-      }
-    });
-
-    const cleanHeaders = Array.from(new Set(headersList.filter(h => h.length > 0)));
-
-    if (!cleanHeaders.includes(sheetUniqueKey)) {
-      return NextResponse.json({ error: `Kolom ID Unik "${sheetUniqueKey}" tidak ditemukan di file.` }, { status: 400 });
-    }
-
-    // 2. Parse Rows
-    const rows: Record<string, any>[] = [];
-    worksheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
-      if (rowNumber <= headerRowNumber) return;
-
-      const rowData: Record<string, any> = {};
-      cleanHeaders.forEach((header, idx) => {
-        const cell = row.getCell(idx + 1);
-        let val = cell.value;
-        if (val !== null && val !== undefined) {
-          if (typeof val === "object") {
-            if ("text" in val) {
-              val = val.text;
-            } else if ("result" in val) {
-              val = val.result;
-            } else if (val instanceof Date) {
-              // Let's keep Date
-            } else {
-              val = JSON.stringify(val);
-            }
-          }
-          rowData[header] = typeof val === "string" ? val.trim() : val;
-        } else {
-          rowData[header] = "";
-        }
-      });
-
-      rowData["__sheetRowIndex"] = rowNumber;
-      rows.push(rowData);
-    });
+    
+    // Parse using the shared utility
+    const { headers: cleanHeaders, rows, errors: errorsList } = await parseExcelFile(
+      buffer,
+      file.name,
+      sheetUniqueKey,
+      sheetName
+    );
 
     if (rows.length === 0) {
       return NextResponse.json({ error: "File spreadsheet tidak memiliki baris data." }, { status: 400 });
     }
 
-    // 3. Validation: Unique Key Check
-    const errorsList: any[] = [];
-    const keyMap = new Map<string, number>();
-
-    rows.forEach((row, i) => {
-      const keyValue = String(row[sheetUniqueKey] || "").trim();
-      const currentSheetRow = row["__sheetRowIndex"];
-      if (!keyValue) {
-        errorsList.push({
-          row: currentSheetRow,
-          column: sheetUniqueKey,
-          message: "Unique Key kosong."
-        });
-      } else if (keyMap.has(keyValue)) {
-        errorsList.push({
-          row: currentSheetRow,
-          column: sheetUniqueKey,
-          message: `Duplikasi Unique Key: "${keyValue}" (sudah ada di baris ${keyMap.get(keyValue)})`
-        });
-      } else {
-        keyMap.set(keyValue, currentSheetRow);
-      }
-    });
-
-    // 4. Create Program in Transaction
+    // Create Program and Participants in a transaction
     const program = await db.$transaction(async (tx) => {
-      // Create program metadata
+      // Create program metadata including uniqueKeyColumn
       const prog = await tx.program.create({
         data: {
           name,
@@ -154,6 +62,7 @@ export async function POST(req: Request) {
           totalRows: rows.length,
           fieldCount: cleanHeaders.length,
           errorCount: errorsList.length,
+          uniqueKeyColumn: sheetUniqueKey,
           programMembers: {
             create: {
               userId: session.user.id,
@@ -164,31 +73,22 @@ export async function POST(req: Request) {
         },
       });
 
-      // Prepare all batch records
-      const participantDataRecords = [];
-      const batchSize = 500;
-      for (let i = 0; i < rows.length; i += batchSize) {
-        const chunk = rows.slice(i, i + batchSize);
-        const batchIndex = Math.floor(i / batchSize);
-        
-        // Filter errors that belong to this batch
-        const startRow = i + headerRowNumber + 1;
-        const endRow = startRow + chunk.length - 1;
-        const batchErrors = errorsList.filter(e => e.row >= startRow && e.row <= endRow);
-
-        participantDataRecords.push({
+      // Prepare all participant records
+      const participantRecords = rows.map((row, rowIndex) => {
+        const { [sheetUniqueKey]: uniqueKeyValue, __sheetRowIndex, ...rest } = row;
+        return {
           programId: prog.id,
-          headers: cleanHeaders as any,
-          rows: chunk as any,
-          batchIndex,
-          totalInBatch: chunk.length,
-          errorDetails: batchErrors.length > 0 ? (batchErrors as any) : null,
-        });
-      }
+          rowIndex,
+          uniqueKey: String(uniqueKeyValue ?? "").trim(),
+          data: rest as any,
+          headers: cleanHeaders,
+          searchText: buildSearchText(rest),
+        };
+      });
 
-      // Insert all batches in a single operation
-      await tx.participantData.createMany({
-        data: participantDataRecords,
+      // Insert all participants using createMany
+      await tx.participant.createMany({
+        data: participantRecords,
       });
 
       // Initialize empty profile schema
@@ -214,8 +114,8 @@ export async function POST(req: Request) {
 
       return prog;
     }, {
-      maxWait: 15000, // 15 seconds max wait to acquire connection
-      timeout: 30000,  // 30 seconds max execution time
+      maxWait: 15000,
+      timeout: 30000,
     });
 
     return NextResponse.json(program);

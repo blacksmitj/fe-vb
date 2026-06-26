@@ -25,23 +25,24 @@ export async function GET(
     let data: Record<string, any>[] = [];
 
     if (includePreview) {
-      // Fetch only the first batch for headers and preview data (sliced to 10 rows on DB side)
-      const previewResult = await db.$queryRaw<Array<{ headers: string; previewRows: string }>>`
-        SELECT "headers", jsonb_path_query_array("rows"::jsonb, '$[0 to 9]') as "previewRows"
-        FROM "ParticipantData"
-        WHERE "programId" = ${id} AND "batchIndex" = 0
-        LIMIT 1
-      `;
-      const firstBatch = previewResult[0] || null;
-      
-      // Parse headers and preview rows safely
-      headers = typeof firstBatch?.headers === 'string'
-        ? JSON.parse(firstBatch.headers)
-        : (firstBatch?.headers as unknown as string[]) ?? [];
+      // Fetch headers from the first participant
+      const firstParticipant = await db.participant.findFirst({
+        where: { programId: id },
+        orderBy: { rowIndex: "asc" },
+        select: { headers: true },
+      });
+
+      headers = firstParticipant?.headers || [];
+
+      // Fetch first 10 rows for preview
+      const previewRows = await db.participant.findMany({
+        where: { programId: id },
+        orderBy: { rowIndex: "asc" },
+        take: 10,
+        select: { data: true },
+      });
         
-      data = typeof firstBatch?.previewRows === 'string'
-        ? JSON.parse(firstBatch.previewRows)
-        : (firstBatch?.previewRows as unknown as Record<string, any>[]) ?? [];
+      data = previewRows.map(p => (p.data as Record<string, any>) || {});
     }
 
     return NextResponse.json({

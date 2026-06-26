@@ -1,3 +1,15 @@
+export interface Participant {
+  id: string;
+  rowIndex: number;
+  uniqueKey: string;
+  data: Record<string, any>;
+  headers: string[];
+  evalStatus: string | null;
+  evalDescription: string | null;
+  evalByUserName: string | null;
+  evalAt: string | null;
+}
+
 export interface Program {
   id: string;
   name: string;
@@ -7,6 +19,7 @@ export interface Program {
   totalRows: number;
   fieldCount: number;
   errorCount: number;
+  uniqueKeyColumn: string;
   headers: string[];
   data: Record<string, any>[];
   profileSchema?: any;

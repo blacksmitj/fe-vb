@@ -3,6 +3,13 @@ import { auth } from "@/lib/auth/auth";
 import { headers as getHeaders } from "next/headers";
 import { NextResponse } from "next/server";
 
+function buildSearchText(data: Record<string, any>): string {
+  return Object.values(data)
+    .filter((v) => v != null && v !== "")
+    .map((v) => String(v))
+    .join(" ");
+}
+
 export async function GET(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -15,32 +22,41 @@ export async function GET(
     const searchQuery = searchParams.get("search");
     
     if (searchQuery !== null) {
-      const query = searchQuery.trim().toLowerCase();
+      const query = searchQuery.trim();
       if (!query) {
         return NextResponse.json({ matches: [] });
       }
 
-      const matchesRaw = await db.$queryRaw<Array<{
-        batchIndex: number;
-        row: any;
-        rowIndex: number;
-      }>>`
-        SELECT "batchIndex", "elem" as "row", ("idx" - 1)::int as "rowIndex"
-        FROM "ParticipantData",
-        jsonb_array_elements("rows") WITH ORDINALITY AS arr("elem", "idx")
-        WHERE "programId" = ${id}
-          AND EXISTS (
-            SELECT 1
-            FROM jsonb_each_text("elem") AS kv("key", "val")
-            WHERE LEFT("key", 1) <> '_' AND "val" ILIKE ${`%${query}%`}
-          )
-        ORDER BY "batchIndex" ASC, "rowIndex" ASC
-        LIMIT 100
-      `;
+      // Fast Trigram ILIKE Search using GIN index on searchText
+      const matchesRaw = await db.participant.findMany({
+        where: {
+          programId: id,
+          searchText: {
+            contains: query,
+            mode: "insensitive",
+          },
+        },
+        select: {
+          id: true,
+          rowIndex: true,
+          uniqueKey: true,
+          data: true,
+          evalStatus: true,
+        },
+        orderBy: {
+          rowIndex: "asc",
+        },
+        take: 100,
+      });
 
       const matches = matchesRaw.map((m) => ({
-        globalIndex: m.batchIndex * 500 + m.rowIndex,
-        row: m.row,
+        globalIndex: m.rowIndex,
+        row: {
+          id: m.id,
+          uniqueKey: m.uniqueKey,
+          _evaluationStatus: m.evalStatus,
+          ...(m.data as Record<string, any>),
+        },
       }));
 
       return NextResponse.json({ matches });
@@ -53,17 +69,36 @@ export async function GET(
       return NextResponse.json({ error: "Invalid page parameter" }, { status: 400 });
     }
 
-    const batchIndex = Math.floor(page / 500);
-    const rowIndex = page % 500;
+    // Get 1 participant by rowIndex (0-based)
+    const participantRecord = await db.participant.findFirst({
+      where: {
+        programId: id,
+        rowIndex: page,
+      },
+      select: {
+        id: true,
+        rowIndex: true,
+        uniqueKey: true,
+        data: true,
+        headers: true,
+        evalStatus: true,
+        evalDescription: true,
+        evalByUserName: true,
+        evalAt: true,
+      },
+    });
 
-    const result = await db.$queryRaw<Array<{ row: any }>>`
-      SELECT "rows"->CAST(${rowIndex} AS integer) as row
-      FROM "ParticipantData"
-      WHERE "programId" = ${id} AND "batchIndex" = ${batchIndex}
-      LIMIT 1
-    `;
-
-    const participant = result[0]?.row || null;
+    const participant = participantRecord
+      ? {
+          id: participantRecord.id,
+          uniqueKey: participantRecord.uniqueKey,
+          _evaluationStatus: participantRecord.evalStatus,
+          _evaluationDescription: participantRecord.evalDescription,
+          _verifiedByName: participantRecord.evalByUserName,
+          _evaluatedAt: participantRecord.evalAt ? participantRecord.evalAt.toISOString() : null,
+          ...(participantRecord.data as Record<string, any>),
+        }
+      : null;
 
     // Get total rows count from the program
     const program = await db.program.findUnique({
@@ -94,73 +129,79 @@ export async function PATCH(
   }
 
   try {
-    const { id } = await params;
+    const { id: programId } = await params;
     const { searchParams } = new URL(req.url);
+    
+    // We support updating by direct participantId or fallback by page (rowIndex)
+    const participantIdParam = searchParams.get("participantId");
     const pageParam = searchParams.get("page");
     const page = pageParam ? parseInt(pageParam, 10) : 0;
 
-    if (isNaN(page) || page < 0) {
-      return NextResponse.json({ error: "Invalid page parameter" }, { status: 400 });
+    const { status, description, participant: updatedFields } = await req.json();
+
+    let targetParticipant = null;
+
+    if (participantIdParam) {
+      targetParticipant = await db.participant.findUnique({
+        where: { id: participantIdParam },
+      });
+    } else {
+      targetParticipant = await db.participant.findFirst({
+        where: { programId, rowIndex: page },
+      });
     }
 
-    const { status, description, participant } = await req.json();
-
-    const batchIndex = Math.floor(page / 500);
-    const rowIndex = page % 500;
-
-    const program = await db.program.findUnique({
-      where: { id },
-      select: { 
-        name: true,
-      },
-    });
-
-    if (!program) {
-      return NextResponse.json({ error: "Program not found" }, { status: 404 });
-    }
-
-    // Fetch only the batch ID and the specific participant row
-    const result = await db.$queryRaw<Array<{ id: string; row: any }>>`
-      SELECT id, "rows"->CAST(${rowIndex} AS integer) as row
-      FROM "ParticipantData"
-      WHERE "programId" = ${id} AND "batchIndex" = ${batchIndex}
-      LIMIT 1
-    `;
-
-    const batch = result[0];
-
-    if (!batch || !batch.row) {
+    if (!targetParticipant) {
       return NextResponse.json({ error: "Participant data not found" }, { status: 404 });
     }
 
-    // Prepare updated row
-    const mergedParticipant = {
-      ...batch.row,
-      ...(participant || {}),
-      _evaluationStatus: status || "VERIFIED",
-      _verifiedByName: session.user.name || session.user.email,
-      _evaluationDescription: description || "",
-      _evaluatedAt: new Date().toISOString(),
+    // Filter out internal application properties if present
+    const cleanFields = { ...(updatedFields || {}) };
+    delete cleanFields.id;
+    delete cleanFields.uniqueKey;
+    delete cleanFields._evaluationStatus;
+    delete cleanFields._evaluationDescription;
+    delete cleanFields._verifiedByName;
+    delete cleanFields._evaluatedAt;
+
+    const mergedData = {
+      ...(targetParticipant.data as Record<string, any>),
+      ...cleanFields,
     };
 
-    // Save back to db in-place using PostgreSQL jsonb_set
-    await db.$executeRaw`
-      UPDATE "ParticipantData"
-      SET "rows" = jsonb_set("rows", ARRAY[CAST(${rowIndex} AS text)], ${JSON.stringify(mergedParticipant)}::jsonb)
-      WHERE "id" = ${batch.id}
-    `;
+    // Save back to db in-place
+    const updated = await db.participant.update({
+      where: { id: targetParticipant.id },
+      data: {
+        data: mergedData,
+        evalStatus: status || "VERIFIED",
+        evalDescription: description || "",
+        evalByUserId: session.user.id,
+        evalByUserName: session.user.name || session.user.email,
+        evalAt: new Date(),
+        searchText: buildSearchText(mergedData),
+      },
+    });
+
+    const responseParticipant = {
+      id: updated.id,
+      uniqueKey: updated.uniqueKey,
+      _evaluationStatus: updated.evalStatus,
+      _evaluationDescription: updated.evalDescription,
+      _verifiedByName: updated.evalByUserName,
+      _evaluatedAt: updated.evalAt ? updated.evalAt.toISOString() : null,
+      ...(updated.data as Record<string, any>),
+    };
 
     // Create activity log
     try {
-      const uniqueKey = Object.keys(mergedParticipant).find(k => !k.startsWith('_')) || "ID";
-      const uniqueValue = mergedParticipant[uniqueKey] || "Unknown";
-      const details = `Memverifikasi data peserta (${uniqueKey}: ${uniqueValue}).${
+      const details = `Memverifikasi data peserta (ID: ${updated.uniqueKey}).${
         description ? ` Catatan: ${description}` : ""
       }`;
 
       await db.activityLog.create({
         data: {
-          programId: id,
+          programId,
           userId: session.user.id,
           action: "VERIFIED",
           details,
@@ -170,7 +211,7 @@ export async function PATCH(
       console.error("Failed to write activity log:", logError);
     }
 
-    return NextResponse.json({ success: true, participant: mergedParticipant });
+    return NextResponse.json({ success: true, participant: responseParticipant });
   } catch (error) {
     console.error("PATCH /api/programs/[id]/participants error:", error);
     return NextResponse.json({ error: "Failed to save evaluation" }, { status: 500 });

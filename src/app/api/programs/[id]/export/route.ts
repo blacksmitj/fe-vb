@@ -42,45 +42,26 @@ export async function GET(
       return NextResponse.json({ error: "Program not found" }, { status: 404 });
     }
 
-    // Find the maximum batchIndex first
-    const maxBatchResult = await db.participantData.aggregate({
+    // Get all participants ordered by rowIndex
+    const participants = await db.participant.findMany({
       where: { programId: id },
-      _max: {
-        batchIndex: true,
+      orderBy: { rowIndex: "asc" },
+      select: {
+        headers: true,
+        data: true,
+        evalStatus: true,
+        evalByUserName: true,
+        evalAt: true,
+        evalDescription: true,
       },
     });
 
-    const maxBatchIndex = maxBatchResult._max.batchIndex;
-
-    if (maxBatchIndex === null) {
+    if (participants.length === 0) {
       return NextResponse.json({ error: "No participant data available to export" }, { status: 400 });
     }
 
-    // Extract headers and combine rows sequentially to save memory
-    let headersList: string[] = [];
-    const allRows: Record<string, any>[] = [];
-
-    for (let i = 0; i <= maxBatchIndex; i++) {
-      const batch = await db.participantData.findFirst({
-        where: { programId: id, batchIndex: i },
-        select: { headers: true, rows: true }, // Avoid loading errorDetails or other fields
-      });
-
-      if (batch) {
-        if (batch.headers && Array.isArray(batch.headers)) {
-          // Collect headers, merge unique ones
-          const batchHeaders = batch.headers as string[];
-          batchHeaders.forEach(h => {
-            if (!headersList.includes(h)) {
-              headersList.push(h);
-            }
-          });
-        }
-        if (batch.rows && Array.isArray(batch.rows)) {
-          allRows.push(...(batch.rows as Record<string, any>[]));
-        }
-      }
-    }
+    // Extract headers (headers are same across rows for a single import, use first row)
+    const headersList = participants[0].headers || [];
 
     // Create workbook and sheet
     const workbook = new ExcelJS.Workbook();
@@ -103,7 +84,8 @@ export async function GET(
     }));
 
     // Add rows
-    allRows.forEach(row => {
+    participants.forEach(p => {
+      const row = (p.data as Record<string, any>) || {};
       const rowData: Record<string, any> = {};
       
       // Populate original fields
@@ -114,12 +96,12 @@ export async function GET(
       });
 
       // Populate verification results
-      rowData["Status Verifikasi"] = row["_evaluationStatus"] === "VERIFIED" ? "SUDAH DIVERIFIKASI" : "BELUM DIVERIFIKASI";
-      rowData["Diverifikasi Oleh"] = row["_verifiedByName"] || "";
-      rowData["Waktu Verifikasi"] = row["_evaluatedAt"] 
-        ? new Date(row["_evaluatedAt"]).toLocaleString("id-ID")
+      rowData["Status Verifikasi"] = p.evalStatus === "VERIFIED" ? "SUDAH DIVERIFIKASI" : "BELUM DIVERIFIKASI";
+      rowData["Diverifikasi Oleh"] = p.evalByUserName || "";
+      rowData["Waktu Verifikasi"] = p.evalAt 
+        ? new Date(p.evalAt).toLocaleString("id-ID")
         : "";
-      rowData["Keterangan Verifikasi"] = row["_evaluationDescription"] || "";
+      rowData["Keterangan Verifikasi"] = p.evalDescription || "";
 
       worksheet.addRow(rowData);
     });
