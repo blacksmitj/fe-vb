@@ -31,6 +31,13 @@ export async function POST(req: Request) {
         sheetId,
         sheetName,
         sheetUniqueKey,
+        programMembers: {
+          create: {
+            userId: session.user.id,
+            role: "ADMIN",
+            status: "APPROVED",
+          },
+        },
       },
     });
 

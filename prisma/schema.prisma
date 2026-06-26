@@ -30,6 +30,8 @@ model Program {
   profileSchema   ProfileSchema?
   importLogs      ImportLog[]
   syncLogs        SyncLog[]
+  programMembers  ProgramMember[]
+  activityLogs    ActivityLog[]
 
   @@index([createdAt(sort: Desc)])
 }
@@ -104,8 +106,10 @@ model User {
   image         String?
   createdAt     DateTime
   updatedAt     DateTime
-  sessions      Session[]
-  accounts      Account[]
+  sessions       Session[]
+  accounts       Account[]
+  programMembers ProgramMember[]
+  activityLogs   ActivityLog[]
 
   @@unique([email])
   @@map("user")
@@ -183,6 +187,43 @@ enum SyncStatus {
   FAILED
   PARTIAL
 }
+
+// ─────────────────────────────────────────────
+// Model: ProgramMember
+// ─────────────────────────────────────────────
+model ProgramMember {
+  id        String   @id @default(uuid())
+  programId String
+  program   Program  @relation(fields: [programId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      String   // "ADMIN" | "VERIFIER"
+  status    String   // "PENDING" | "APPROVED" | "REJECTED"
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([programId, userId])
+  @@index([programId])
+  @@index([userId])
+}
+
+// ─────────────────────────────────────────────
+// Model: ActivityLog
+// ─────────────────────────────────────────────
+model ActivityLog {
+  id        String   @id @default(uuid())
+  programId String
+  program   Program  @relation(fields: [programId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  action    String   // e.g. "VERIFIED_PARTICIPANT", "REJECTED_PARTICIPANT"
+  details   String   // Detail/keterangan aktivitas (misal: "Memverifikasi NIK 123456")
+  createdAt DateTime @default(now())
+
+  @@index([programId])
+  @@index([createdAt(sort: Desc)])
+}
+
 
 
 

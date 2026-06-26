@@ -153,6 +153,26 @@ export async function PATCH(
       data: { rows: rows.map((r, idx) => idx === rowIndex ? mergedParticipant : r) },
     });
 
+    // Create activity log
+    try {
+      const uniqueKey = program.sheetUniqueKey || Object.keys(mergedParticipant)[0] || "ID";
+      const uniqueValue = mergedParticipant[uniqueKey] || "Unknown";
+      const details = `Mengubah status verifikasi peserta (${uniqueKey}: ${uniqueValue}) menjadi "${status}".${
+        description ? ` Catatan: ${description}` : ""
+      }`;
+
+      await db.activityLog.create({
+        data: {
+          programId: id,
+          userId: session.user.id,
+          action: `VERIFICATION_${status}`,
+          details,
+        },
+      });
+    } catch (logError) {
+      console.error("Failed to write activity log:", logError);
+    }
+
     // PUSH: If Google Sheet integration is configured, push the change
     if (program.sheetId && program.sheetUniqueKey) {
       const uniqueKeyValue = String(mergedParticipant[program.sheetUniqueKey] || "").trim();
