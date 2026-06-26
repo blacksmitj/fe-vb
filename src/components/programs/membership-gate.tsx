@@ -73,6 +73,55 @@ export function MembershipGate({ programId, children }: MembershipGateProps) {
 
   // If approved member, show children
   if (membership?.status === "APPROVED") {
+    // If program is paused and user is not admin, block verification
+    if (program && program.status === "STOPPED" && membership.role !== "ADMIN") {
+      return (
+        <div className="flex min-h-screen w-full items-center justify-center p-6 bg-linear-to-br from-background to-muted/30">
+          <div className="w-full max-w-md">
+            {/* Header Back Button */}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => router.push("/programs")}
+              className="mb-4 gap-2 text-muted-foreground hover:text-foreground"
+            >
+              <ArrowLeftIcon className="h-4 w-4" />
+              Kembali ke Dashboard
+            </Button>
+
+            <Card className="border border-border/50 shadow-xl bg-card/50 backdrop-blur-md">
+              <CardHeader className="text-center pb-2">
+                <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-rose-500/10 text-rose-500">
+                  <ShieldAlertIcon className="h-6 w-6" />
+                </div>
+                <CardTitle className="text-2xl font-bold tracking-tight text-rose-600">Verifikasi Ditutup</CardTitle>
+                <CardDescription>
+                  Program <span className="font-semibold text-foreground">{program?.name}</span>
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="text-center space-y-3">
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  Proses verifikasi data untuk program ini telah dihentikan atau ditutup sementara oleh Administrator.
+                </p>
+                <p className="text-xs text-rose-600 dark:text-rose-400 bg-rose-500/10 p-2.5 rounded-md border border-rose-500/20">
+                  Anda tidak dapat melakukan verifikasi data sampai proses ini dibuka kembali.
+                </p>
+              </CardContent>
+              <CardFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => router.push("/programs")}
+                  className="w-full h-10 border-border/60 hover:bg-muted"
+                >
+                  Kembali ke Halaman Program
+                </Button>
+              </CardFooter>
+            </Card>
+          </div>
+        </div>
+      );
+    }
+
     return <>{children}</>;
   }
 

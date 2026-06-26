@@ -18,13 +18,10 @@ import {
   SearchIcon,
   SettingsIcon,
   Share2Icon,
+  LockIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardDescription,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { type Program } from "@/types";
 import { usePrograms, useDeleteProgram } from "@/hooks/use-programs";
@@ -64,18 +61,21 @@ export default function ProgramsPage() {
   ]);
   const [globalFilter, setGlobalFilter] = React.useState("");
 
-  const handleDelete = React.useCallback((id: string, name: string) => {
-    if (confirm(`Apakah Anda yakin ingin menghapus program "${name}"?`)) {
-      deleteMutation.mutate(id, {
-        onSuccess: () => {
-          toast.success(`Program "${name}" berhasil dihapus`);
-        },
-        onError: () => {
-          toast.error("Gagal menghapus program");
-        },
-      });
-    }
-  }, [deleteMutation]);
+  const handleDelete = React.useCallback(
+    (id: string, name: string) => {
+      if (confirm(`Apakah Anda yakin ingin menghapus program "${name}"?`)) {
+        deleteMutation.mutate(id, {
+          onSuccess: () => {
+            toast.success(`Program "${name}" berhasil dihapus`);
+          },
+          onError: () => {
+            toast.error("Gagal menghapus program");
+          },
+        });
+      }
+    },
+    [deleteMutation],
+  );
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("id-ID", {
@@ -95,7 +95,9 @@ export default function ProgramsPage() {
           return (
             <Button
               variant="ghost"
-              onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+              onClick={() =>
+                column.toggleSorting(column.getIsSorted() === "asc")
+              }
               className="-ml-4 hover:bg-transparent"
             >
               Nama Program
@@ -106,13 +108,34 @@ export default function ProgramsPage() {
         cell: ({ row }) => {
           const name = row.getValue("name") as string;
           const description = row.original.description;
+          const status = row.original.status;
           return (
             <div className="flex flex-col gap-0.5 max-w-[280px] sm:max-w-[360px]">
-              <span className="font-semibold text-foreground truncate" title={name}>
-                {name}
-              </span>
+              <div className="flex items-center gap-2">
+                <span
+                  className="font-semibold text-foreground truncate"
+                  title={name}
+                >
+                  {name}
+                </span>
+                {status === "ACTIVE" ? (
+                  <Badge className="bg-emerald-500 hover:bg-emerald-600 text-white text-[10px] font-semibold h-4 px-1.5 py-0 border-none shrink-0">
+                    Buka
+                  </Badge>
+                ) : (
+                  <Badge
+                    variant="destructive"
+                    className="text-[10px] font-semibold h-4 px-1.5 py-0 shrink-0 bg-rose-600 text-white"
+                  >
+                    Ditutup
+                  </Badge>
+                )}
+              </div>
               {description && (
-                <span className="text-xs text-muted-foreground truncate" title={description}>
+                <span
+                  className="text-xs text-muted-foreground truncate"
+                  title={description}
+                >
                   {description}
                 </span>
               )}
@@ -126,45 +149,29 @@ export default function ProgramsPage() {
           return (
             <Button
               variant="ghost"
-              onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+              onClick={() =>
+                column.toggleSorting(column.getIsSorted() === "asc")
+              }
               className="-ml-4 hover:bg-transparent"
             >
-              Total Data
+              Data & Struktur
               <ArrowUpDownIcon className="ml-2 size-4" />
             </Button>
           );
         },
         cell: ({ row }) => {
           const totalRows = row.getValue("totalRows") as number;
+          const fieldCount = row.original.fieldCount;
           return (
-            <span className="inline-flex items-center gap-1.5 font-medium">
-              <TableIcon className="size-4 text-blue-500" />
-              {totalRows.toLocaleString("id-ID")} Baris
-            </span>
-          );
-        },
-      },
-      {
-        accessorKey: "fieldCount",
-        header: ({ column }) => {
-          return (
-            <Button
-              variant="ghost"
-              onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-              className="-ml-4 hover:bg-transparent"
-            >
-              Jumlah Field
-              <ArrowUpDownIcon className="ml-2 size-4" />
-            </Button>
-          );
-        },
-        cell: ({ row }) => {
-          const fieldCount = row.getValue("fieldCount") as number;
-          return (
-            <span className="inline-flex items-center gap-1.5 font-medium">
-              <FileSpreadsheetIcon className="size-4 text-emerald-500" />
-              {fieldCount} Kolom
-            </span>
+            <div className="flex flex-col gap-0.5">
+              <span className="inline-flex items-center gap-1.5 font-medium text-sm">
+                <TableIcon className="size-4 text-blue-500" />
+                {totalRows.toLocaleString("id-ID")} Baris
+              </span>
+              <span className="text-[11px] text-muted-foreground ml-5">
+                {fieldCount} Kolom
+              </span>
+            </div>
           );
         },
       },
@@ -174,10 +181,12 @@ export default function ProgramsPage() {
           return (
             <Button
               variant="ghost"
-              onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+              onClick={() =>
+                column.toggleSorting(column.getIsSorted() === "asc")
+              }
               className="-ml-4 hover:bg-transparent"
             >
-              Status
+              Status Import
               <ArrowUpDownIcon className="ml-2 size-4" />
             </Button>
           );
@@ -201,12 +210,50 @@ export default function ProgramsPage() {
         },
       },
       {
+        id: "verificationProgress",
+        header: "Progress Verifikasi",
+        cell: ({ row }) => {
+          const program = row.original;
+          const verified = program.verifiedCount ?? 0;
+          const rejected = program.rejectedCount ?? 0;
+          const total = program.totalRows || 1;
+          const percent = Math.round(((verified + rejected) / total) * 100);
+
+          return (
+            <div className="flex flex-col gap-1.5 min-w-[140px]">
+              <div className="flex items-center justify-between text-xs font-semibold">
+                <span className="text-muted-foreground">
+                  {percent}% Selesai
+                </span>
+                <span className="text-foreground font-mono">
+                  {verified + rejected}/{total}
+                </span>
+              </div>
+              <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden flex">
+                <div
+                  className="bg-emerald-500 h-full transition-all duration-300"
+                  style={{ width: `${Math.round((verified / total) * 100)}%` }}
+                  title={`Diverifikasi: ${verified}`}
+                />
+                <div
+                  className="bg-red-100 h-full transition-all duration-300"
+                  style={{ width: `${Math.round((rejected / total) * 100)}%` }}
+                  title={`Ditolak: ${rejected}`}
+                />
+              </div>
+            </div>
+          );
+        },
+      },
+      {
         accessorKey: "createdAt",
         header: ({ column }) => {
           return (
             <Button
               variant="ghost"
-              onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+              onClick={() =>
+                column.toggleSorting(column.getIsSorted() === "asc")
+              }
               className="-ml-4 hover:bg-transparent"
             >
               Tanggal Dibuat
@@ -236,19 +283,6 @@ export default function ProgramsPage() {
                 <Button
                   size="icon"
                   asChild
-                  title="Lihat Detail"
-                  variant="outline"
-                  className="size-8"
-                >
-                  <Link href={`/programs/import?edit=${program.id}`}>
-                    <EyeIcon className="size-4" />
-                  </Link>
-                </Button>
-              )}
-              {isAdmin && (
-                <Button
-                  size="icon"
-                  asChild
                   title="Settings"
                   variant="outline"
                   className="size-8"
@@ -258,38 +292,33 @@ export default function ProgramsPage() {
                   </Link>
                 </Button>
               )}
-              {isAdmin && (
-                <Button
-                  size="icon"
-                  asChild
-                  title="Profile Builder"
-                  variant="outline"
-                  className="size-8"
-                >
-                  <Link href={`/builder?programId=${program.id}`}>
-                    <LayoutTemplateIcon className="size-4" />
-                  </Link>
-                </Button>
-              )}
               <Button
-                variant="secondary"
-                size="icon"
+                variant={program.status === "ACTIVE" ? "secondary" : "outline"}
                 asChild
-                title="Verifikasi Data"
-                className="size-8"
+                title={program.status === "ACTIVE" ? "Verifikasi Data" : "Lihat Data (Verifikasi Ditutup)"}
+                className={
+                  program.status === "ACTIVE"
+                    ? "gap-1.5 h-8 px-3 text-xs font-semibold"
+                    : "gap-1.5 h-8 px-3 text-xs text-muted-foreground border-dashed"
+                }
               >
                 <Link href={`/programs/${program.id}/verification`}>
-                  <ClipboardCheckIcon className="size-4" />
+                  {program.status === "ACTIVE" ? (
+                    <ClipboardCheckIcon className="size-4 text-emerald-500" />
+                  ) : (
+                    <LockIcon className="size-4" />
+                  )}
+                  {program.status === "ACTIVE" ? "Verifikasi" : "Lihat Data"}
                 </Link>
               </Button>
               <Button
                 variant="outline"
-                size="icon"
                 title="Salin Link Verifikasi"
-                className="size-8 text-muted-foreground hover:text-foreground"
+                className="gap-1.5 h-8 px-3 text-xs text-muted-foreground hover:text-foreground"
                 onClick={() => {
                   const shareUrl = `${window.location.origin}/programs/${program.id}/verification`;
-                  navigator.clipboard.writeText(shareUrl)
+                  navigator.clipboard
+                    .writeText(shareUrl)
                     .then(() => {
                       toast.success("Link verifikasi berhasil disalin!");
                     })
@@ -300,24 +329,14 @@ export default function ProgramsPage() {
                 }}
               >
                 <Share2Icon className="size-4" />
+                Share
               </Button>
-              {isAdmin && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 size-8"
-                  onClick={() => handleDelete(program.id, program.name)}
-                  title="Hapus Program"
-                >
-                  <Trash2Icon className="size-4" />
-                </Button>
-              )}
             </div>
           );
         },
       },
     ],
-    [handleDelete]
+    [handleDelete],
   );
 
   const table = useReactTable({
@@ -404,7 +423,8 @@ export default function ProgramsPage() {
                 Belum Ada Program
               </CardTitle>
               <CardDescription className="max-w-sm mt-2">
-                Silakan buat program baru dengan mengunggah file Excel atau CSV Anda.
+                Silakan buat program baru dengan mengunggah file Excel atau CSV
+                Anda.
               </CardDescription>
               <Button asChild className="mt-6 gap-2">
                 <Link href="/programs/import">
@@ -420,12 +440,15 @@ export default function ProgramsPage() {
                   {table.getHeaderGroups().map((headerGroup) => (
                     <TableRow key={headerGroup.id}>
                       {headerGroup.headers.map((header) => (
-                        <TableHead key={header.id} className="py-2.5 px-4 font-semibold text-xs uppercase tracking-wider text-muted-foreground">
+                        <TableHead
+                          key={header.id}
+                          className="py-2.5 px-4 font-semibold text-xs uppercase tracking-wider text-muted-foreground"
+                        >
                           {header.isPlaceholder
                             ? null
                             : flexRender(
                                 header.column.columnDef.header,
-                                header.getContext()
+                                header.getContext(),
                               )}
                         </TableHead>
                       ))}
@@ -444,7 +467,7 @@ export default function ProgramsPage() {
                           <TableCell key={cell.id} className="py-3 px-4">
                             {flexRender(
                               cell.column.columnDef.cell,
-                              cell.getContext()
+                              cell.getContext(),
                             )}
                           </TableCell>
                         ))}
@@ -469,4 +492,3 @@ export default function ProgramsPage() {
     </div>
   );
 }
-

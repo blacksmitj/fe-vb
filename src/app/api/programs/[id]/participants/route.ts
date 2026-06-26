@@ -80,7 +80,6 @@ export async function GET(
         rowIndex: true,
         uniqueKey: true,
         data: true,
-        headers: true,
         evalStatus: true,
         evalDescription: true,
         evalByUserName: true,
@@ -130,6 +129,24 @@ export async function PATCH(
 
   try {
     const { id: programId } = await params;
+
+    // Check program status first
+    const program = await db.program.findUnique({
+      where: { id: programId },
+      select: { status: true },
+    });
+
+    if (!program) {
+      return NextResponse.json({ error: "Program tidak ditemukan" }, { status: 404 });
+    }
+
+    if (program.status === "STOPPED") {
+      return NextResponse.json(
+        { error: "Verifikasi untuk program ini telah ditangguhkan/ditutup oleh Admin." },
+        { status: 403 }
+      );
+    }
+
     const { searchParams } = new URL(req.url);
     
     // We support updating by direct participantId or fallback by page (rowIndex)

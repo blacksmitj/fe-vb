@@ -21,6 +21,8 @@ import {
   Loader2Icon,
   EyeIcon,
   InfoIcon,
+  LayoutTemplateIcon,
+  Trash2Icon,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -37,7 +39,7 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
-import { useProgram } from "@/hooks/use-programs";
+import { useProgram, useDeleteProgram } from "@/hooks/use-programs";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -51,9 +53,15 @@ import {
 } from "@/components/ui/table";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { MembershipGate } from "@/components/programs/membership-gate";
-import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface DryRunResult {
   stats: {
@@ -177,8 +185,48 @@ export default function ProgramSettingsPage({ params }: { params: Promise<{ id: 
   const { id } = React.use(params);
   const router = useRouter();
   const { data: program, isLoading: isProgramLoading, refetch: refetchProgram } = useProgram(id);
+  const deleteMutation = useDeleteProgram();
+
+  const handleDeleteClick = React.useCallback(() => {
+    if (confirm(`Apakah Anda yakin ingin menghapus program "${program?.name}"?`)) {
+      deleteMutation.mutate(id, {
+        onSuccess: () => {
+          toast.success(`Program "${program?.name}" berhasil dihapus`);
+          router.push("/programs");
+        },
+        onError: () => {
+          toast.error("Gagal menghapus program");
+        },
+      });
+    }
+  }, [id, program, deleteMutation, router]);
 
   const [isExporting, setIsExporting] = React.useState(false);
+  const [isTogglingStatus, setIsTogglingStatus] = React.useState(false);
+
+  const handleToggleStatus = async (nextStatus: "ACTIVE" | "STOPPED") => {
+    setIsTogglingStatus(true);
+    const toastId = toast.loading("Memperbarui status verifikasi...");
+    try {
+      const res = await fetch(`/api/programs/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: nextStatus }),
+      });
+      if (res.ok) {
+        toast.success(`Status verifikasi berhasil ${nextStatus === "ACTIVE" ? "dibuka" : "ditutup"}`, { id: toastId });
+        refetchProgram();
+      } else {
+        const data = await res.json();
+        toast.error(data.error || "Gagal mengubah status verifikasi", { id: toastId });
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Terjadi kesalahan saat mengubah status verifikasi", { id: toastId });
+    } finally {
+      setIsTogglingStatus(false);
+    }
+  };
 
   // Reupload states
   const [reuploadFile, setReuploadFile] = React.useState<File | null>(null);
@@ -602,534 +650,610 @@ export default function ProgramSettingsPage({ params }: { params: Promise<{ id: 
 
         {/* ── Content ────────────────────────────────────────── */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6 w-full max-w-[1600px] mx-auto">
-          <div className="flex items-center gap-3">
-            <Button variant="outline" size="icon" asChild className="h-8 w-8">
-              <Link href={`/programs/${id}/verification`}>
-                <ArrowLeftIcon className="h-4 w-4" />
-              </Link>
-            </Button>
-            <div>
-              <h1 className="text-3xl font-bold tracking-tight">Program Settings</h1>
-              <p className="text-muted-foreground mt-0.5">
-                Kelola konfigurasi, keanggotaan verifikator, dan audit log program <span className="font-semibold">{program?.name}</span>.
-              </p>
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <Button variant="outline" size="icon" asChild className="h-8 w-8 shrink-0">
+                <Link href="/programs">
+                  <ArrowLeftIcon className="h-4 w-4" />
+                </Link>
+              </Button>
+              <div>
+                <h1 className="text-3xl font-bold tracking-tight">Program Settings</h1>
+                <p className="text-muted-foreground mt-0.5">
+                  Kelola konfigurasi, keanggotaan verifikator, dan audit log program <span className="font-semibold">{program?.name}</span>.
+                </p>
+              </div>
             </div>
-          </div>
-
-          {/* Tab Navigation */}
-          <div className="flex border-b border-border/60 pb-px gap-1">
             {userRole === "ADMIN" && (
-              <Button
-                variant="ghost"
-                onClick={() => setActiveTab("export")}
-                className={`h-9 px-4 rounded-none border-b-2 font-medium text-sm transition-all ${
-                  activeTab === "export"
-                    ? "border-primary text-foreground bg-muted/40"
-                    : "border-transparent text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                <DatabaseIcon className="h-4 w-4 mr-2" />
-                Data & Export
-              </Button>
-            )}
-
-            {userRole === "ADMIN" && (
-              <Button
-                variant="ghost"
-                onClick={() => setActiveTab("members")}
-                className={`h-9 px-4 rounded-none border-b-2 font-medium text-sm transition-all ${
-                  activeTab === "members"
-                    ? "border-primary text-foreground bg-muted/40"
-                    : "border-transparent text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                <UsersIcon className="h-4 w-4 mr-2" />
-                Anggota
-              </Button>
-            )}
-
-            <Button
-              variant="ghost"
-              onClick={() => setActiveTab("logs")}
-              className={`h-9 px-4 rounded-none border-b-2 font-medium text-sm transition-all ${
-                activeTab === "logs"
-                  ? "border-primary text-foreground bg-muted/40"
-                  : "border-transparent text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <ActivityIcon className="h-4 w-4 mr-2" />
-              Log Aktivitas
-            </Button>
-          </div>
-
-          {/* TAB 1: DATA & EXPORT */}
-          {userRole === "ADMIN" && activeTab === "export" && (
-            <div className="grid gap-6 md:grid-cols-3">
-              {/* Main Export Card */}
-              <div className="md:col-span-2 space-y-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <DatabaseIcon className="h-5 w-5 text-primary" />
-                      Export Data Peserta
-                    </CardTitle>
-                    <CardDescription>
-                      Unduh hasil akhir verifikasi program ini. Hasil unduhan berupa file Excel (.xlsx) yang berisi data asli peserta beserta status evaluasi, catatan verifikator, dan waktu evaluasi.
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="rounded-lg bg-muted/50 p-4 border space-y-3">
-                      <div className="flex justify-between items-center text-xs">
-                        <span className="text-muted-foreground font-medium">Total Baris Data:</span>
-                        <span className="font-bold text-foreground">{(program?.totalRows ?? 0).toLocaleString("id-ID")} baris</span>
-                      </div>
-                      <div className="flex justify-between items-center text-xs">
-                        <span className="text-muted-foreground font-medium">Jumlah Kolom:</span>
-                        <span className="font-bold text-foreground">{program?.fieldCount ?? 0} kolom</span>
-                      </div>
-                      <div className="flex justify-between items-center text-xs">
-                        <span className="text-muted-foreground font-medium">Jumlah Validation Error (Import):</span>
-                        <span className={`font-bold ${program?.errorCount && program.errorCount > 0 ? "text-rose-500" : "text-emerald-500"}`}>
-                          {program?.errorCount ?? 0} baris
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="flex justify-end">
-                      <Button onClick={handleExport} disabled={isExporting || !program?.totalRows} className="gap-2 w-full md:w-auto">
-                        {isExporting ? (
-                          <RefreshCwIcon className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <DatabaseIcon className="h-4 w-4" />
-                        )}
-                        Export Data ke Excel (.xlsx)
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Reupload & Ganti Data Card */}
-                <Card className="shadow-sm">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-lg">
-                      <UploadCloudIcon className="h-5 w-5 text-primary" />
-                      Reupload & Ganti Data Peserta
-                    </CardTitle>
-                    <CardDescription>
-                      Unggah berkas Excel/CSV baru untuk menggantikan seluruh data peserta yang ada saat ini.
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="reupload-file">File Spreadsheet (.xlsx, .xls, .csv)</Label>
-                      <div className="relative">
-                        <Input
-                          id="reupload-file"
-                          type="file"
-                          accept=".xlsx,.xls,.csv"
-                          onChange={handleReuploadFileChange}
-                          required
-                          className="pr-10"
-                          disabled={isReuploadPreviewLoading || isReuploadSubmitting || isReuploadDryRunning}
-                        />
-                        {isReuploadPreviewLoading && (
-                          <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                            <Loader2Icon className="size-4 animate-spin text-primary" />
-                          </div>
-                        )}
-                      </div>
-                      {isReuploadPreviewLoading && (
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Membaca metadata & sheet file...
-                        </p>
+              <div className="flex items-center gap-2">
+                {program && (
+                  program.status === "ACTIVE" ? (
+                    <Button
+                      variant="outline"
+                      onClick={() => handleToggleStatus("STOPPED")}
+                      disabled={isTogglingStatus}
+                      className="gap-2 h-9 px-4 border-rose-200 text-rose-600 hover:bg-rose-50 hover:text-rose-700 font-medium"
+                    >
+                      {isTogglingStatus ? (
+                        <Loader2Icon className="size-4 animate-spin" />
+                      ) : (
+                        <XIcon className="size-4" />
                       )}
-                    </div>
+                      Tutup Verifikasi
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      onClick={() => handleToggleStatus("ACTIVE")}
+                      disabled={isTogglingStatus}
+                      className="gap-2 h-9 px-4 border-emerald-200 text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700 animate-pulse font-medium"
+                    >
+                      {isTogglingStatus ? (
+                        <Loader2Icon className="size-4 animate-spin" />
+                      ) : (
+                        <PlayIcon className="size-4" />
+                      )}
+                      Buka Verifikasi
+                    </Button>
+                  )
+                )}
+                <Button variant="outline" asChild className="gap-2 h-9 px-4">
+                  <Link href={`/builder?programId=${id}`}>
+                    <LayoutTemplateIcon className="size-4" />
+                    Profile Builder
+                  </Link>
+                </Button>
+                <Button
+                  variant="destructive"
+                  className="gap-2 h-9 px-4"
+                  onClick={handleDeleteClick}
+                  disabled={deleteMutation.isPending}
+                >
+                  {deleteMutation.isPending ? (
+                    <Loader2Icon className="size-4 animate-spin" />
+                  ) : (
+                    <Trash2Icon className="size-4" />
+                  )}
+                  Hapus Program
+                </Button>
+              </div>
+            )}
+          </div>
 
-                    {reuploadFile && (
-                      <>
-                        {reuploadSheets.length > 1 && (
-                          <div className="space-y-2">
-                            <Label htmlFor="reuploadSheetName">Pilih Sheet (Tab)</Label>
-                            <NativeSelect
-                              id="reuploadSheetName"
-                              value={reuploadSheetName}
-                              onChange={(e) => handleReuploadSheetChange(e.target.value)}
-                              disabled={isReuploadPreviewLoading || isReuploadSubmitting || isReuploadDryRunning}
-                              className="w-full"
-                            >
-                              {reuploadSheets.map((s) => (
-                                <NativeSelectOption key={s} value={s}>
-                                  {s}
-                                </NativeSelectOption>
-                              ))}
-                            </NativeSelect>
+          {/* Tabbed Interface */}
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full space-y-6">
+            <TabsList>
+              {userRole === "ADMIN" && (
+                <TabsTrigger value="export">
+                  <DatabaseIcon className="h-4 w-4 mr-2" />
+                  Export Data
+                </TabsTrigger>
+              )}
+
+              {userRole === "ADMIN" && (
+                <TabsTrigger value="import">
+                  <UploadCloudIcon className="h-4 w-4 mr-2" />
+                  Import / Reupload
+                </TabsTrigger>
+              )}
+
+              {userRole === "ADMIN" && (
+                <TabsTrigger value="members">
+                  <UsersIcon className="h-4 w-4 mr-2" />
+                  Anggota
+                </TabsTrigger>
+              )}
+
+              <TabsTrigger value="logs">
+                <ActivityIcon className="h-4 w-4 mr-2" />
+                Log Aktivitas
+              </TabsTrigger>
+            </TabsList>
+
+            {/* TAB: EXPORT DATA */}
+            {userRole === "ADMIN" && (
+              <TabsContent value="export" className="space-y-6 outline-none mt-0">
+                <div className="grid gap-6 md:grid-cols-3">
+                  {/* Main Export Card */}
+                  <div className="md:col-span-2 space-y-6">
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                          <DatabaseIcon className="h-5 w-5 text-primary" />
+                          Export Data Peserta
+                        </CardTitle>
+                        <CardDescription>
+                          Unduh hasil akhir verifikasi program ini. Hasil unduhan berupa file Excel (.xlsx) yang berisi data asli peserta beserta status evaluasi, catatan verifikator, dan waktu evaluasi.
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <div className="rounded-lg bg-muted/50 p-4 border space-y-3">
+                          <div className="flex justify-between items-center text-xs">
+                            <span className="text-muted-foreground font-medium">Total Baris Data:</span>
+                            <span className="font-bold text-foreground">{(program?.totalRows ?? 0).toLocaleString("id-ID")} baris</span>
                           </div>
-                        )}
+                          <div className="flex justify-between items-center text-xs">
+                            <span className="text-muted-foreground font-medium">Jumlah Kolom:</span>
+                            <span className="font-bold text-foreground">{program?.fieldCount ?? 0} kolom</span>
+                          </div>
+                          <div className="flex justify-between items-center text-xs">
+                            <span className="text-muted-foreground font-medium">Jumlah Validation Error (Import):</span>
+                            <span className={`font-bold ${program?.errorCount && program.errorCount > 0 ? "text-rose-500" : "text-emerald-500"}`}>
+                              {program?.errorCount ?? 0} baris
+                            </span>
+                          </div>
+                        </div>
 
+                        <div className="flex justify-end">
+                          <Button onClick={handleExport} disabled={isExporting || !program?.totalRows} className="gap-2 w-full md:w-auto">
+                            {isExporting ? (
+                              <RefreshCwIcon className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <DatabaseIcon className="h-4 w-4" />
+                            )}
+                            Export Data ke Excel (.xlsx)
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  {/* Instructions Panel */}
+                  <div className="space-y-6">
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="flex items-center gap-2 text-sm">
+                          <HistoryIcon className="h-4 w-4 text-muted-foreground" />
+                          Petunjuk Penggunaan
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="text-xs text-muted-foreground leading-relaxed space-y-2">
+                        <p>
+                          1. Data peserta diimpor dari file Excel eksternal melalui menu <strong>Import Data</strong> di dashboard program.
+                        </p>
+                        <p>
+                          2. Verifikator akan memproses status kelayakan masing-masing peserta (Approve / Reject) secara langsung melalui antarmuka web.
+                        </p>
+                        <p>
+                          3. Hasil akhir dapat Anda ekspor kapan saja untuk pelaporan. Tiga kolom tambahan akan otomatis disematkan di bagian kanan kolom Excel: <strong>Status Evaluasi</strong>, <strong>Catatan Evaluasi</strong>, dan <strong>Waktu Evaluasi</strong>.
+                        </p>
+                      </CardContent>
+                    </Card>
+                  </div>
+                </div>
+              </TabsContent>
+            )}
+
+            {/* TAB: IMPORT / REUPLOAD DATA */}
+            {userRole === "ADMIN" && (
+              <TabsContent value="import" className="space-y-6 outline-none mt-0">
+                <div className="grid gap-6 md:grid-cols-3">
+                  {/* Reupload & Ganti Data Card */}
+                  <div className="md:col-span-2 space-y-6">
+                    <Card className="shadow-sm">
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2 text-lg">
+                          <UploadCloudIcon className="h-5 w-5 text-primary" />
+                          Reupload & Ganti Data Peserta
+                        </CardTitle>
+                        <CardDescription>
+                          Unggah berkas Excel/CSV baru untuk menggantikan seluruh data peserta yang ada saat ini.
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
                         <div className="space-y-2">
-                          <Label htmlFor="reuploadSheetUniqueKey">Kolom ID Unik (Unique Key)</Label>
+                          <Label htmlFor="reupload-file">File Spreadsheet (.xlsx, .xls, .csv)</Label>
                           <div className="relative">
-                            <NativeSelect
-                              id="reuploadSheetUniqueKey"
-                              value={reuploadSheetUniqueKey}
-                              onChange={(e) => {
-                                setReuploadSheetUniqueKey(e.target.value);
-                                setReuploadDryRunResult(null);
-                              }}
+                            <Input
+                              id="reupload-file"
+                              type="file"
+                              accept=".xlsx,.xls,.csv"
+                              onChange={handleReuploadFileChange}
                               required
-                              disabled={isReuploadPreviewLoading || isReuploadSubmitting || isReuploadDryRunning || reuploadHeadersList.length === 0}
-                              className="w-full pr-10"
-                            >
-                              {reuploadHeadersList.length === 0 ? (
-                                <NativeSelectOption value="">
-                                  {isReuploadPreviewLoading ? "Memuat kolom..." : "Tidak ada kolom tersedia"}
-                                </NativeSelectOption>
-                              ) : (
-                                reuploadHeadersList.map((h) => (
-                                  <NativeSelectOption key={h} value={h}>
-                                    {h}
-                                  </NativeSelectOption>
-                                ))
-                              )}
-                            </NativeSelect>
+                              className="pr-10"
+                              disabled={isReuploadPreviewLoading || isReuploadSubmitting || isReuploadDryRunning}
+                            />
                             {isReuploadPreviewLoading && (
-                              <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                              <div className="absolute right-3 top-1/2 -translate-y-1/2">
                                 <Loader2Icon className="size-4 animate-spin text-primary" />
                               </div>
                             )}
                           </div>
-                          <p className="text-[11px] text-muted-foreground leading-snug">
-                            Pilih kolom dengan nilai unik (contoh: NIK, NIM, Email) untuk mengidentifikasi setiap peserta secara akurat.
-                          </p>
+                          {isReuploadPreviewLoading && (
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Membaca metadata & sheet file...
+                            </p>
+                          )}
                         </div>
 
-                        <div className="pt-2">
-                          <Button
-                            type="button"
-                            className="w-full flex items-center justify-center gap-2"
-                            variant="secondary"
-                            onClick={handleReuploadDryRun}
-                            disabled={!reuploadFile || !reuploadSheetUniqueKey || isReuploadPreviewLoading || isReuploadSubmitting || isReuploadDryRunning}
-                          >
-                            {isReuploadDryRunning ? (
-                              <>
-                                <Loader2Icon className="h-4 w-4 animate-spin" />
-                                Menguji Data...
-                              </>
-                            ) : (
-                              <>
-                                <PlayIcon className="h-4 w-4 text-emerald-600" />
-                                Jalankan Uji Coba (Dry Run)
-                              </>
+                        {reuploadFile && (
+                          <>
+                            {reuploadSheets.length > 1 && (
+                              <div className="space-y-2">
+                                <Label htmlFor="reuploadSheetName">Pilih Sheet (Tab)</Label>
+                                <Select
+                                  value={reuploadSheetName}
+                                  onValueChange={handleReuploadSheetChange}
+                                  disabled={isReuploadPreviewLoading || isReuploadSubmitting || isReuploadDryRunning}
+                                >
+                                  <SelectTrigger id="reuploadSheetName" className="w-full justify-between">
+                                    <SelectValue placeholder="Pilih Sheet" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {reuploadSheets.map((s) => (
+                                      <SelectItem key={s} value={s}>
+                                        {s}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
                             )}
-                          </Button>
-                        </div>
-                      </>
-                    )}
 
-                    {/* Dry Run Result UI inside Settings */}
-                    {reuploadDryRunResult && (
-                      <div className="mt-4 border-t pt-4 space-y-4">
-                        <div className="flex items-start gap-3">
-                          <CheckCircle2Icon className="h-5 w-5 text-emerald-600 shrink-0 mt-0.5" />
-                          <div>
-                            <h4 className="font-semibold text-emerald-900 text-sm">Uji Coba Dry Run Selesai</h4>
-                            <p className="text-xs text-emerald-700 mt-0.5">
-                              Silakan periksa rangkuman data di bawah ini.
-                            </p>
-                          </div>
-                        </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="reuploadSheetUniqueKey">Kolom ID Unik (Unique Key)</Label>
+                              <div className="relative">
+                                <Select
+                                  value={reuploadSheetUniqueKey}
+                                  onValueChange={(val) => {
+                                    setReuploadSheetUniqueKey(val);
+                                    setReuploadDryRunResult(null);
+                                  }}
+                                  disabled={isReuploadPreviewLoading || isReuploadSubmitting || isReuploadDryRunning || reuploadHeadersList.length === 0}
+                                >
+                                  <SelectTrigger id="reuploadSheetUniqueKey" className="w-full justify-between">
+                                    <SelectValue placeholder={isReuploadPreviewLoading ? "Memuat kolom..." : "Pilih kolom ID Unik"} />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {reuploadHeadersList.map((h) => (
+                                      <SelectItem key={h} value={h}>
+                                        {h}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                {isReuploadPreviewLoading && (
+                                  <div className="absolute right-9 top-1/2 -translate-y-1/2 pointer-events-none z-10">
+                                    <Loader2Icon className="size-4 animate-spin text-primary" />
+                                  </div>
+                                )}
+                              </div>
+                              <p className="text-[11px] text-muted-foreground leading-snug">
+                                Pilih kolom dengan nilai unik (contoh: NIK, NIM, Email) untuk mengidentifikasi setiap peserta secara akurat.
+                              </p>
+                            </div>
 
-                        <div className="grid grid-cols-3 gap-2 text-center">
-                          <div className="p-2 border rounded bg-muted/30">
-                            <p className="text-[10px] text-muted-foreground">Baris</p>
-                            <p className="text-sm font-bold">{reuploadDryRunResult.stats.totalRows}</p>
-                          </div>
-                          <div className="p-2 border rounded bg-muted/30">
-                            <p className="text-[10px] text-muted-foreground">Kolom</p>
-                            <p className="text-sm font-bold">{reuploadDryRunResult.stats.totalColumns}</p>
-                          </div>
-                          <div className="p-2 border rounded bg-muted/30">
-                            <p className="text-[10px] text-muted-foreground">Error</p>
-                            <p className={`text-sm font-bold ${reuploadDryRunResult.stats.errorCount > 0 ? "text-rose-500" : "text-emerald-600"}`}>
-                              {reuploadDryRunResult.stats.errorCount}
-                            </p>
-                          </div>
-                        </div>
-
-                        {reuploadDryRunResult.stats.errorCount > 0 && (
-                          <Alert variant="destructive" className="bg-destructive/5 py-2 border-destructive/20 text-destructive-foreground text-[11px]">
-                            <AlertTriangleIcon className="h-3.5 w-3.5 shrink-0" />
-                            <AlertDescription>
-                              Terdapat {reuploadDryRunResult.stats.errorCount} masalah validasi duplikasi. Baris bermasalah akan tetap dimasukkan tapi ditandai error di dashboard.
-                            </AlertDescription>
-                          </Alert>
+                            <div className="pt-2">
+                              <Button
+                                type="button"
+                                className="w-full flex items-center justify-center gap-2"
+                                variant="secondary"
+                                onClick={handleReuploadDryRun}
+                                disabled={!reuploadFile || !reuploadSheetUniqueKey || isReuploadPreviewLoading || isReuploadSubmitting || isReuploadDryRunning}
+                              >
+                                {isReuploadDryRunning ? (
+                                  <>
+                                    <Loader2Icon className="h-4 w-4 animate-spin" />
+                                    Menguji Data...
+                                  </>
+                                ) : (
+                                  <>
+                                    <PlayIcon className="h-4 w-4 text-emerald-600" />
+                                    Jalankan Uji Coba (Dry Run)
+                                  </>
+                                )}
+                              </Button>
+                            </div>
+                          </>
                         )}
 
-                        <div className="flex justify-end gap-3 pt-2">
-                          <Button
-                            type="button"
-                            onClick={handleReuploadSubmit}
-                            disabled={isReuploadSubmitting}
-                            className="bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-2 w-full justify-center"
-                          >
-                            {isReuploadSubmitting ? (
-                              <>
-                                <Loader2Icon className="h-4 w-4 animate-spin" />
-                                Meng-update...
-                              </>
-                            ) : (
-                              <>
-                                <DatabaseIcon className="h-4 w-4" />
-                                Reupload & Ganti Data
-                              </>
+                        {/* Dry Run Result UI inside Settings */}
+                        {reuploadDryRunResult && (
+                          <div className="mt-4 border-t pt-4 space-y-4">
+                            <div className="flex items-start gap-3">
+                              <CheckCircle2Icon className="h-5 w-5 text-emerald-600 shrink-0 mt-0.5" />
+                              <div>
+                                <h4 className="font-semibold text-emerald-900 text-sm">Uji Coba Dry Run Selesai</h4>
+                                <p className="text-xs text-emerald-700 mt-0.5">
+                                  Silakan periksa rangkuman data di bawah ini.
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-3 gap-2 text-center">
+                              <div className="p-2 border rounded bg-muted/30">
+                                <p className="text-[10px] text-muted-foreground">Baris</p>
+                                <p className="text-sm font-bold">{reuploadDryRunResult.stats.totalRows}</p>
+                              </div>
+                              <div className="p-2 border rounded bg-muted/30">
+                                <p className="text-[10px] text-muted-foreground">Kolom</p>
+                                <p className="text-sm font-bold">{reuploadDryRunResult.stats.totalColumns}</p>
+                              </div>
+                              <div className="p-2 border rounded bg-muted/30">
+                                <p className="text-[10px] text-muted-foreground">Error</p>
+                                <p className={`text-sm font-bold ${reuploadDryRunResult.stats.errorCount > 0 ? "text-rose-500" : "text-emerald-600"}`}>
+                                  {reuploadDryRunResult.stats.errorCount}
+                                </p>
+                              </div>
+                            </div>
+
+                            {reuploadDryRunResult.stats.errorCount > 0 && (
+                              <Alert variant="destructive" className="bg-destructive/5 py-2 border-destructive/20 text-destructive-foreground text-[11px]">
+                                <AlertTriangleIcon className="h-3.5 w-3.5 shrink-0" />
+                                <AlertDescription>
+                                  Terdapat {reuploadDryRunResult.stats.errorCount} masalah validasi duplikasi. Baris bermasawat akan tetap dimasukkan tapi ditandai error di dashboard.
+                                </AlertDescription>
+                              </Alert>
                             )}
-                          </Button>
-                        </div>
+
+                            <div className="flex justify-end gap-3 pt-2">
+                              <Button
+                                type="button"
+                                onClick={handleReuploadSubmit}
+                                disabled={isReuploadSubmitting}
+                                className="bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-2 w-full justify-center"
+                              >
+                                {isReuploadSubmitting ? (
+                                  <>
+                                    <Loader2Icon className="h-4 w-4 animate-spin" />
+                                    Meng-update...
+                                  </>
+                                ) : (
+                                  <>
+                                    <DatabaseIcon className="h-4 w-4" />
+                                    Reupload & Ganti Data
+                                  </>
+                                )}
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  {/* Instructions Panel */}
+                  <div className="space-y-6">
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="flex items-center gap-2 text-sm">
+                          <HistoryIcon className="h-4 w-4 text-muted-foreground" />
+                          Petunjuk Reupload
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="text-xs text-muted-foreground leading-relaxed space-y-2">
+                        <p>
+                          1. Pastikan struktur kolom pada file baru sesuai dengan kebutuhan identifikasi data (NIK, NIM, Email, dll).
+                        </p>
+                        <p>
+                          2. Anda wajib memilih <strong>Kolom ID Unik</strong> untuk menghindari data ganda dan memastikan identitas peserta unik.
+                        </p>
+                        <p>
+                          3. Gunakan fitur <strong>Jalankan Uji Coba (Dry Run)</strong> terlebih dahulu untuk memastikan tidak ada kesalahan format atau data duplikat sebelum memperbarui database secara permanen.
+                        </p>
+                      </CardContent>
+                    </Card>
+                  </div>
+                </div>
+              </TabsContent>
+            )}
+
+            {/* TAB 2: MEMBERS APPROVAL LIST */}
+            {userRole === "ADMIN" && (
+              <TabsContent value="members" className="outline-none mt-0">
+                <Card className="border border-border/50 shadow-sm">
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+                    <div className="space-y-1.5">
+                      <CardTitle className="flex items-center gap-2 text-lg font-bold">
+                        <UsersIcon className="h-5 w-5 text-primary" />
+                        Daftar Pendaftar & Verifikator
+                      </CardTitle>
+                      <CardDescription>
+                        Kelola pendaftar baru yang ingin berkontribusi melakukan verifikasi data pada program ini.
+                      </CardDescription>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={fetchMembers}
+                      disabled={isMembersLoading}
+                      className="h-8 gap-1.5"
+                    >
+                      <RefreshCwIcon className={cn("h-3.5 w-3.5", isMembersLoading && "animate-spin")} />
+                      Refresh
+                    </Button>
+                  </CardHeader>
+                  <CardContent>
+                    {isMembersLoading ? (
+                      <div className="flex h-48 items-center justify-center">
+                        <RefreshCwIcon className="h-6 w-6 animate-spin text-primary" />
+                      </div>
+                    ) : members.length === 0 ? (
+                      <div className="text-center py-12 text-muted-foreground border border-dashed rounded-lg bg-muted/20">
+                        Belum ada anggota atau pendaftaran untuk program ini.
+                      </div>
+                    ) : (
+                      <div className="rounded-md border bg-card">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>User / Pendaftar</TableHead>
+                              <TableHead>Role</TableHead>
+                              <TableHead>Status</TableHead>
+                              <TableHead>Tanggal Daftar</TableHead>
+                              <TableHead className="text-right">Aksi</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {members.map((member) => (
+                              <TableRow key={member.id}>
+                                <TableCell className="flex items-center gap-3">
+                                  <Avatar className="h-8 w-8">
+                                    <AvatarImage src={member.user.image || undefined} />
+                                    <AvatarFallback className="text-[10px] bg-primary/10 text-primary">
+                                      {member.user.name?.slice(0, 2).toUpperCase() || "US"}
+                                    </AvatarFallback>
+                                  </Avatar>
+                                  <div className="flex flex-col">
+                                    <span className="font-medium text-sm text-foreground">{member.user.name}</span>
+                                    <span className="text-[11px] text-muted-foreground">{member.user.email}</span>
+                                  </div>
+                                </TableCell>
+                                <TableCell>
+                                  <Badge variant={member.role === "ADMIN" ? "default" : "outline"} className="text-[10px]">
+                                    {member.role}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell>
+                                  <Badge
+                                    variant={
+                                      member.status === "APPROVED"
+                                        ? "secondary"
+                                        : member.status === "PENDING"
+                                        ? "outline"
+                                        : "destructive"
+                                    }
+                                    className={cn(
+                                      "text-[10px]",
+                                      member.status === "APPROVED" && "bg-emerald-500/10 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400 border-emerald-500/20",
+                                      member.status === "PENDING" && "bg-amber-500/10 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400 border-amber-500/20"
+                                    )}
+                                  >
+                                    {member.status}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell className="text-xs text-muted-foreground">
+                                  {formatTimestamp(member.createdAt)}
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  {member.role !== "ADMIN" && member.status === "PENDING" && (
+                                    <div className="flex justify-end gap-1.5">
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => handleMemberAction(member.id, "APPROVED")}
+                                        className="h-7 w-7 p-0 border-emerald-500/30 hover:bg-emerald-50 text-emerald-600 dark:hover:bg-emerald-950/20"
+                                        title="Setujui"
+                                      >
+                                        <CheckIcon className="h-3.5 w-3.5" />
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => handleMemberAction(member.id, "REJECTED")}
+                                        className="h-7 w-7 p-0 border-rose-500/30 hover:bg-rose-50 text-rose-600 dark:hover:bg-rose-950/20"
+                                        title="Tolak"
+                                      >
+                                        <XIcon className="h-3.5 w-3.5" />
+                                      </Button>
+                                    </div>
+                                  )}
+                                  {member.role !== "ADMIN" && member.status === "APPROVED" && (
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() => handleMemberAction(member.id, "REJECTED")}
+                                      className="h-7 text-xs text-rose-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/20 px-2"
+                                    >
+                                      Nonaktifkan
+                                    </Button>
+                                  )}
+                                  {member.role !== "ADMIN" && member.status === "REJECTED" && (
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() => handleMemberAction(member.id, "APPROVED")}
+                                      className="h-7 text-xs text-emerald-500 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/20 px-2"
+                                    >
+                                      Aktifkan Kembali
+                                    </Button>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
                       </div>
                     )}
                   </CardContent>
                 </Card>
-              </div>
+              </TabsContent>
+            )}
 
-              {/* Instructions Panel */}
-              <div className="space-y-6">
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="flex items-center gap-2 text-sm">
-                      <HistoryIcon className="h-4 w-4 text-muted-foreground" />
-                      Petunjuk Penggunaan
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="text-xs text-muted-foreground leading-relaxed space-y-2">
-                    <p>
-                      1. Data peserta diimpor dari file Excel eksternal melalui menu <strong>Import Data</strong> di dashboard program.
-                    </p>
-                    <p>
-                      2. Verifikator akan memproses status kelayakan masing-masing peserta (Approve / Reject) secara langsung melalui antarmuka web.
-                    </p>
-                    <p>
-                      3. Hasil akhir dapat Anda ekspor kapan saja untuk pelaporan. Tiga kolom tambahan akan otomatis disematkan di bagian kanan kolom Excel: <strong>Status Evaluasi</strong>, <strong>Catatan Evaluasi</strong>, dan <strong>Waktu Evaluasi</strong>.
-                    </p>
-                  </CardContent>
-                </Card>
-              </div>
-            </div>
-          )}
-
-          {/* TAB 2: MEMBERS APPROVAL LIST */}
-          {activeTab === "members" && userRole === "ADMIN" && (
-            <Card className="border border-border/50 shadow-sm">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-                <div className="space-y-1.5">
+            {/* TAB 3: ACTIVITY LOGS */}
+            <TabsContent value="logs" className="outline-none mt-0">
+              <Card className="border border-border/50 shadow-sm">
+                <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-lg font-bold">
-                    <UsersIcon className="h-5 w-5 text-primary" />
-                    Daftar Pendaftar & Verifikator
+                    <ActivityIcon className="h-5 w-5 text-primary" />
+                    Log Aktivitas Verifikasi
                   </CardTitle>
                   <CardDescription>
-                    Kelola pendaftar baru yang ingin berkontribusi melakukan verifikasi data pada program ini.
+                    Riwayat perubahan data verifikasi peserta program yang dilakukan oleh verifikator.
                   </CardDescription>
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={fetchMembers}
-                  disabled={isMembersLoading}
-                  className="h-8 gap-1.5"
-                >
-                  <RefreshCwIcon className={cn("h-3.5 w-3.5", isMembersLoading && "animate-spin")} />
-                  Refresh
-                </Button>
-              </CardHeader>
-              <CardContent>
-                {isMembersLoading ? (
-                  <div className="flex h-48 items-center justify-center">
-                    <RefreshCwIcon className="h-6 w-6 animate-spin text-primary" />
-                  </div>
-                ) : members.length === 0 ? (
-                  <div className="text-center py-12 text-muted-foreground border border-dashed rounded-lg bg-muted/20">
-                    Belum ada anggota atau pendaftaran untuk program ini.
-                  </div>
-                ) : (
-                  <div className="rounded-md border bg-card">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>User / Pendaftar</TableHead>
-                          <TableHead>Role</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead>Tanggal Daftar</TableHead>
-                          <TableHead className="text-right">Aksi</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {members.map((member) => (
-                          <TableRow key={member.id}>
-                            <TableCell className="flex items-center gap-3">
-                              <Avatar className="h-8 w-8">
-                                <AvatarImage src={member.user.image || undefined} />
-                                <AvatarFallback className="text-[10px] bg-primary/10 text-primary">
-                                  {member.user.name?.slice(0, 2).toUpperCase() || "US"}
-                                </AvatarFallback>
-                              </Avatar>
-                              <div className="flex flex-col">
-                                <span className="font-medium text-sm text-foreground">{member.user.name}</span>
-                                <span className="text-[11px] text-muted-foreground">{member.user.email}</span>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant={member.role === "ADMIN" ? "default" : "outline"} className="text-[10px]">
-                                {member.role}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>
-                              <Badge
-                                variant={
-                                  member.status === "APPROVED"
-                                    ? "secondary"
-                                    : member.status === "PENDING"
-                                    ? "outline"
-                                    : "destructive"
-                                }
-                                className={cn(
-                                  "text-[10px]",
-                                  member.status === "APPROVED" && "bg-emerald-500/10 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400 border-emerald-500/20",
-                                  member.status === "PENDING" && "bg-amber-500/10 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400 border-amber-500/20"
-                                )}
-                              >
-                                {member.status}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="text-xs text-muted-foreground">
-                              {formatTimestamp(member.createdAt)}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              {member.role !== "ADMIN" && member.status === "PENDING" && (
-                                <div className="flex justify-end gap-1.5">
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => handleMemberAction(member.id, "APPROVED")}
-                                    className="h-7 w-7 p-0 border-emerald-500/30 hover:bg-emerald-50 text-emerald-600 dark:hover:bg-emerald-950/20"
-                                    title="Setujui"
-                                  >
-                                    <CheckIcon className="h-3.5 w-3.5" />
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => handleMemberAction(member.id, "REJECTED")}
-                                    className="h-7 w-7 p-0 border-rose-500/30 hover:bg-rose-50 text-rose-600 dark:hover:bg-rose-950/20"
-                                    title="Tolak"
-                                  >
-                                    <XIcon className="h-3.5 w-3.5" />
-                                  </Button>
+                </CardHeader>
+                <CardContent>
+                  {isLogsLoading ? (
+                    <div className="flex h-48 items-center justify-center">
+                      <RefreshCwIcon className="h-6 w-6 animate-spin text-primary" />
+                    </div>
+                  ) : logs.length === 0 ? (
+                    <div className="text-center py-12 text-muted-foreground border border-dashed rounded-lg bg-muted/20">
+                      Belum ada log aktivitas verifikasi untuk program ini.
+                    </div>
+                  ) : (
+                    <div className="rounded-md border bg-card">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Waktu</TableHead>
+                            <TableHead>Verifikator</TableHead>
+                            <TableHead>Aksi</TableHead>
+                            <TableHead>Keterangan</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {logs.map((log) => (
+                            <TableRow key={log.id}>
+                              <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+                                {formatTimestamp(log.createdAt)}
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex flex-col">
+                                  <span className="font-semibold text-xs text-foreground">{log.user.name}</span>
+                                  <span className="text-[10px] text-muted-foreground">{log.user.email}</span>
                                 </div>
-                              )}
-                              {member.role !== "ADMIN" && member.status === "APPROVED" && (
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={() => handleMemberAction(member.id, "REJECTED")}
-                                  className="h-7 text-xs text-rose-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/20 px-2"
+                              </TableCell>
+                              <TableCell>
+                                <Badge
+                                  variant={
+                                    log.action.includes("APPROVED") || log.action.includes("DISETUJUI")
+                                      ? "secondary"
+                                      : log.action.includes("REJECTED") || log.action.includes("DITOLAK")
+                                      ? "destructive"
+                                      : "outline"
+                                  }
+                                  className={cn(
+                                    "text-[9px] uppercase tracking-wider",
+                                    (log.action.includes("APPROVED") || log.action.includes("DISETUJUI")) && "bg-emerald-500/10 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400 border-emerald-500/20"
+                                  )}
                                 >
-                                  Nonaktifkan
-                                </Button>
-                              )}
-                              {member.role !== "ADMIN" && member.status === "REJECTED" && (
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={() => handleMemberAction(member.id, "APPROVED")}
-                                  className="h-7 text-xs text-emerald-500 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/20 px-2"
-                                >
-                                  Aktifkan Kembali
-                                </Button>
-                              )}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          )}
-
-          {/* TAB 3: ACTIVITY LOGS */}
-          {activeTab === "logs" && (
-            <Card className="border border-border/50 shadow-sm">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-lg font-bold">
-                  <ActivityIcon className="h-5 w-5 text-primary" />
-                  Log Aktivitas Verifikasi
-                </CardTitle>
-                <CardDescription>
-                  Riwayat perubahan data verifikasi peserta program yang dilakukan oleh verifikator.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {isLogsLoading ? (
-                  <div className="flex h-48 items-center justify-center">
-                    <RefreshCwIcon className="h-6 w-6 animate-spin text-primary" />
-                  </div>
-                ) : logs.length === 0 ? (
-                  <div className="text-center py-12 text-muted-foreground border border-dashed rounded-lg bg-muted/20">
-                    Belum ada log aktivitas verifikasi untuk program ini.
-                  </div>
-                ) : (
-                  <div className="rounded-md border bg-card">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Waktu</TableHead>
-                          <TableHead>Verifikator</TableHead>
-                          <TableHead>Aksi</TableHead>
-                          <TableHead>Keterangan</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {logs.map((log) => (
-                          <TableRow key={log.id}>
-                            <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
-                              {formatTimestamp(log.createdAt)}
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex flex-col">
-                                <span className="font-semibold text-xs text-foreground">{log.user.name}</span>
-                                <span className="text-[10px] text-muted-foreground">{log.user.email}</span>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <Badge
-                                variant={
-                                  log.action.includes("APPROVED") || log.action.includes("DISETUJUI")
-                                    ? "secondary"
-                                    : log.action.includes("REJECTED") || log.action.includes("DITOLAK")
-                                    ? "destructive"
-                                    : "outline"
-                                }
-                                className={cn(
-                                  "text-[9px] uppercase tracking-wider",
-                                  (log.action.includes("APPROVED") || log.action.includes("DISETUJUI")) && "bg-emerald-500/10 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400 border-emerald-500/20"
-                                )}
-                              >
-                                {log.action.replace("VERIFICATION_", "")}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="text-xs text-foreground/80 font-mono max-w-md wrap-break-word">
-                              {log.details}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          )}
+                                  {log.action.replace("VERIFICATION_", "")}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-xs text-foreground/80 font-mono max-w-md wrap-break-word">
+                                {log.details}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
         </div>
       </div>
     </MembershipGate>

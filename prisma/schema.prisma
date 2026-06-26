@@ -17,6 +17,8 @@ model Program {
   fieldCount      Int      @default(0)
   errorCount      Int      @default(0)
   uniqueKeyColumn String   @default("")  // nama kolom ID unik, contoh: "NIK"
+  headers         String[] @default([])
+  status          ProgramStatus @default(ACTIVE)
 
   // Relasi ke tabel terpisah
   participants    Participant[]
@@ -40,10 +42,9 @@ model Participant {
   uniqueKey       String   // nilai kolom ID unik (contoh: NIK, No. Peserta)
 
   data            Json     // semua field Excel: { "Nama": "...", "Alamat": "...", ... }
-  headers         String[] // daftar header kolom program ini
 
   // Kolom evaluasi — terpisah dari data{}, bisa di-index dan query langsung
-  evalStatus      String?   // "VERIFIED" | "REJECTED" | null (belum)
+  evalStatus      ParticipantEvalStatus?
   evalDescription String?
   evalByUserId    String?
   evalByUserName  String?
@@ -174,8 +175,8 @@ model ProgramMember {
   program   Program  @relation(fields: [programId], references: [id], onDelete: Cascade)
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  role      String   // "ADMIN" | "VERIFIER"
-  status    String   // "PENDING" | "APPROVED" | "REJECTED"
+  role      ProgramMemberRole
+  status    ProgramMemberStatus
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -199,6 +200,27 @@ model ActivityLog {
 
   @@index([programId])
   @@index([createdAt(sort: Desc)])
+}
+
+enum ProgramMemberRole {
+  ADMIN
+  VERIFIER
+}
+
+enum ProgramMemberStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum ParticipantEvalStatus {
+  VERIFIED
+  REJECTED
+}
+
+enum ProgramStatus {
+  ACTIVE
+  STOPPED
 }
 
 

@@ -84,6 +84,7 @@ export async function POST(
           fieldCount: cleanHeaders.length,
           errorCount: errorsList.length,
           uniqueKeyColumn: sheetUniqueKey,
+          headers: cleanHeaders,
         },
       });
 
@@ -95,7 +96,6 @@ export async function POST(
           rowIndex,
           uniqueKey: String(uniqueKeyValue ?? "").trim(),
           data: rest as any,
-          headers: cleanHeaders,
           searchText: buildSearchText(rest),
         };
       });

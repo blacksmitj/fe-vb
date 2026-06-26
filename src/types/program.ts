@@ -23,6 +23,9 @@ export interface Program {
   headers: string[];
   data: Record<string, any>[];
   profileSchema?: any;
-  status?: "PROCESSING" | "COMPLETED" | "FAILED" | "PARTIAL";
+  status?: "PROCESSING" | "COMPLETED" | "FAILED" | "PARTIAL" | "ACTIVE" | "STOPPED";
   userRole?: "ADMIN" | "VERIFIER";
+  verifiedCount?: number;
+  rejectedCount?: number;
+  pendingCount?: number;
 }

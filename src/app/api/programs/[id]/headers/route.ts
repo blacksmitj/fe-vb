@@ -28,31 +28,22 @@ export async function POST(
     // Check if program exists
     const program = await db.program.findUnique({
       where: { id },
+      select: { headers: true },
     });
 
     if (!program) {
       return NextResponse.json({ error: "Program not found" }, { status: 404 });
     }
 
-    // Find first participant to check current headers
-    const firstParticipant = await db.participant.findFirst({
-      where: { programId: id },
-      select: { headers: true },
-    });
+    const currentHeaders = program.headers || [];
+    let updatedHeaders: string[] = currentHeaders;
 
-    let updatedHeaders: string[] = [cleanHeader];
-
-    if (firstParticipant) {
-      const currentHeaders = (firstParticipant.headers as string[]) || [];
-      if (!currentHeaders.map(h => h.toLowerCase()).includes(cleanHeader.toLowerCase())) {
-        updatedHeaders = [...currentHeaders, cleanHeader];
-        await db.participant.updateMany({
-          where: { programId: id },
-          data: { headers: updatedHeaders },
-        });
-      } else {
-        updatedHeaders = currentHeaders;
-      }
+    if (!currentHeaders.map((h: string) => h.toLowerCase()).includes(cleanHeader.toLowerCase())) {
+      updatedHeaders = [...currentHeaders, cleanHeader];
+      await db.program.update({
+        where: { id },
+        data: { headers: updatedHeaders },
+      });
     }
 
     return NextResponse.json({ success: true, headers: updatedHeaders });

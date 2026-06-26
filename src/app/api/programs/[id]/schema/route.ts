@@ -62,23 +62,23 @@ export async function PATCH(
       select: { version: true },
     });
 
-    // Synchronize layout headers to Participant headers
+    // Synchronize layout headers to Program headers
     if (layoutHeaders.length > 0) {
-      const firstParticipant = await db.participant.findFirst({
-        where: { programId: id },
+      const program = await db.program.findUnique({
+        where: { id },
         select: { headers: true },
       });
 
-      if (firstParticipant) {
-        const currentHeaders = (firstParticipant.headers as string[]) || [];
+      if (program) {
+        const currentHeaders = program.headers || [];
         const missingHeaders = layoutHeaders.filter(
           (lh) => !currentHeaders.map((ch) => ch.toLowerCase()).includes(lh.toLowerCase())
         );
 
         if (missingHeaders.length > 0) {
           const nextHeaders = [...currentHeaders, ...missingHeaders];
-          await db.participant.updateMany({
-            where: { programId: id },
+          await db.program.update({
+            where: { id },
             data: { headers: nextHeaders },
           });
         }

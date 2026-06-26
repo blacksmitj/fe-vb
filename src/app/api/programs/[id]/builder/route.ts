@@ -20,14 +20,15 @@ export async function GET(
           fieldCount: true,
           errorCount: true,
           createdAt: true,
+          headers: true,
         },
       }),
 
-      // Hanya ambil headers dan data dari participant pertama
+      // Hanya ambil data dari participant pertama
       db.participant.findFirst({
         where: { programId: id },
         orderBy: { rowIndex: "asc" },
-        select: { headers: true, data: true },
+        select: { data: true },
       }),
 
       // Konfigurasi layout
@@ -41,7 +42,7 @@ export async function GET(
       return NextResponse.json({ error: "Program not found" }, { status: 404 });
     }
 
-    const headers = (firstParticipant?.headers as string[]) ?? [];
+    const headers = program.headers ?? [];
     const sampleRow = (firstParticipant?.data as Record<string, unknown>) ?? {};
 
     return NextResponse.json({

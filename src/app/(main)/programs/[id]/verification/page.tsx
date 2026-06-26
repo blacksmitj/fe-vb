@@ -9,7 +9,7 @@ import {
 } from "@/components/verification";
 import { useVerificationStore } from "@/stores";
 import { Section, migrateSectionsSchema } from "@/components/profile-builder";
-import { Loader2, ArrowLeft, RefreshCw } from "lucide-react";
+import { Loader2, ArrowLeft, RefreshCw, AlertCircle } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { SidebarTrigger } from "@/components/ui/sidebar";
@@ -25,10 +25,12 @@ import {
 import { useProgram } from "@/hooks/use-programs";
 import { toast } from "sonner";
 import { MembershipGate } from "@/components/programs/membership-gate";
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 
 export default function VerificationPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = React.use(params);
-  const { data: program } = useProgram(id);
+  const { data: program, refetch: refetchProgram } = useProgram(id);
   
   const {
     currentRowIndex,
@@ -102,6 +104,7 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
   // Callback to update participant row locally after saving evaluation
   const handleParticipantUpdated = (updatedParticipant: Record<string, any>) => {
     setParticipant(updatedParticipant);
+    refetchProgram();
   };
 
   const handleFieldChange = (label: string, value: any) => {
@@ -109,6 +112,10 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
   };
 
   const handleSave = async () => {
+    if (program?.status === "STOPPED") {
+      toast.error("Tidak dapat menyimpan perubahan karena verifikasi program ini ditangguhkan.");
+      return;
+    }
     setIsSaving(true);
     try {
       const url = currentParticipantId 
@@ -128,6 +135,7 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
       if (res.ok && data.success) {
         toast.success(`Data saved successfully`);
         setParticipant(data.participant);
+        refetchProgram();
       } else {
         toast.error(data.error || "Failed to save data");
       }
@@ -160,8 +168,15 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
                   </BreadcrumbItem>
                   <BreadcrumbSeparator className="hidden md:block" />
                   <BreadcrumbItem>
-                    <BreadcrumbPage>
-                      Verification - {program?.name || "Loading..."}
+                    <BreadcrumbPage className="flex items-center gap-2">
+                      <span>Verification - {program?.name || "Loading..."}</span>
+                      {program && (
+                        program.status === "ACTIVE" ? (
+                          <Badge className="bg-emerald-500 hover:bg-emerald-600 text-white text-[10px] font-semibold h-5 px-2 py-0 border-none">Buka</Badge>
+                        ) : (
+                          <Badge variant="destructive" className="text-[10px] font-semibold h-5 px-2 py-0">Ditutup</Badge>
+                        )
+                      )}
                     </BreadcrumbPage>
                   </BreadcrumbItem>
                 </BreadcrumbList>
@@ -184,6 +199,16 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
           )}
 
           <div className="p-6 flex flex-col gap-6">
+            {program?.status === "STOPPED" && (
+              <Alert variant="destructive" className="border-rose-500 bg-rose-500/5 text-rose-600">
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle className="font-bold">Verifikasi Ditangguhkan</AlertTitle>
+                <AlertDescription className="text-xs">
+                  Proses verifikasi untuk program ini telah dihentikan oleh Administrator. Anda tidak dapat melakukan penyimpanan atau perubahan data verifikasi.
+                </AlertDescription>
+              </Alert>
+            )}
+
             {/* Sticky Navigator Container */}
             <div className="sticky top-0 z-20 bg-background/95 backdrop-blur-md pb-2.5 border-b pt-4 px-6 -mt-6 -mx-6">
               <ParticipantNavigator
@@ -191,6 +216,10 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
                 onSave={handleSave}
                 isSaving={isSaving}
                 evaluationStatus={evaluationStatus}
+                verifiedCount={program?.verifiedCount}
+                rejectedCount={program?.rejectedCount}
+                pendingCount={program?.pendingCount}
+                isPaused={program?.status === "STOPPED"}
               />
             </div>
 

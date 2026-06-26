@@ -35,7 +35,7 @@ export async function GET(
 
     const program = await db.program.findUnique({
       where: { id },
-      select: { name: true },
+      select: { name: true, headers: true },
     });
 
     if (!program) {
@@ -47,7 +47,6 @@ export async function GET(
       where: { programId: id },
       orderBy: { rowIndex: "asc" },
       select: {
-        headers: true,
         data: true,
         evalStatus: true,
         evalByUserName: true,
@@ -61,7 +60,7 @@ export async function GET(
     }
 
     // Extract headers (headers are same across rows for a single import, use first row)
-    const headersList = participants[0].headers || [];
+    const headersList = program.headers || [];
 
     // Create workbook and sheet
     const workbook = new ExcelJS.Workbook();
@@ -69,7 +68,7 @@ export async function GET(
 
     // We add verification status and details headers at the end
     const finalHeaders = [
-      ...headersList.filter(h => !h.startsWith("__") && !h.startsWith("_")),
+      ...headersList.filter((h: string) => !h.startsWith("__") && !h.startsWith("_")),
       "Status Verifikasi",
       "Diverifikasi Oleh",
       "Waktu Verifikasi",
@@ -77,7 +76,7 @@ export async function GET(
     ];
 
     // Define columns
-    worksheet.columns = finalHeaders.map(h => ({
+    worksheet.columns = finalHeaders.map((h: string) => ({
       header: h,
       key: h,
       width: h.length < 15 ? 15 : h.length + 3
@@ -89,7 +88,7 @@ export async function GET(
       const rowData: Record<string, any> = {};
       
       // Populate original fields
-      headersList.forEach(h => {
+      headersList.forEach((h: string) => {
         if (!h.startsWith("__") && !h.startsWith("_")) {
           rowData[h] = row[h] !== undefined && row[h] !== null ? row[h] : "";
         }

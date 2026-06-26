@@ -1,4 +1,6 @@
 import { db } from "@/lib/db";
+import { auth } from "@/lib/auth/auth";
+import { headers as getHeaders } from "next/headers";
 import { NextResponse } from "next/server";
 
 export async function GET(
@@ -21,19 +23,10 @@ export async function GET(
     const { searchParams } = new URL(request.url);
     const includePreview = searchParams.get("preview") === "true";
 
-    let headers: string[] = [];
+    let headers: string[] = program.headers;
     let data: Record<string, any>[] = [];
 
     if (includePreview) {
-      // Fetch headers from the first participant
-      const firstParticipant = await db.participant.findFirst({
-        where: { programId: id },
-        orderBy: { rowIndex: "asc" },
-        select: { headers: true },
-      });
-
-      headers = firstParticipant?.headers || [];
-
       // Fetch first 10 rows for preview
       const previewRows = await db.participant.findMany({
         where: { programId: id },
@@ -44,6 +37,26 @@ export async function GET(
         
       data = previewRows.map(p => (p.data as Record<string, any>) || {});
     }
+
+    // Fetch evaluation statistics
+    const stats = await db.participant.groupBy({
+      by: ["evalStatus"],
+      where: { programId: id },
+      _count: { id: true },
+    });
+
+    let verifiedCount = 0;
+    let rejectedCount = 0;
+
+    stats.forEach(stat => {
+      if (stat.evalStatus === "VERIFIED") {
+        verifiedCount = stat._count.id;
+      } else if (stat.evalStatus === "REJECTED") {
+        rejectedCount = stat._count.id;
+      }
+    });
+
+    const pendingCount = Math.max(0, program.totalRows - verifiedCount - rejectedCount);
 
     return NextResponse.json({
       id: program.id,
@@ -57,10 +70,62 @@ export async function GET(
       headers,
       data,
       profileSchema: program.profileSchema?.sections ?? [],
+      verifiedCount,
+      rejectedCount,
+      pendingCount,
+      status: program.status,
     });
   } catch (error) {
     console.error("GET /api/programs/[id] error:", error);
     return NextResponse.json({ error: "Failed to fetch program" }, { status: 500 });
+  }
+}
+
+export async function PATCH(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const session = await auth.api.getSession({
+      headers: await getHeaders(),
+    });
+
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { id } = await params;
+
+    // Check if the user is an APPROVED ADMIN of the program
+    const membership = await db.programMember.findUnique({
+      where: {
+        programId_userId: {
+          programId: id,
+          userId: session.user.id,
+        },
+      },
+    });
+
+    if (!membership || membership.role !== "ADMIN" || membership.status !== "APPROVED") {
+      return NextResponse.json({ error: "Forbidden: Admin only" }, { status: 403 });
+    }
+
+    const { status, name, description } = await request.json();
+
+    const dataToUpdate: any = {};
+    if (status !== undefined) dataToUpdate.status = status;
+    if (name !== undefined) dataToUpdate.name = name;
+    if (description !== undefined) dataToUpdate.description = description;
+
+    const updated = await db.program.update({
+      where: { id },
+      data: dataToUpdate,
+    });
+
+    return NextResponse.json(updated);
+  } catch (error) {
+    console.error("PATCH /api/programs/[id] error:", error);
+    return NextResponse.json({ error: "Failed to update program" }, { status: 500 });
   }
 }
 
@@ -69,7 +134,30 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const session = await auth.api.getSession({
+      headers: await getHeaders(),
+    });
+
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const { id } = await params;
+
+    // Check if the user is an APPROVED ADMIN of the program
+    const membership = await db.programMember.findUnique({
+      where: {
+        programId_userId: {
+          programId: id,
+          userId: session.user.id,
+        },
+      },
+    });
+
+    if (!membership || membership.role !== "ADMIN" || membership.status !== "APPROVED") {
+      return NextResponse.json({ error: "Forbidden: Admin only" }, { status: 403 });
+    }
+
     await db.program.delete({
       where: { id },
     });
