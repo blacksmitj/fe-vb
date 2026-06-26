@@ -24,6 +24,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Combobox,
+  ComboboxInput,
+  ComboboxContent,
+  ComboboxList,
+  ComboboxItem,
+  ComboboxEmpty,
+} from "@/components/ui/combobox";
 import { 
   Type, 
   AlignLeft, 
@@ -602,27 +610,34 @@ export default function ProfileBuilderFieldRenderer({
         const selectOptions = field.options || [];
         if (field.isEditable) {
           return (
-            <Select
+            <Combobox
               value={dropdownVal}
               disabled={field.locked}
-              onValueChange={(val) => onUpdateField({ ...field, value: val })}
+              onValueChange={(val) => onUpdateField({ ...field, value: val || "" })}
             >
-              <SelectTrigger className="h-7 text-xs px-2 w-full">
-                <SelectValue placeholder={field.placeholder || "Select option..."} />
-              </SelectTrigger>
-              <SelectContent>
-                {selectOptions.map((opt) => (
-                  <SelectItem key={opt} value={opt}>
-                    {opt}
-                  </SelectItem>
-                ))}
-                {selectOptions.length === 0 && (
-                  <div className="text-[10px] text-muted-foreground p-2 text-center">
-                    No options defined. Edit field to add options.
-                  </div>
-                )}
-              </SelectContent>
-            </Select>
+              <ComboboxInput
+                placeholder={field.placeholder || "Select option..."}
+                className="w-full text-xs"
+              />
+              <ComboboxContent>
+                <ComboboxList>
+                  {selectOptions.map((opt) => (
+                    <ComboboxItem key={opt} value={opt}>
+                      {opt}
+                    </ComboboxItem>
+                  ))}
+                  {selectOptions.length === 0 ? (
+                    <div className="text-[10px] text-muted-foreground p-2 text-center">
+                      No options defined. Edit field to add options.
+                    </div>
+                  ) : (
+                    <ComboboxEmpty className="text-[10px] text-muted-foreground p-2 text-center">
+                      Tidak ditemukan
+                    </ComboboxEmpty>
+                  )}
+                </ComboboxList>
+              </ComboboxContent>
+            </Combobox>
           );
         } else {
           const hasValue = dropdownVal !== "";

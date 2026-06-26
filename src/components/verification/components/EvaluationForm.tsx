@@ -10,12 +10,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Calendar, FileText, Image as ImageIcon, Video, Tag, Bookmark, Hash, ArrowUpRight, Eye, Play, Globe } from "lucide-react";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  Combobox,
+  ComboboxInput,
+  ComboboxContent,
+  ComboboxList,
+  ComboboxItem,
+  ComboboxEmpty,
+} from "@/components/ui/combobox";
 
 function formatDateForInput(valueStr: string, isDateTime: boolean = false): string {
   if (!valueStr) return "";
@@ -413,26 +414,33 @@ export function EvaluationForm({ sections, participant, onFieldChange }: Evaluat
         if (field.isEditable) {
           const selectOptions = field.options || [];
           return (
-            <Select
+            <Combobox
               value={valueStr}
-              onValueChange={(val) => onFieldChange?.(field.label, val)}
+              onValueChange={(val) => onFieldChange?.(field.label, val || "")}
             >
-              <SelectTrigger className="w-full text-sm">
-                <SelectValue placeholder={field.placeholder || "Select option..."} />
-              </SelectTrigger>
-              <SelectContent>
-                {selectOptions.map((opt) => (
-                  <SelectItem key={opt} value={opt}>
-                    {opt}
-                  </SelectItem>
-                ))}
-                {selectOptions.length === 0 && (
-                  <div className="text-[10px] text-muted-foreground p-2 text-center">
-                    No options defined for this dropdown.
-                  </div>
-                )}
-              </SelectContent>
-            </Select>
+              <ComboboxInput
+                placeholder={field.placeholder || "Select option..."}
+                className="w-full text-sm"
+              />
+              <ComboboxContent>
+                <ComboboxList>
+                  {selectOptions.map((opt) => (
+                    <ComboboxItem key={opt} value={opt}>
+                      {opt}
+                    </ComboboxItem>
+                  ))}
+                  {selectOptions.length === 0 ? (
+                    <div className="text-[10px] text-muted-foreground p-2 text-center">
+                      No options defined for this dropdown.
+                    </div>
+                  ) : (
+                    <ComboboxEmpty className="text-[10px] text-muted-foreground p-2 text-center">
+                      Tidak ditemukan
+                    </ComboboxEmpty>
+                  )}
+                </ComboboxList>
+              </ComboboxContent>
+            </Combobox>
           );
         }
         return (
