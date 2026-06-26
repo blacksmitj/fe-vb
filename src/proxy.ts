@@ -5,7 +5,7 @@ export async function proxy(request: NextRequest) {
   const sessionCookie = request.cookies.get("better-auth.session_token") || 
                         request.cookies.get("__Secure-better-auth.session_token");
 
-  const { pathname } = request.nextUrl;
+  const { pathname, search } = request.nextUrl;
   const isAuthPage = pathname === "/";
   
   // Protected paths
@@ -15,7 +15,8 @@ export async function proxy(request: NextRequest) {
     pathname.startsWith("/programs");
 
   if (isProtectedPage && !sessionCookie) {
-    return NextResponse.redirect(new URL("/", request.url));
+    const callbackURL = encodeURIComponent(`${pathname}${search}`);
+    return NextResponse.redirect(new URL(`/?callbackURL=${callbackURL}`, request.url));
   }
 
   if (isAuthPage && sessionCookie) {

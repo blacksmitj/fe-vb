@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { signIn } from "@/lib/auth/auth-client";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
@@ -9,6 +10,8 @@ import { toast } from "sonner";
 
 export default function Home() {
   const [isLoading, setIsLoading] = useState(false);
+  const searchParams = useSearchParams();
+  const callbackURL = searchParams.get("callbackURL") || "/dashboard";
 
   const handleGoogleLogin = async () => {
     try {
@@ -16,7 +19,7 @@ export default function Home() {
       await signIn.social(
         {
           provider: "google",
-          callbackURL: "/dashboard",
+          callbackURL: callbackURL,
         },
         {
           onError: (ctx: any) => {

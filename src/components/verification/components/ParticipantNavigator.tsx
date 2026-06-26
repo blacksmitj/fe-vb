@@ -126,7 +126,7 @@ export function ParticipantNavigator({
   };
 
   return (
-    <div className="flex items-center gap-3 w-full bg-muted/20 p-1.5 rounded-lg border shadow-xs">
+    <div className="flex items-center gap-3 w-full">
       {/* Exit Button */}
       <Button variant="outline" size="sm" asChild className="gap-1.5 h-8 text-xs shrink-0">
         <Link href="/programs">

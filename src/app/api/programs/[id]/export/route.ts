@@ -42,32 +42,43 @@ export async function GET(
       return NextResponse.json({ error: "Program not found" }, { status: 404 });
     }
 
-    // Fetch all participant batches
-    const batches = await db.participantData.findMany({
+    // Find the maximum batchIndex first
+    const maxBatchResult = await db.participantData.aggregate({
       where: { programId: id },
-      orderBy: { batchIndex: "asc" },
+      _max: {
+        batchIndex: true,
+      },
     });
 
-    if (batches.length === 0) {
+    const maxBatchIndex = maxBatchResult._max.batchIndex;
+
+    if (maxBatchIndex === null) {
       return NextResponse.json({ error: "No participant data available to export" }, { status: 400 });
     }
 
-    // Extract headers and combine rows
+    // Extract headers and combine rows sequentially to save memory
     let headersList: string[] = [];
     const allRows: Record<string, any>[] = [];
 
-    for (const batch of batches) {
-      if (batch.headers && Array.isArray(batch.headers)) {
-        // Collect headers, merge unique ones (in case batches differ slightly, but usually they're same)
-        const batchHeaders = batch.headers as string[];
-        batchHeaders.forEach(h => {
-          if (!headersList.includes(h)) {
-            headersList.push(h);
-          }
-        });
-      }
-      if (batch.rows && Array.isArray(batch.rows)) {
-        allRows.push(...(batch.rows as Record<string, any>[]));
+    for (let i = 0; i <= maxBatchIndex; i++) {
+      const batch = await db.participantData.findFirst({
+        where: { programId: id, batchIndex: i },
+        select: { headers: true, rows: true }, // Avoid loading errorDetails or other fields
+      });
+
+      if (batch) {
+        if (batch.headers && Array.isArray(batch.headers)) {
+          // Collect headers, merge unique ones
+          const batchHeaders = batch.headers as string[];
+          batchHeaders.forEach(h => {
+            if (!headersList.includes(h)) {
+              headersList.push(h);
+            }
+          });
+        }
+        if (batch.rows && Array.isArray(batch.rows)) {
+          allRows.push(...(batch.rows as Record<string, any>[]));
+        }
       }
     }
 

@@ -1,11 +1,14 @@
 "use client";
 
+import * as React from "react";
 import {
   BellIcon,
   ChevronsUpDownIcon,
   CreditCardIcon,
   LogOutIcon,
   UserIcon,
+  SunIcon,
+  MoonIcon,
 } from "lucide-react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -27,11 +30,18 @@ import {
 
 import { useSession, signOut } from "@/lib/auth/auth-client";
 import { useRouter } from "next/navigation";
+import { useTheme } from "next-themes";
 
 export function NavUser() {
   const { isMobile } = useSidebar();
   const router = useRouter();
   const { data: session } = useSession();
+  const { theme, setTheme, resolvedTheme } = useTheme();
+  const [mounted, setMounted] = React.useState(false);
+
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const user = {
     name: session?.user?.name || "Admin User",
@@ -70,7 +80,7 @@ export function NavUser() {
               </Avatar>
               <div className="grid flex-1 text-left text-sm leading-tight">
                 <span className="truncate font-semibold">{user.name}</span>
-                <span className="truncate text-xs text-muted-foreground">
+                <span className="truncate text-xs text-sidebar-foreground/60">
                   {user.email}
                 </span>
               </div>
@@ -115,6 +125,22 @@ export function NavUser() {
               <DropdownMenuItem>
                 <BellIcon />
                 Notifications
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
+                className="cursor-pointer"
+              >
+                {mounted && resolvedTheme === "dark" ? (
+                  <>
+                    <SunIcon className="size-4" />
+                    <span>Light Mode</span>
+                  </>
+                ) : (
+                  <>
+                    <MoonIcon className="size-4" />
+                    <span>Dark Mode</span>
+                  </>
+                )}
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
