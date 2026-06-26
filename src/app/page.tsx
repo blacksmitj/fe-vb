@@ -5,19 +5,30 @@ import { signIn } from "@/lib/auth/auth-client";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 
+import { toast } from "sonner";
+
 export default function Home() {
   const [isLoading, setIsLoading] = useState(false);
 
   const handleGoogleLogin = async () => {
     try {
       setIsLoading(true);
-      await signIn.social({
-        provider: "google",
-        callbackURL: "/dashboard",
-      });
+      await signIn.social(
+        {
+          provider: "google",
+          callbackURL: "/dashboard",
+        },
+        {
+          onError: (ctx: any) => {
+            console.error("Google Login Client Error (onError):", ctx.error);
+            toast.error(`Error: ${ctx?.error?.message || "Failed to log in with Google"}`);
+            setIsLoading(false);
+          },
+        }
+      );
     } catch (error) {
-      console.error("Failed to login with Google:", error);
-    } finally {
+      console.error("Failed to login with Google (catch):", error);
+      toast.error(error instanceof Error ? error.message : "Failed to login with Google");
       setIsLoading(false);
     }
   };

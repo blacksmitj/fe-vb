@@ -17,6 +17,7 @@ import {
   ArrowUpDownIcon,
   SearchIcon,
   SettingsIcon,
+  Share2Icon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -273,6 +274,25 @@ export default function ProgramsPage() {
                 <Link href={`/programs/${program.id}/verification`}>
                   <ClipboardCheckIcon className="size-4" />
                 </Link>
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                title="Salin Link Verifikasi"
+                className="size-8 text-muted-foreground hover:text-foreground"
+                onClick={() => {
+                  const shareUrl = `${window.location.origin}/programs/${program.id}/verification`;
+                  navigator.clipboard.writeText(shareUrl)
+                    .then(() => {
+                      toast.success("Link verifikasi berhasil disalin!");
+                    })
+                    .catch((err) => {
+                      console.error("Gagal menyalin link:", err);
+                      toast.error("Gagal menyalin link verifikasi");
+                    });
+                }}
+              >
+                <Share2Icon className="size-4" />
               </Button>
               <Button
                 variant="ghost"
