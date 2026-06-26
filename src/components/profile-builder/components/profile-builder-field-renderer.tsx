@@ -9,13 +9,13 @@ import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import {
   Select,
   SelectContent,
@@ -30,7 +30,6 @@ import {
   Edit3, 
   Lock, 
   Check, 
-  GripHorizontal,
   X,
   Play,
   Volume2,
@@ -43,13 +42,16 @@ import {
   Bookmark,
   Link2,
   Globe,
-  FileText
+  FileText,
+  ChevronUp,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  List,
+  Plus
 } from "lucide-react";
 import { toast } from "sonner";
-import { useSortable } from "@dnd-kit/react/sortable";
-import { SortableKeyboardPlugin } from "@dnd-kit/dom/sortable";
 import { detectMediaType } from "../utils/detect-media-type";
-import { Feedback } from "@dnd-kit/dom";
 
 interface FieldRendererProps {
   field: Field;
@@ -58,6 +60,12 @@ interface FieldRendererProps {
   sectionId: string;
   onUpdateField: (updatedField: Field) => void;
   onDeleteField: (fieldId: string) => void;
+  onMoveUp?: () => void;
+  onMoveDown?: () => void;
+  onMoveColumn?: (column: "left" | "right") => void;
+  isFirst?: boolean;
+  isLast?: boolean;
+  showColumnMove?: boolean;
   sampleRow?: Record<string, any>;
   isOverlay?: boolean;
 }
@@ -69,6 +77,12 @@ export default function ProfileBuilderFieldRenderer({
   sectionId,
   onUpdateField,
   onDeleteField,
+  onMoveUp,
+  onMoveDown,
+  onMoveColumn,
+  isFirst = false,
+  isLast = false,
+  showColumnMove = false,
   sampleRow,
   isOverlay = false,
 }: FieldRendererProps) {
@@ -88,6 +102,9 @@ export default function ProfileBuilderFieldRenderer({
   const [editMediaSubType, setEditMediaSubType] = useState<'auto' | 'image' | 'video' | 'pdf' | 'link'>(
     field.mediaSubType || 'auto'
   );
+  const [editOptions, setEditOptions] = useState<string[]>(field.options || []);
+  const [newOptionText, setNewOptionText] = useState("");
+  const [optionsBulkText, setOptionsBulkText] = useState("");
 
   const handleOpenEditModal = () => {
     setEditType(field.type);
@@ -99,7 +116,36 @@ export default function ProfileBuilderFieldRenderer({
     setEditStatusStyle(field.statusStyle || 'default');
     setEditPillsSeparator(field.pillsSeparator || ',');
     setEditMediaSubType(field.mediaSubType || 'auto');
+    
+    const initialOptions = field.options || [];
+    setEditOptions(initialOptions);
+    setNewOptionText("");
+    setOptionsBulkText(initialOptions.join("\n"));
+    
     setIsEditModalOpen(true);
+  };
+
+  const handleBulkOptionsChange = (text: string) => {
+    setOptionsBulkText(text);
+    const parsed = text
+      .split("\n")
+      .map((item) => item.trim())
+      .filter(Boolean);
+    setEditOptions(parsed);
+  };
+
+  const handleAddOption = () => {
+    if (!newOptionText.trim()) return;
+    const updated = [...editOptions, newOptionText.trim()];
+    setEditOptions(updated);
+    setOptionsBulkText(updated.join("\n"));
+    setNewOptionText("");
+  };
+
+  const handleRemoveOption = (index: number) => {
+    const updated = editOptions.filter((_, idx) => idx !== index);
+    setEditOptions(updated);
+    setOptionsBulkText(updated.join("\n"));
   };
 
   const handleSaveFieldSettings = (e: React.FormEvent) => {
@@ -119,19 +165,11 @@ export default function ProfileBuilderFieldRenderer({
       statusStyle: editStatusStyle,
       pillsSeparator: editPillsSeparator,
       mediaSubType: editMediaSubType === 'auto' ? undefined : editMediaSubType,
+      options: editType === 'dropdown' ? editOptions : undefined,
     });
     setIsEditModalOpen(false);
     toast.success("Field settings updated");
   };
-
-  const { ref, handleRef, isDragging } = useSortable({
-    id: field.id,
-    index,
-    type: "field",
-    accept: "field",
-    group: `${sectionId}-${column}`,
-    disabled: isOverlay,
-  });
 
   const handleSaveLabel = () => {
     if (!labelValue.trim()) {
@@ -158,6 +196,8 @@ export default function ProfileBuilderFieldRenderer({
         return <Tag className="h-4.5 w-4.5 text-amber-500" />;
       case "array-pills":
         return <Bookmark className="h-4.5 w-4.5 text-emerald-500" />;
+      case "dropdown":
+        return <List className="h-4.5 w-4.5 text-indigo-500" />;
     }
   };
 
@@ -199,10 +239,13 @@ export default function ProfileBuilderFieldRenderer({
             />
           );
         } else {
-          const textVal = field.value !== undefined && field.value !== "" ? field.value : (sampleValue !== undefined && sampleValue !== null ? String(sampleValue) : "-");
+          const hasValue = (field.value !== undefined && field.value !== "") || (sampleValue !== undefined && sampleValue !== null && String(sampleValue) !== "");
+          const textVal = hasValue 
+            ? (field.value !== undefined && field.value !== "" ? field.value : String(sampleValue)) 
+            : (field.placeholder || "Belum diisi");
           return (
-            <div className="py-1 px-2.5 bg-muted/40 border border-border/50 rounded-lg text-xs select-all">
-              <span className={field.previewFontMode === "mono" ? "font-mono tracking-tight text-foreground/80 font-medium" : "text-foreground/80 font-medium"}>
+            <div className="min-h-7 flex items-center py-1 px-2.5 bg-muted/40 border border-border/50 rounded-lg text-xs select-all">
+              <span className={`${field.previewFontMode === "mono" ? "font-mono " : ""}tracking-tight font-medium ${hasValue ? "text-foreground/80" : "text-muted-foreground/50 italic"}`}>
                 {textVal}
               </span>
             </div>
@@ -220,10 +263,13 @@ export default function ProfileBuilderFieldRenderer({
             />
           );
         } else {
-          const textVal = field.value !== undefined && field.value !== "" ? field.value : (sampleValue !== undefined && sampleValue !== null ? String(sampleValue) : "-");
+          const hasValue = (field.value !== undefined && field.value !== "") || (sampleValue !== undefined && sampleValue !== null && String(sampleValue) !== "");
+          const textVal = hasValue 
+            ? (field.value !== undefined && field.value !== "" ? field.value : String(sampleValue)) 
+            : (field.placeholder || "Belum diisi");
           return (
-            <div className="py-1 px-2.5 bg-muted/40 border border-border/50 rounded-lg text-xs select-all whitespace-pre-wrap">
-              <span className={field.previewFontMode === "mono" ? "font-mono tracking-tight text-foreground/80 font-medium" : "text-foreground/80 font-medium"}>
+            <div className="min-h-[50px] py-1 px-2.5 bg-muted/40 border border-border/50 rounded-lg text-xs select-all whitespace-pre-wrap">
+              <span className={`${field.previewFontMode === "mono" ? "font-mono " : ""}tracking-tight font-medium ${hasValue ? "text-foreground/80" : "text-muted-foreground/50 italic"}`}>
                 {textVal}
               </span>
             </div>
@@ -365,9 +411,12 @@ export default function ProfileBuilderFieldRenderer({
             />
           );
         } else {
-          const textVal = field.value !== undefined && field.value !== "" ? field.value : (sampleValue !== undefined && sampleValue !== null ? String(sampleValue) : "-");
+          const hasValue = (field.value !== undefined && field.value !== "") || (sampleValue !== undefined && sampleValue !== null && String(sampleValue) !== "");
+          const textVal = hasValue 
+            ? (field.value !== undefined && field.value !== "" ? field.value : String(sampleValue)) 
+            : (field.placeholder || "Belum diisi");
           return (
-            <div className="py-1 px-2.5 bg-muted/40 border border-border/50 rounded-lg text-xs select-all font-mono text-foreground/80 font-medium">
+            <div className={`min-h-7 flex items-center py-1 px-2.5 bg-muted/40 border border-border/50 rounded-lg text-xs select-all font-mono font-medium ${hasValue ? "text-foreground/80" : "text-muted-foreground/50 italic"}`}>
               {textVal}
             </div>
           );
@@ -397,7 +446,7 @@ export default function ProfileBuilderFieldRenderer({
           );
         } else {
           return (
-            <div className="py-1 px-2.5 bg-muted/40 border border-border/50 rounded-lg text-xs select-all flex items-center gap-1.5">
+            <div className="min-h-7 py-1 px-2.5 bg-muted/40 border border-border/50 rounded-lg text-xs select-all flex items-center gap-1.5">
               <Calendar className="h-3.5 w-3.5 text-muted-foreground/75" />
               <span className="text-foreground/80 font-medium font-sans">
                 {formattedDateStr || "Belum ada tanggal"}
@@ -504,33 +553,98 @@ export default function ProfileBuilderFieldRenderer({
             </div>
           );
         }
+      case "dropdown":
+        const dropdownVal = field.value !== undefined && field.value !== "" ? field.value : (sampleValue !== undefined && sampleValue !== null ? String(sampleValue) : "");
+        const selectOptions = field.options || [];
+        if (field.isEditable) {
+          return (
+            <Select
+              value={dropdownVal}
+              disabled={field.locked}
+              onValueChange={(val) => onUpdateField({ ...field, value: val })}
+            >
+              <SelectTrigger className="h-7 text-xs px-2 w-full">
+                <SelectValue placeholder={field.placeholder || "Select option..."} />
+              </SelectTrigger>
+              <SelectContent>
+                {selectOptions.map((opt) => (
+                  <SelectItem key={opt} value={opt}>
+                    {opt}
+                  </SelectItem>
+                ))}
+                {selectOptions.length === 0 && (
+                  <div className="text-[10px] text-muted-foreground p-2 text-center">
+                    No options defined. Edit field to add options.
+                  </div>
+                )}
+              </SelectContent>
+            </Select>
+          );
+        } else {
+          const hasValue = dropdownVal !== "";
+          const textVal = hasValue ? dropdownVal : (field.placeholder || "Belum diisi");
+          return (
+            <div className="min-h-7 flex items-center py-1 px-2.5 bg-muted/40 border border-border/50 rounded-lg text-xs select-all">
+              <span className={`tracking-tight font-medium ${hasValue ? "text-foreground/80" : "text-muted-foreground/50 italic"}`}>
+                {textVal}
+              </span>
+            </div>
+          );
+        }
     }
   };
 
   return (
     <div className="w-full">
       <div 
-        ref={isOverlay ? undefined : ref}
-        className={`group/field relative flex items-start gap-1.5 rounded-lg border p-1 transition-all ${
-          isOverlay
-            ? "border-primary bg-card shadow-lg ring-1 ring-primary/20 scale-[1.02] cursor-grabbing"
-            : isDragging
-              ? "border-dashed border-border/40 bg-muted/20 opacity-30 select-none pointer-events-none"
-              : "border-transparent hover:border-border/50 hover:bg-muted/5"
-        }`}
+        className="group/field relative flex items-start gap-1.5 rounded-lg border p-1 transition-all border-transparent hover:border-border/50 hover:bg-muted/5"
       >
-        {/* Small drag handle indicator for aesthetics */}
-        {!isOverlay && (
-          <div 
-            ref={handleRef}
-            className="mt-1.5 opacity-0 group-hover/field:opacity-40 transition-opacity cursor-grab text-muted-foreground p-0.5 z-10"
-          >
-            <GripHorizontal className="h-3.5 w-3.5" />
-          </div>
-        )}
-        {isOverlay && (
-          <div className="mt-1.5 text-primary/75 p-0.5 z-10 cursor-grabbing">
-            <GripHorizontal className="h-3.5 w-3.5" />
+        {/* Compact Move Controls (Up/Down and Left/Right if in 2-col) */}
+        {!isOverlay && !field.locked && (
+          <div className="flex flex-col gap-0.5 mt-1.5 opacity-0 group-hover/field:opacity-100 transition-opacity z-10 shrink-0">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-5 w-5 p-0 hover:bg-muted text-muted-foreground hover:text-foreground"
+              disabled={isFirst}
+              onClick={(e) => {
+                e.stopPropagation();
+                onMoveUp?.();
+              }}
+              title="Move Up"
+            >
+              <ChevronUp className="h-3.5 w-3.5" />
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-5 w-5 p-0 hover:bg-muted text-muted-foreground hover:text-foreground"
+              disabled={isLast}
+              onClick={(e) => {
+                e.stopPropagation();
+                onMoveDown?.();
+              }}
+              title="Move Down"
+            >
+              <ChevronDown className="h-3.5 w-3.5" />
+            </Button>
+            {showColumnMove && onMoveColumn && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-5 w-5 p-0 hover:bg-muted text-muted-foreground hover:text-foreground"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onMoveColumn(column === "left" ? "right" : "left");
+                }}
+                title={column === "left" ? "Move to Right Column" : "Move to Left Column"}
+              >
+                {column === "left" ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronLeft className="h-3.5 w-3.5" />}
+              </Button>
+            )}
           </div>
         )}
 
@@ -630,177 +744,275 @@ export default function ProfileBuilderFieldRenderer({
           </Button>
         )}
 
-        {/* Edit Field Modal */}
-        <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
-          <DialogContent className="sm:max-w-[425px]">
-            <form onSubmit={handleSaveFieldSettings}>
-              <DialogHeader>
-                <DialogTitle>Edit Field: {field.label}</DialogTitle>
-                <DialogDescription>
-                  Modify the properties, type, or label for this field.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="grid gap-4 py-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="editFieldType">Field Type</Label>
-                  <Select
-                    value={editType}
-                    onValueChange={(val) => setEditType(val as FieldType)}
-                  >
-                    <SelectTrigger id="editFieldType">
-                      <SelectValue placeholder="Select field type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="text">Text Input</SelectItem>
-                      <SelectItem value="textarea">Text Area</SelectItem>
-                      <SelectItem value="number">Number Input</SelectItem>
-                      <SelectItem value="date">Date picker</SelectItem>
-                      <SelectItem value="badge-status">Badge Status</SelectItem>
-                      <SelectItem value="array-pills">Array Pills</SelectItem>
-                      <SelectItem value="media">Media / Dokumen (Auto-detect)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                {editType === "media" && (
+        {/* Edit Field Sheet */}
+        <Sheet open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
+          <SheetContent className="sm:max-w-[480px] p-6 overflow-y-auto flex flex-col h-full">
+            <form onSubmit={handleSaveFieldSettings} className="flex flex-col h-full justify-between gap-6">
+              <div>
+                <SheetHeader className="p-0 pb-2">
+                  <SheetTitle>Edit Field: {field.label}</SheetTitle>
+                  <SheetDescription>
+                    Modify the properties, type, or label for this field.
+                  </SheetDescription>
+                </SheetHeader>
+                <div className="grid gap-4 py-4">
                   <div className="grid gap-2">
-                    <Label htmlFor="editMediaSubType">Media Sub-type Override</Label>
+                    <Label htmlFor="editFieldType">Field Type</Label>
                     <Select
-                      value={editMediaSubType}
-                      onValueChange={(val) => setEditMediaSubType(val as any)}
+                      value={editType}
+                      onValueChange={(val) => setEditType(val as FieldType)}
                     >
-                      <SelectTrigger id="editMediaSubType">
-                        <SelectValue placeholder="Select media override" />
+                      <SelectTrigger id="editFieldType">
+                        <SelectValue placeholder="Select field type" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="auto">Auto-detect (Default)</SelectItem>
-                        <SelectItem value="image">Force Image</SelectItem>
-                        <SelectItem value="video">Force Video</SelectItem>
-                        <SelectItem value="pdf">Force PDF</SelectItem>
-                        <SelectItem value="link">Force Link</SelectItem>
+                        <SelectItem value="text">Text Input</SelectItem>
+                        <SelectItem value="textarea">Text Area</SelectItem>
+                        <SelectItem value="number">Number Input</SelectItem>
+                        <SelectItem value="date">Date picker</SelectItem>
+                        <SelectItem value="badge-status">Badge Status</SelectItem>
+                        <SelectItem value="array-pills">Array Pills</SelectItem>
+                        <SelectItem value="media">Media / Dokumen (Auto-detect)</SelectItem>
+                        <SelectItem value="dropdown">Dropdown Input</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
-                )}
-                <div className="grid gap-2">
-                  <Label htmlFor="editLabel">Field Label</Label>
-                  <Input
-                    id="editLabel"
-                    value={editLabel}
-                    onChange={(e) => setEditLabel(e.target.value)}
-                    placeholder="e.g. Phone Number, Date of Birth"
-                  />
-                </div>
-                {(editType === "text" || editType === "textarea" || editType === "number") && (
-                  <div className="grid gap-2">
-                    <Label htmlFor="editPlaceholder">Placeholder Text</Label>
-                    <Input
-                      id="editPlaceholder"
-                      value={editPlaceholder}
-                      onChange={(e) => setEditPlaceholder(e.target.value)}
-                      placeholder="e.g. Enter value..."
-                    />
-                  </div>
-                )}
-
-                {/* Date Options */}
-                {editType === "date" && (
-                  <>
+                  {editType === "media" && (
                     <div className="grid gap-2">
-                      <Label htmlFor="editDateMode">Date Form Mode</Label>
+                      <Label htmlFor="editMediaSubType">Media Sub-type Override</Label>
                       <Select
-                        value={editDateMode}
-                        onValueChange={(val) => setEditDateMode(val as 'date-only' | 'date-time')}
+                        value={editMediaSubType}
+                        onValueChange={(val) => setEditMediaSubType(val as any)}
                       >
-                        <SelectTrigger id="editDateMode">
-                          <SelectValue placeholder="Select mode" />
+                        <SelectTrigger id="editMediaSubType">
+                          <SelectValue placeholder="Select media override" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="date-only">Date Only</SelectItem>
-                          <SelectItem value="date-time">Date with Hours</SelectItem>
+                          <SelectItem value="auto">Auto-detect (Default)</SelectItem>
+                          <SelectItem value="image">Force Image</SelectItem>
+                          <SelectItem value="video">Force Video</SelectItem>
+                          <SelectItem value="pdf">Force PDF</SelectItem>
+                          <SelectItem value="link">Force Link</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
+                  )}
+                  <div className="grid gap-2">
+                    <Label htmlFor="editLabel">Field Label</Label>
+                    <Input
+                      id="editLabel"
+                      value={editLabel}
+                      onChange={(e) => setEditLabel(e.target.value)}
+                      placeholder="e.g. Phone Number, Date of Birth"
+                    />
+                  </div>
+                  {(editType === "text" || editType === "textarea" || editType === "number") && (
                     <div className="grid gap-2">
-                      <Label htmlFor="editDateLocale">Locale Display</Label>
+                      <Label htmlFor="editPlaceholder">Placeholder Text</Label>
+                      <Input
+                        id="editPlaceholder"
+                        value={editPlaceholder}
+                        onChange={(e) => setEditPlaceholder(e.target.value)}
+                        placeholder="e.g. Enter value..."
+                      />
+                    </div>
+                  )}
+
+                  {/* Dropdown Options Configuration */}
+                  {editType === "dropdown" && (
+                    <div className="space-y-4 border border-border/50 rounded-lg p-3.5 bg-muted/25">
+                      <div className="space-y-1">
+                        <Label className="text-xs font-semibold flex items-center gap-1.5">
+                          <List className="h-3.5 w-3.5 text-primary" />
+                          Dropdown Options Config
+                        </Label>
+                        <p className="text-[10px] text-muted-foreground leading-normal">
+                          Manage options for the dropdown field. You can paste multiple values in bulk (one per line) or add them one-by-one.
+                        </p>
+                      </div>
+
+                      {/* Bulk Options Textarea */}
+                      <div className="grid gap-1.5">
+                        <Label htmlFor="editBulkOptions" className="text-[10px] font-bold text-muted-foreground/80 uppercase tracking-wide">
+                          Bulk Input (One option per line)
+                        </Label>
+                        <Textarea
+                          id="editBulkOptions"
+                          rows={4}
+                          value={optionsBulkText}
+                          onChange={(e) => handleBulkOptionsChange(e.target.value)}
+                          placeholder="Option 1&#10;Option 2&#10;Option 3"
+                          className="text-xs font-mono font-medium resize-y"
+                        />
+                      </div>
+
+                      {/* Interactive Add Option */}
+                      <div className="grid gap-1.5">
+                        <Label className="text-[10px] font-bold text-muted-foreground/80 uppercase tracking-wide">
+                          Add Single Option
+                        </Label>
+                        <div className="flex gap-1.5">
+                          <Input
+                            value={newOptionText}
+                            onChange={(e) => setNewOptionText(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                e.preventDefault();
+                                handleAddOption();
+                              }
+                            }}
+                            placeholder="Type option value..."
+                            className="h-8 text-xs"
+                          />
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={handleAddOption}
+                            className="h-8 gap-1 text-xs shrink-0 bg-primary/95 text-primary-foreground hover:bg-primary"
+                          >
+                            <Plus className="h-3 w-3" /> Add
+                          </Button>
+                        </div>
+                      </div>
+
+                      {/* Interactive List */}
+                      <div className="space-y-1.5">
+                        <Label className="text-[10px] font-bold text-muted-foreground/80 uppercase tracking-wide flex items-center justify-between">
+                          <span>Options List ({editOptions.length})</span>
+                          {editOptions.length > 0 && (
+                            <span className="text-[9px] text-muted-foreground normal-case font-normal italic">
+                              shows up to 40 items
+                            </span>
+                          )}
+                        </Label>
+                        <div className="max-h-[160px] overflow-y-auto border border-border/40 bg-background/50 rounded-md p-1.5 divide-y divide-border/30">
+                          {editOptions.map((opt, idx) => (
+                            <div key={idx} className="flex items-center justify-between py-1 px-1.5 group/opt hover:bg-muted/30 rounded text-xs">
+                              <span className="font-medium truncate text-foreground/80 max-w-[85%]">
+                                <span className="text-[10px] text-muted-foreground font-mono mr-1.5">{idx + 1}.</span>
+                                {opt}
+                              </span>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="h-5 w-5 text-muted-foreground hover:text-destructive hover:bg-destructive/15 transition-colors"
+                                onClick={() => handleRemoveOption(idx)}
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          ))}
+                          {editOptions.length === 0 && (
+                            <div className="text-[10px] text-muted-foreground/60 text-center py-4 italic">
+                              No options. Add options above.
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Date Options */}
+                  {editType === "date" && (
+                    <>
+                      <div className="grid gap-2">
+                        <Label htmlFor="editDateMode">Date Form Mode</Label>
+                        <Select
+                          value={editDateMode}
+                          onValueChange={(val) => setEditDateMode(val as 'date-only' | 'date-time')}
+                        >
+                          <SelectTrigger id="editDateMode">
+                            <SelectValue placeholder="Select mode" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="date-only">Date Only</SelectItem>
+                            <SelectItem value="date-time">Date with Hours</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="editDateLocale">Locale Display</Label>
+                        <Select
+                          value={editDateLocale}
+                          onValueChange={(val) => setEditDateLocale(val as 'id' | 'en')}
+                        >
+                          <SelectTrigger id="editDateLocale">
+                            <SelectValue placeholder="Select locale" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="id">Indonesian (ID)</SelectItem>
+                            <SelectItem value="en">English (EN)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </>
+                  )}
+
+                  {/* Text Preview Options */}
+                  {(editType === "text" || editType === "textarea") && (
+                    <div className="grid gap-2">
+                      <Label htmlFor="editPreviewFont">Font Mode</Label>
                       <Select
-                        value={editDateLocale}
-                        onValueChange={(val) => setEditDateLocale(val as 'id' | 'en')}
+                        value={editPreviewFontMode}
+                        onValueChange={(val) => setEditPreviewFontMode(val as 'sans' | 'mono')}
                       >
-                        <SelectTrigger id="editDateLocale">
-                          <SelectValue placeholder="Select locale" />
+                        <SelectTrigger id="editPreviewFont">
+                          <SelectValue placeholder="Select font style" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="id">Indonesian (ID)</SelectItem>
-                          <SelectItem value="en">English (EN)</SelectItem>
+                          <SelectItem value="sans">Standard Sans</SelectItem>
+                          <SelectItem value="mono">Monospace Mono (Numbers)</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
-                  </>
-                )}
+                  )}
 
-                {/* Text Preview Options */}
-                {(editType === "text" || editType === "textarea") && (
-                  <div className="grid gap-2">
-                    <Label htmlFor="editPreviewFont">Font Mode</Label>
-                    <Select
-                      value={editPreviewFontMode}
-                      onValueChange={(val) => setEditPreviewFontMode(val as 'sans' | 'mono')}
-                    >
-                      <SelectTrigger id="editPreviewFont">
-                        <SelectValue placeholder="Select font style" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="sans">Standard Sans</SelectItem>
-                        <SelectItem value="mono">Monospace Mono (Numbers)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
+                  {/* Badge Status Options */}
+                  {editType === "badge-status" && (
+                    <div className="grid gap-2">
+                      <Label htmlFor="editStatusStyle">Status Badge Color</Label>
+                      <Select
+                        value={editStatusStyle}
+                        onValueChange={(val) => setEditStatusStyle(val as any)}
+                      >
+                        <SelectTrigger id="editStatusStyle">
+                          <SelectValue placeholder="Select style" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="default">Slate (Default)</SelectItem>
+                          <SelectItem value="success">Green (Success/Active)</SelectItem>
+                          <SelectItem value="warning">Yellow (Warning/Pending)</SelectItem>
+                          <SelectItem value="danger">Red (Danger/Rejected)</SelectItem>
+                          <SelectItem value="info">Blue (Info)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
 
-                {/* Badge Status Options */}
-                {editType === "badge-status" && (
-                  <div className="grid gap-2">
-                    <Label htmlFor="editStatusStyle">Status Badge Color</Label>
-                    <Select
-                      value={editStatusStyle}
-                      onValueChange={(val) => setEditStatusStyle(val as any)}
-                    >
-                      <SelectTrigger id="editStatusStyle">
-                        <SelectValue placeholder="Select style" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="default">Slate (Default)</SelectItem>
-                        <SelectItem value="success">Green (Success/Active)</SelectItem>
-                        <SelectItem value="warning">Yellow (Warning/Pending)</SelectItem>
-                        <SelectItem value="danger">Red (Danger/Rejected)</SelectItem>
-                        <SelectItem value="info">Blue (Info)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-
-                {/* Array Pills Options */}
-                {editType === "array-pills" && (
-                  <div className="grid gap-2">
-                    <Label htmlFor="editPillsSep">Pills Separator Character</Label>
-                    <Input
-                      id="editPillsSep"
-                      value={editPillsSeparator}
-                      onChange={(e) => setEditPillsSeparator(e.target.value)}
-                      placeholder="e.g. , or ; or |"
-                    />
-                  </div>
-                )}
+                  {/* Array Pills Options */}
+                  {editType === "array-pills" && (
+                    <div className="grid gap-2">
+                      <Label htmlFor="editPillsSep">Pills Separator Character</Label>
+                      <Input
+                        id="editPillsSep"
+                        value={editPillsSeparator}
+                        onChange={(e) => setEditPillsSeparator(e.target.value)}
+                        placeholder="e.g. , or ; or |"
+                      />
+                    </div>
+                  )}
+                </div>
               </div>
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setIsEditModalOpen(false)}>
+              <SheetFooter className="border-t pt-4 shrink-0">
+                <Button type="button" variant="outline" onClick={() => setIsEditModalOpen(false)} className="h-9">
                   Cancel
                 </Button>
-                <Button type="submit">Save Changes</Button>
-              </DialogFooter>
+                <Button type="submit" className="h-9">Save Changes</Button>
+              </SheetFooter>
             </form>
-          </DialogContent>
-        </Dialog>
+          </SheetContent>
+        </Sheet>
       </div>
     </div>
   );

@@ -5,7 +5,8 @@ export type FieldType =
   | 'number' 
   | 'date' 
   | 'badge-status' 
-  | 'array-pills';
+  | 'array-pills'
+  | 'dropdown';
 
 export type MediaSubType = 'image' | 'video' | 'pdf' | 'link';
 
@@ -25,6 +26,7 @@ export interface Field {
   statusStyle?: 'success' | 'warning' | 'danger' | 'info' | 'default';
   pillsSeparator?: string;
   mediaSubType?: MediaSubType;
+  options?: string[];
 }
 
 export interface Section {

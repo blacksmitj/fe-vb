@@ -22,10 +22,7 @@ import {
   Loader2,
 } from "lucide-react";
 
-import { useDraggable } from "@dnd-kit/react";
-import { Feedback } from "@dnd-kit/dom";
-
-function DraggableHeaderItem({
+function HeaderItem({
   header,
   sampleVal,
   onAddField,
@@ -34,21 +31,10 @@ function DraggableHeaderItem({
   sampleVal: any;
   onAddField: (type: FieldType, label: string, placeholder?: string) => void;
 }) {
-  const { ref, isDragging } = useDraggable({
-    id: `sidebar-${header}`,
-    type: "new-field",
-    data: {
-      label: header,
-    },
-  });
-
   return (
     <Button
-      ref={ref}
       variant="ghost"
-      className={`justify-start gap-1 h-auto py-1.5 w-full hover:bg-muted font-medium text-xs text-foreground/80 px-2 flex flex-col items-start align-top select-none touch-none ${
-        isDragging ? "opacity-50 scale-95 border border-dashed border-primary bg-muted" : ""
-      }`}
+      className="justify-start gap-1 h-auto py-1.5 w-full hover:bg-muted font-medium text-xs text-foreground/80 px-2 flex flex-col items-start align-top select-none cursor-pointer"
       onClick={() => {
         onAddField("text", header, `Enter ${header}...`);
       }}
@@ -285,7 +271,7 @@ export default function ProfileBuilderSidebar({
             {filteredHeaders.map((header) => {
               const sampleVal = sampleRow?.[header];
               return (
-                <DraggableHeaderItem
+                <HeaderItem
                   key={header}
                   header={header}
                   sampleVal={sampleVal}

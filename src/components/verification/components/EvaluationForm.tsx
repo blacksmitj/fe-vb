@@ -8,6 +8,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Calendar, FileText, Image as ImageIcon, Video, Tag, Bookmark, Hash, ArrowUpRight, Eye, Play, Globe } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface EvaluationFormProps {
   sections: Section[];
@@ -265,6 +272,37 @@ export function EvaluationForm({ sections, participant, onFieldChange }: Evaluat
         return (
           <div className="py-2.5 px-3 bg-muted/40 border border-border/50 rounded-lg text-sm select-all whitespace-pre-wrap text-foreground/80 font-medium">
             {valueStr}
+          </div>
+        );
+      case "dropdown":
+        if (field.isEditable) {
+          const selectOptions = field.options || [];
+          return (
+            <Select
+              value={valueStr}
+              onValueChange={(val) => onFieldChange?.(field.label, val)}
+            >
+              <SelectTrigger className="w-full text-sm">
+                <SelectValue placeholder={field.placeholder || "Select option..."} />
+              </SelectTrigger>
+              <SelectContent>
+                {selectOptions.map((opt) => (
+                  <SelectItem key={opt} value={opt}>
+                    {opt}
+                  </SelectItem>
+                ))}
+                {selectOptions.length === 0 && (
+                  <div className="text-[10px] text-muted-foreground p-2 text-center">
+                    No options defined for this dropdown.
+                  </div>
+                )}
+              </SelectContent>
+            </Select>
+          );
+        }
+        return (
+          <div className="py-2.5 px-3 bg-muted/40 border border-border/50 rounded-lg text-sm select-all whitespace-pre-wrap text-foreground/80 font-medium">
+            {valueStr || (field.placeholder || "Belum diisi")}
           </div>
         );
       default:

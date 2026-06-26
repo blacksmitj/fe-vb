@@ -7,8 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Save, Eye, LayoutTemplateIcon, ArrowLeft, Loader2 } from "lucide-react";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
-import { DragDropProvider, DragOverlay } from "@dnd-kit/react";
-import { isSortable } from "@dnd-kit/react/sortable";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
 import { Contact2 } from "lucide-react";
@@ -41,9 +39,14 @@ function BuilderPageContent() {
   const [sections, setSections] = useState<Section[]>(initialSections);
   const [isLoaded, setIsLoaded] = useState(false);
   const [hasDraft, setHasDraft] = useState(false);
+  const [activeSectionId, setActiveSectionId] = useState<string | null>(null);
 
-  const [activeField, setActiveField] = useState<Field | null>(null);
-  const [activeNewField, setActiveNewField] = useState<{ label: string } | null>(null);
+  // Set default active section to the last one if none is active and sections exist
+  useEffect(() => {
+    if (sections.length > 0 && !activeSectionId) {
+      setActiveSectionId(sections[sections.length - 1].id);
+    }
+  }, [sections, activeSectionId]);
 
   // Load profile schema from program details or localStorage draft if it exists
   useEffect(() => {
@@ -55,7 +58,11 @@ function BuilderPageContent() {
         try {
           const parsedDraft = JSON.parse(draft);
           if (Array.isArray(parsedDraft)) {
-            setSections(migrateSectionsSchema(parsedDraft as Section[]));
+            const loaded = migrateSectionsSchema(parsedDraft as Section[]);
+            setSections(loaded);
+            if (loaded.length > 0) {
+              setActiveSectionId(loaded[loaded.length - 1].id);
+            }
             setHasDraft(true);
             toast.info("Memulihkan draf perubahan yang belum disimpan", {
               description: "Menampilkan layout yang belum Anda simpan sebelumnya.",
@@ -70,7 +77,11 @@ function BuilderPageContent() {
             ? JSON.parse(program.profileSchema) 
             : program.profileSchema;
           if (Array.isArray(parsed)) {
-            setSections(migrateSectionsSchema(parsed as Section[]));
+            const loaded = migrateSectionsSchema(parsed as Section[]);
+            setSections(loaded);
+            if (loaded.length > 0) {
+              setActiveSectionId(loaded[loaded.length - 1].id);
+            }
           }
         } catch (e) {
           console.error("Failed to parse program profileSchema:", e);
@@ -114,6 +125,9 @@ function BuilderPageContent() {
           : program.profileSchema;
         if (Array.isArray(parsed)) {
           setSections(parsed as Section[]);
+          if (parsed.length > 0) {
+            setActiveSectionId(parsed[parsed.length - 1].id);
+          }
         }
       } catch (e) {
         setSections([]);
@@ -132,7 +146,14 @@ function BuilderPageContent() {
 
   const handleDeleteSection = (index: number) => {
     const sectionTitle = sections[index].title;
-    setSections(sections.filter((_, i) => i !== index));
+    const deletedId = sections[index].id;
+    const newSections = sections.filter((_, i) => i !== index);
+    setSections(newSections);
+    
+    // If active section is deleted, select another one
+    if (activeSectionId === deletedId) {
+      setActiveSectionId(newSections.length > 0 ? newSections[newSections.length - 1].id : null);
+    }
     toast.error(`Removed section "${sectionTitle}"`);
   };
 
@@ -149,13 +170,15 @@ function BuilderPageContent() {
   };
 
   const handleAddSection = (layout: "1-col" | "2-col") => {
+    const newId = `sec-${crypto.randomUUID()}`;
     const newSection: Section = {
-      id: `sec-${crypto.randomUUID()}`,
+      id: newId,
       title: `New Section ${sections.length + 1}`,
       layout,
       fields: [],
     };
     setSections([...sections, newSection]);
+    setActiveSectionId(newId); // auto-activate newly added section
   };
 
   const handleAddField = (
@@ -168,22 +191,83 @@ function BuilderPageContent() {
       return;
     }
 
-    const lastIndex = sections.length - 1;
-    const lastSection = sections[lastIndex];
+    const targetSectionId = activeSectionId || sections[sections.length - 1].id;
+    const sectionIndex = sections.findIndex((sec) => sec.id === targetSectionId);
+    
+    if (sectionIndex === -1) {
+      toast.error("Active section not found!");
+      return;
+    }
 
+    const targetSection = sections[sectionIndex];
     const newField: Field = {
       id: `field-${crypto.randomUUID()}`,
       type,
       label,
       placeholder,
+      column: "left", // Default column
     };
 
     const updatedSection = {
-      ...lastSection,
-      fields: [...lastSection.fields, newField],
+      ...targetSection,
+      fields: [...targetSection.fields, newField],
     };
 
-    handleUpdateSection(lastIndex, updatedSection);
+    handleUpdateSection(sectionIndex, updatedSection);
+    toast.success(`Added field "${label}" to "${targetSection.title}"`);
+  };
+
+  const handleMoveField = (sectionId: string, fieldId: string, direction: "up" | "down") => {
+    setSections((prev) =>
+      prev.map((sec) => {
+        if (sec.id !== sectionId) return sec;
+
+        const leftFields = sec.fields.filter((f) => f.column !== "right");
+        const rightFields = sec.fields.filter((f) => f.column === "right");
+
+        const field = sec.fields.find((f) => f.id === fieldId);
+        if (!field) return sec;
+
+        const isRight = field.column === "right";
+        const targetList = isRight ? rightFields : leftFields;
+
+        const idx = targetList.findIndex((f) => f.id === fieldId);
+        if (idx === -1) return sec;
+
+        if (direction === "up" && idx === 0) return sec;
+        if (direction === "down" && idx === targetList.length - 1) return sec;
+
+        const swapIdx = direction === "up" ? idx - 1 : idx + 1;
+        const updatedList = [...targetList];
+        const temp = updatedList[idx];
+        updatedList[idx] = updatedList[swapIdx];
+        updatedList[swapIdx] = temp;
+
+        if (isRight) {
+          return { ...sec, fields: [...leftFields, ...updatedList] };
+        } else {
+          return { ...sec, fields: [...updatedList, ...rightFields] };
+        }
+      })
+    );
+  };
+
+  const handleMoveFieldColumn = (sectionId: string, fieldId: string, targetCol: "left" | "right") => {
+    setSections((prev) =>
+      prev.map((sec) => {
+        if (sec.id !== sectionId) return sec;
+
+        return {
+          ...sec,
+          fields: sec.fields.map((f) => {
+            if (f.id === fieldId) {
+              return { ...f, column: targetCol };
+            }
+            return f;
+          }),
+        };
+      })
+    );
   };
 
   const handleSave = () => {
@@ -241,271 +325,56 @@ function BuilderPageContent() {
   }
 
   return (
-    <DragDropProvider
-      onDragStart={(event) => {
-        const { source } = event.operation;
-        if (!source) return;
-
-        if (source.type === "new-field") {
-          setActiveNewField(source.data as { label: string });
-          setActiveField(null);
-        } else if (source.type === "field") {
-          const fieldId = source.id;
-          let foundField: Field | null = null;
-          for (const sec of sections) {
-            const f = sec.fields.find((f) => f.id === fieldId);
-            if (f) {
-              foundField = f;
-              break;
-            }
-          }
-          if (foundField) {
-            setActiveField(foundField);
-            setActiveNewField(null);
-          }
-        }
-      }}
-      onDragOver={(event) => {
-        const { source, target } = event.operation;
-        if (!source || !target) return;
-
-        if (isSortable(source) && source.type === "field") {
-          let targetGroupStr: string | null = null;
-          let targetIndex = 0;
-
-          if (isSortable(target)) {
-            targetGroupStr = typeof target.group === "string" ? target.group : null;
-            targetIndex = typeof target.index === "number" ? target.index : 0;
-          } else {
-            targetGroupStr = typeof target.id === "string" ? target.id : null;
-          }
-
-          const sourceGroupStr = source.group;
-
-          if (
-            typeof sourceGroupStr === "string" &&
-            typeof targetGroupStr === "string" &&
-            sourceGroupStr !== targetGroupStr &&
-            sourceGroupStr.includes("-") &&
-            targetGroupStr.includes("-")
-          ) {
-            const splitGroup = (g: string) => {
-              const i = g.lastIndexOf("-");
-              return [g.slice(0, i), g.slice(i + 1)] as const;
-            };
-
-            const [sourceSectionId, sourceCol] = splitGroup(sourceGroupStr);
-            const [targetSectionId, targetCol] = splitGroup(targetGroupStr);
-            const fieldId = source.id;
-
-            setSections((prev) => {
-              let fieldToMove: Field | null = null;
-              
-              // 1. Remove the field from its original section
-              const cleanSections = prev.map((sec) => {
-                if (sec.id === sourceSectionId) {
-                  fieldToMove = sec.fields.find(f => f.id === fieldId) || null;
-                  return { ...sec, fields: sec.fields.filter(f => f.id !== fieldId) };
-                }
-                return sec;
-              });
-
-              if (!fieldToMove) return prev;
-
-              // 2. Insert it into the target section & column
-              return cleanSections.map((sec) => {
-                if (sec.id === targetSectionId) {
-                  const updatedField: Field = {
-                    ...fieldToMove!,
-                    column: targetCol as "left" | "right",
-                  };
-                  const leftFields = sec.fields.filter(f => f.column !== "right");
-                  const rightFields = sec.fields.filter(f => f.column === "right");
-                  const targetList = targetCol === "right" ? rightFields : leftFields;
-
-                  const insertAt = Math.min(Math.max(0, targetIndex), targetList.length);
-                  targetList.splice(insertAt, 0, updatedField);
-
-                  return { ...sec, fields: [...leftFields, ...rightFields] };
-                }
-                return sec;
-              });
-            });
-          }
-        }
-      }}
-      onDragEnd={(event) => {
-        setActiveField(null);
-        setActiveNewField(null);
-
-        if (event.canceled) return;
-
-        const { source } = event.operation;
-        if (!source) return;
-
-        if (source.type === "new-field") {
-          let targetGroupStr: string | null = null;
-          let dropIndex = 0;
-
-          const { target } = event.operation;
-          if (target) {
-            if (isSortable(target)) {
-              targetGroupStr = typeof target.group === "string" ? target.group : null;
-              dropIndex = typeof target.index === "number" ? target.index : 0;
-            } else {
-              targetGroupStr = typeof target.id === "string" ? target.id : null;
-            }
-          }
-
-          if (targetGroupStr && targetGroupStr.includes("-")) {
-            const splitGroup = (g: string) => {
-              const i = g.lastIndexOf("-");
-              return [g.slice(0, i), g.slice(i + 1)] as const;
-            };
-            const [targetSectionId, targetCol] = splitGroup(targetGroupStr);
-            const label = (source.data as { label?: string })?.label || "New Field";
-
-            setTimeout(() => {
-              setSections((prev) => {
-                return prev.map((sec) => {
-                  if (sec.id !== targetSectionId) return sec;
-
-                  const newField: Field = {
-                    id: `field-${crypto.randomUUID()}`,
-                    type: "text",
-                    label: label,
-                    placeholder: `Enter ${label}...`,
-                    column: targetCol as "left" | "right",
-                  };
-
-                  const leftFields = sec.fields.filter(f => f.column !== "right");
-                  const rightFields = sec.fields.filter(f => f.column === "right");
-                  const targetList = targetCol === "right" ? rightFields : leftFields;
-
-                  const insertAt = Math.min(Math.max(0, dropIndex), targetList.length);
-                  targetList.splice(insertAt, 0, newField);
-
-                  return { ...sec, fields: [...leftFields, ...rightFields] };
-                });
-              });
-            }, 0);
-          }
-          return;
-        }
-
-        if (isSortable(source)) {
-          const { initialIndex, index, group, type, initialGroup } = source;
-
-          if (type === "section" || group === "sections") {
-            if (initialIndex !== index) {
-              setTimeout(() => {
-                setSections((prev) => {
-                  const updated = [...prev];
-                  const [removed] = updated.splice(initialIndex, 1);
-                  updated.splice(index, 0, removed);
-                  return updated;
-                });
-              }, 0);
-            }
-          } else if (type === "field" && initialGroup === group && typeof group === "string") {
-            // Same group reorder
-            if (initialIndex !== index) {
-              const splitGroup = (g: string) => {
-                const i = g.lastIndexOf("-");
-                return [g.slice(0, i), g.slice(i + 1)] as const;
-              };
-              const [sectionId, col] = splitGroup(group);
-
-              setTimeout(() => {
-                setSections((prev) =>
-                  prev.map((sec) => {
-                    if (sec.id !== sectionId) return sec;
-
-                    const leftFields = sec.fields.filter((f) => f.column !== "right");
-                    const rightFields = sec.fields.filter((f) => f.column === "right");
-                    const targetList = col === "right" ? rightFields : leftFields;
-
-                    const [removed] = targetList.splice(initialIndex, 1);
-                    targetList.splice(index, 0, removed);
-
-                    return { ...sec, fields: [...leftFields, ...rightFields] };
-                  })
-                );
-              }, 0);
-            }
-          }
-        }
-      }}
-    >
-      <div className="flex flex-col h-screen bg-background overflow-hidden font-sans">
-        {/* Sub-header / Title Bar inside builder layout */}
-        <header className="flex h-16 shrink-0 items-center justify-between gap-2 border-b px-6">
-          <div className="flex items-center gap-2 font-sans">
-            <SidebarTrigger className="-ml-1" />
-            <Separator orientation="vertical" className="mr-2 h-4" />
-            <div className="flex items-center gap-2">
-              <LayoutTemplateIcon className="h-4 w-4 text-muted-foreground" />
-              <span className="font-semibold text-sm flex items-center gap-2">
-                Profile Builder - <span className="text-primary font-bold">{program?.name}</span>
-                {hasDraft && (
-                  <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-yellow-500/10 text-yellow-600 border border-yellow-500/20">
-                    Ada Perubahan Belum Disimpan
-                  </span>
-                )}
-              </span>
-            </div>
+    <div className="flex flex-col h-screen bg-background overflow-hidden font-sans">
+      {/* Sub-header / Title Bar inside builder layout */}
+      <header className="flex h-16 shrink-0 items-center justify-between gap-2 border-b px-6">
+        <div className="flex items-center gap-2 font-sans">
+          <SidebarTrigger className="-ml-1" />
+          <Separator orientation="vertical" className="mr-2 h-4" />
+          <div className="flex items-center gap-2">
+            <LayoutTemplateIcon className="h-4 w-4 text-muted-foreground" />
+            <span className="font-semibold text-sm flex items-center gap-2">
+              Profile Builder - <span className="text-primary font-bold">{program?.name}</span>
+              {hasDraft && (
+                <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-yellow-500/10 text-yellow-600 border border-yellow-500/20">
+                  Ada Perubahan Belum Disimpan
+                </span>
+              )}
+            </span>
           </div>
-        </header>
-        
-        <div className="flex flex-1 overflow-hidden">
-          <ProfileBuilderSidebar
-            onAddField={handleAddField}
-            sections={sections}
-            programHeaders={program?.headers}
-            sampleRow={sampleRow}
-            onSave={handleSave}
-            isSaving={updateSchemaMutation.isPending}
-            onPreview={handlePreview}
-            onDiscardDraft={handleDiscardDraft}
-            hasDraft={hasDraft}
-            programId={programId}
-          />
-          
-          <ProfileBuilderCanvas
-            sections={sections}
-            onUpdateSection={handleUpdateSection}
-            onDeleteSection={handleDeleteSection}
-            onMoveSection={handleMoveSection}
-            onAddSection={handleAddSection}
-            sampleRow={sampleRow}
-          />
         </div>
+      </header>
+      
+      <div className="flex flex-1 overflow-hidden">
+        <ProfileBuilderSidebar
+          onAddField={handleAddField}
+          sections={sections}
+          programHeaders={program?.headers}
+          sampleRow={sampleRow}
+          onSave={handleSave}
+          isSaving={updateSchemaMutation.isPending}
+          onPreview={handlePreview}
+          onDiscardDraft={handleDiscardDraft}
+          hasDraft={hasDraft}
+          programId={programId}
+        />
         
-        <Toaster position="top-right" closeButton richColors />
+        <ProfileBuilderCanvas
+          sections={sections}
+          activeSectionId={activeSectionId}
+          setActiveSectionId={setActiveSectionId}
+          onUpdateSection={handleUpdateSection}
+          onDeleteSection={handleDeleteSection}
+          onMoveSection={handleMoveSection}
+          onAddSection={handleAddSection}
+          onMoveField={handleMoveField}
+          onMoveFieldColumn={handleMoveFieldColumn}
+          sampleRow={sampleRow}
+        />
       </div>
-
-      <DragOverlay dropAnimation={null}>
-        {activeField ? (
-          <div className="w-[320px] pointer-events-none">
-            <ProfileBuilderFieldRenderer
-              field={activeField}
-              index={0}
-              column="left"
-              sectionId=""
-              onUpdateField={() => {}}
-              onDeleteField={() => {}}
-              sampleRow={sampleRow}
-              isOverlay
-            />
-          </div>
-        ) : activeNewField ? (
-          <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-primary bg-card shadow-lg ring-1 ring-primary/20 text-xs font-semibold w-[240px] pointer-events-none scale-102">
-            <Contact2 className="h-4 w-4 text-primary shrink-0" />
-            <span>{activeNewField.label}</span>
-          </div>
-        ) : null}
-      </DragOverlay>
-    </DragDropProvider>
+      
+      <Toaster position="top-right" closeButton richColors />
+    </div>
   );
 }
 
