@@ -41,8 +41,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
-import { SidebarTrigger } from "@/components/ui/sidebar";
+import { PageLayout, PageHeader, PageContent } from "@/components/dashboard";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -628,44 +627,41 @@ export default function ProgramSettingsPage({ params }: { params: Promise<{ id: 
 
   if (isProgramLoading) {
     return (
-      <div className="flex h-screen items-center justify-center bg-background">
-        <RefreshCwIcon className="h-8 w-8 animate-spin text-primary" />
-      </div>
+      <PageLayout>
+        <PageContent scrollable={false} className="flex items-center justify-center pt-6">
+          <RefreshCwIcon className="h-8 w-8 animate-spin text-primary" />
+        </PageContent>
+      </PageLayout>
     );
   }
 
   return (
     <MembershipGate programId={id}>
-      <div className="flex flex-col h-screen bg-background overflow-hidden font-sans">
-        {/* ── Header ─────────────────────────────────────────── */}
-        <header className="flex h-16 shrink-0 items-center justify-between gap-2 border-b px-6 bg-background">
-          <div className="flex items-center gap-2 px-1">
-            <SidebarTrigger className="-ml-1" />
-            <Separator orientation="vertical" className="mr-2 h-4" />
-            <Breadcrumb>
-              <BreadcrumbList>
-                <BreadcrumbItem className="hidden md:block">
-                  <BreadcrumbLink asChild>
-                    <Link href="/programs">Programs</Link>
-                  </BreadcrumbLink>
-                </BreadcrumbItem>
-                <BreadcrumbSeparator className="hidden md:block" />
-                <BreadcrumbItem>
-                  <BreadcrumbLink asChild>
-                    <Link href={`/programs/${id}/verification`}>{program?.name || "Program"}</Link>
-                  </BreadcrumbLink>
-                </BreadcrumbItem>
-                <BreadcrumbSeparator />
-                <BreadcrumbItem>
-                  <BreadcrumbPage>Settings</BreadcrumbPage>
-                </BreadcrumbItem>
-              </BreadcrumbList>
-            </Breadcrumb>
-          </div>
-        </header>
+      <PageLayout>
+        <PageHeader>
+          <Breadcrumb>
+            <BreadcrumbList>
+              <BreadcrumbItem className="hidden md:block">
+                <BreadcrumbLink asChild>
+                  <Link href="/programs">Programs</Link>
+                </BreadcrumbLink>
+              </BreadcrumbItem>
+              <BreadcrumbSeparator className="hidden md:block" />
+              <BreadcrumbItem>
+                <BreadcrumbLink asChild>
+                  <Link href={`/programs/${id}/verification`}>{program?.name || "Program"}</Link>
+                </BreadcrumbLink>
+              </BreadcrumbItem>
+              <BreadcrumbSeparator />
+              <BreadcrumbItem>
+                <BreadcrumbPage>Settings</BreadcrumbPage>
+              </BreadcrumbItem>
+            </BreadcrumbList>
+          </Breadcrumb>
+        </PageHeader>
 
-        {/* ── Content ────────────────────────────────────────── */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6 w-full max-w-[1600px] mx-auto">
+        <PageContent className="space-y-6 w-full max-w-[1600px] mx-auto pt-4">
+
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <Button variant="outline" size="icon" asChild className="h-8 w-8 shrink-0">
@@ -1436,8 +1432,8 @@ export default function ProgramSettingsPage({ params }: { params: Promise<{ id: 
               </Card>
             </TabsContent>
           </Tabs>
-        </div>
-      </div>
+        </PageContent>
+      </PageLayout>
     </MembershipGate>
   );
 }

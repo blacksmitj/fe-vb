@@ -21,7 +21,7 @@ import { Field, FieldLabel, FieldDescription } from "@/components/ui/field";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { SidebarTrigger } from "@/components/ui/sidebar";
+
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -29,6 +29,7 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
+import { PageLayout, PageHeader, PageContent } from "@/components/dashboard";
 import { toast } from "sonner";
 import {
   Select,
@@ -450,30 +451,25 @@ export default function ImportProgramPage() {
   };
 
   return (
-    <div className="flex flex-col h-screen bg-background overflow-hidden font-sans">
-      {/* Header */}
-      <header className="flex h-16 shrink-0 items-center justify-between gap-2 border-b px-6 bg-background">
-        <div className="flex items-center gap-2 px-1">
-          <SidebarTrigger className="-ml-1" />
-          <Separator orientation="vertical" className="mr-2 h-4" />
-          <Breadcrumb>
-            <BreadcrumbList>
-              <BreadcrumbItem>
-                <Link href="/programs" className="text-muted-foreground hover:text-foreground">
-                  Programs
-                </Link>
-              </BreadcrumbItem>
-              <BreadcrumbSeparator />
-              <BreadcrumbItem>
-                <BreadcrumbPage>Tambah Program</BreadcrumbPage>
-              </BreadcrumbItem>
-            </BreadcrumbList>
-          </Breadcrumb>
-        </div>
-      </header>
+    <PageLayout>
+      <PageHeader>
+        <Breadcrumb>
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <Link href="/programs" className="text-muted-foreground hover:text-foreground">
+                Programs
+              </Link>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbPage>Tambah Program</BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
+      </PageHeader>
 
-      {/* Main Content */}
-      <div className="flex-1 overflow-y-auto p-6 space-y-6 w-full max-w-[1200px] mx-auto">
+      <PageContent className="space-y-6 w-full max-w-[1200px] mx-auto pt-4">
+
         <div className="flex items-center gap-3">
           <Button variant="outline" size="icon" asChild className="h-8 w-8">
             <Link href="/programs">
@@ -764,7 +760,7 @@ export default function ImportProgramPage() {
             </Card>
           </div>
         </form>
-      </div>
-    </div>
+      </PageContent>
+    </PageLayout>
   );
 }

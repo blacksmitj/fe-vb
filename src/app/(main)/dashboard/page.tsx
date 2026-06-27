@@ -14,8 +14,6 @@ import {
   AlertCircle,
   ExternalLink,
 } from "lucide-react";
-import { SidebarTrigger } from "@/components/ui/sidebar";
-import { Separator } from "@/components/ui/separator";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -27,6 +25,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useDashboard } from "@/hooks/use-dashboard";
 import type { DashboardActivity } from "@/types";
+import { PageLayout, PageHeader, PageContent } from "@/components/dashboard";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
@@ -134,24 +133,19 @@ export default function DashboardPage() {
       : 0;
 
   return (
-    <div className="flex flex-col h-screen bg-background overflow-hidden font-sans">
-      {/* Header */}
-      <header className="flex h-16 shrink-0 items-center gap-2 border-b px-6 bg-background">
-        <div className="flex items-center gap-2 px-1">
-          <SidebarTrigger className="-ml-1" />
-          <Separator orientation="vertical" className="mr-2 h-4" />
-          <Breadcrumb>
-            <BreadcrumbList>
-              <BreadcrumbItem>
-                <BreadcrumbPage>Dashboard</BreadcrumbPage>
-              </BreadcrumbItem>
-            </BreadcrumbList>
-          </Breadcrumb>
-        </div>
-      </header>
+    <PageLayout>
+      <PageHeader>
+        <Breadcrumb>
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbPage>Dashboard</BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
+      </PageHeader>
 
-      {/* Main Content */}
-      <div className="flex-1 overflow-y-auto p-6 space-y-8">
+      <PageContent className="space-y-8">
+
         {/* Error state */}
         {isError && (
           <div className="flex items-center gap-2 rounded-md border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive">
@@ -425,7 +419,7 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
         </section>
-      </div>
-    </div>
+      </PageContent>
+    </PageLayout>
   );
 }

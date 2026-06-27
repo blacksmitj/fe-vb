@@ -12,8 +12,6 @@ import { Section, migrateSectionsSchema } from "@/components/profile-builder";
 import { Loader2, ArrowLeft, RefreshCw, AlertCircle, CheckCircle2, XCircle, ClockIcon, UserCircle2 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { SidebarTrigger } from "@/components/ui/sidebar";
-import { Separator } from "@/components/ui/separator";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -22,6 +20,7 @@ import {
   BreadcrumbLink,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
+import { PageLayout, PageHeader } from "@/components/dashboard";
 import { useProgram } from "@/hooks/use-programs";
 import { toast } from "sonner";
 import { MembershipGate } from "@/components/programs/membership-gate";
@@ -158,45 +157,43 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
 
   return (
     <MembershipGate programId={id}>
-      <div className="flex flex-col h-screen bg-background overflow-hidden font-sans">
+      <PageLayout>
         {/* ── Main Layout ─────────────────────────────────────── */}
         <VerificationLayout>
           {/* ── Standard Header (inside VerificationLayout to scroll with the page) ─────────────────────────────────── */}
-          <header className="flex h-16 shrink-0 items-center justify-between gap-2 border-b px-6 bg-background">
-            <div className="flex items-center gap-2 px-1">
-              <SidebarTrigger className="-ml-1" />
-              <Separator orientation="vertical" className="mr-2 h-4" />
-              <Breadcrumb>
-                <BreadcrumbList>
-                  <BreadcrumbItem className="hidden md:block">
-                    <BreadcrumbLink asChild>
-                      <Link href="/programs">Programs</Link>
-                    </BreadcrumbLink>
-                  </BreadcrumbItem>
-                  <BreadcrumbSeparator className="hidden md:block" />
-                  <BreadcrumbItem>
-                    <BreadcrumbPage className="flex items-center gap-2">
-                      <span>Verification - {program?.name || "Loading..."}</span>
-                      {program && (
-                        program.status === "ACTIVE" ? (
-                          <Badge className="bg-emerald-500 hover:bg-emerald-600 text-white text-[10px] font-semibold h-5 px-2 py-0 border-none">Buka</Badge>
-                        ) : (
-                          <Badge variant="destructive" className="text-[10px] font-semibold h-5 px-2 py-0">Ditutup</Badge>
-                        )
-                      )}
-                    </BreadcrumbPage>
-                  </BreadcrumbItem>
-                </BreadcrumbList>
-              </Breadcrumb>
-            </div>
-            <div className="flex items-center gap-2">
+          <PageHeader
+            actions={
               <Button variant="outline" size="sm" asChild className="h-8">
                 <Link href={`/programs/${id}/settings`}>
                   Settings
                 </Link>
               </Button>
-            </div>
-          </header>
+            }
+          >
+            <Breadcrumb>
+              <BreadcrumbList>
+                <BreadcrumbItem className="hidden md:block">
+                  <BreadcrumbLink asChild>
+                    <Link href="/programs">Programs</Link>
+                  </BreadcrumbLink>
+                </BreadcrumbItem>
+                <BreadcrumbSeparator className="hidden md:block" />
+                <BreadcrumbItem>
+                  <BreadcrumbPage className="flex items-center gap-2">
+                    <span>Verification - {program?.name || "Loading..."}</span>
+                    {program && (
+                      program.status === "ACTIVE" ? (
+                        <Badge className="bg-emerald-500 hover:bg-emerald-600 text-white text-[10px] font-semibold h-5 px-2 py-0 border-none">Buka</Badge>
+                      ) : (
+                        <Badge variant="destructive" className="text-[10px] font-semibold h-5 px-2 py-0">Ditutup</Badge>
+                      )
+                    )}
+                  </BreadcrumbPage>
+                </BreadcrumbItem>
+              </BreadcrumbList>
+            </Breadcrumb>
+          </PageHeader>
+
 
           {program?.description && (
             <div className="px-6 py-2.5 bg-muted/30 border-b text-xs text-muted-foreground flex items-center gap-2">
@@ -377,7 +374,7 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
             </div>
           </div>
         </VerificationLayout>
-      </div>
+      </PageLayout>
     </MembershipGate>
   );
 }

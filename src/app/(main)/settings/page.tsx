@@ -1,8 +1,6 @@
 "use client";
 
 import * as React from "react";
-import { SidebarTrigger } from "@/components/ui/sidebar";
-import { Separator } from "@/components/ui/separator";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -13,6 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PageLayout, PageHeader, PageContent } from "@/components/dashboard";
 import { authClient, useSession } from "@/lib/auth/auth-client";
 import { toast } from "sonner";
 import { LockIcon, Loader2Icon, UserIcon } from "lucide-react";
@@ -56,34 +55,8 @@ export default function SettingsPage() {
 
   if (isSessionPending) {
     return (
-      <div className="flex flex-col h-screen bg-background overflow-hidden font-sans">
-        <header className="flex h-16 shrink-0 items-center gap-2 border-b px-6 bg-background">
-          <div className="flex items-center gap-2 px-1">
-            <SidebarTrigger className="-ml-1" />
-            <Separator orientation="vertical" className="mr-2 h-4" />
-            <Breadcrumb>
-              <BreadcrumbList>
-                <BreadcrumbItem>
-                  <BreadcrumbPage>Pengaturan Akun</BreadcrumbPage>
-                </BreadcrumbItem>
-              </BreadcrumbList>
-            </Breadcrumb>
-          </div>
-        </header>
-        <div className="flex-1 flex items-center justify-center">
-          <Loader2Icon className="h-6 w-6 animate-spin text-muted-foreground" />
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex flex-col h-screen bg-background overflow-hidden font-sans">
-      {/* Header */}
-      <header className="flex h-16 shrink-0 items-center gap-2 border-b px-6 bg-background">
-        <div className="flex items-center gap-2 px-1">
-          <SidebarTrigger className="-ml-1" />
-          <Separator orientation="vertical" className="mr-2 h-4" />
+      <PageLayout>
+        <PageHeader>
           <Breadcrumb>
             <BreadcrumbList>
               <BreadcrumbItem>
@@ -91,12 +64,28 @@ export default function SettingsPage() {
               </BreadcrumbItem>
             </BreadcrumbList>
           </Breadcrumb>
-        </div>
-      </header>
+        </PageHeader>
+        <PageContent scrollable={false} className="flex items-center justify-center pt-6">
+          <Loader2Icon className="h-6 w-6 animate-spin text-muted-foreground" />
+        </PageContent>
+      </PageLayout>
+    );
+  }
 
-      {/* Main Scrollable Content */}
-      <div className="flex-1 overflow-y-auto p-6">
-        <div className="w-full space-y-6 mt-4">
+  return (
+    <PageLayout>
+      <PageHeader>
+        <Breadcrumb>
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbPage>Pengaturan Akun</BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
+      </PageHeader>
+
+      <PageContent className="pt-4">
+        <div className="w-full space-y-6">
           <div className="space-y-1">
             <h1 className="text-2xl font-bold tracking-tight">Pengaturan</h1>
             <p className="text-muted-foreground text-sm">
@@ -165,7 +154,7 @@ export default function SettingsPage() {
             </form>
           </Card>
         </div>
-      </div>
-    </div>
+      </PageContent>
+    </PageLayout>
   );
 }

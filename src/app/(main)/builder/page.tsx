@@ -7,8 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Save, Eye, LayoutTemplateIcon, ArrowLeft, Loader2, Settings } from "lucide-react";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
-import { SidebarTrigger } from "@/components/ui/sidebar";
-import { Separator } from "@/components/ui/separator";
+import { PageLayout, PageHeader, PageContent } from "@/components/dashboard";
+
 import {
   ProfileBuilderSidebar,
   ProfileBuilderCanvas,
@@ -322,45 +322,42 @@ function BuilderPageContent() {
   }
 
   return (
-    <div className="flex flex-col h-screen bg-background overflow-hidden font-sans">
-      {/* Header */}
-      <header className="flex h-16 shrink-0 items-center justify-between gap-2 border-b px-6">
-        <div className="flex items-center gap-2 font-sans">
-          <SidebarTrigger className="-ml-1" />
-          <Separator orientation="vertical" className="mr-2 h-4" />
-          <div className="flex items-center gap-2">
-            <LayoutTemplateIcon className="h-4 w-4 text-muted-foreground" />
-            <span className="font-semibold text-sm flex items-center gap-2">
-              Profile Builder - <span className="text-primary font-bold">{builder.name}</span>
-              {hasDraft && (
-                <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-yellow-500/10 text-yellow-600 border border-yellow-500/20">
-                  Ada Perubahan Belum Disimpan
-                </span>
-              )}
-            </span>
-
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8"
-              onClick={() => setIsSettingsSheetOpen(true)}
-              title="Pengaturan Profile Builder"
-            >
-              <Settings className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
+    <PageLayout>
+      <PageHeader
+        actions={
           <Button variant="outline" size="sm" asChild>
             <Link href="/profile-builders">
               <ArrowLeft className="mr-1.5 size-4" />
               Kembali ke List
             </Link>
           </Button>
+        }
+      >
+        <div className="flex items-center gap-2">
+          <LayoutTemplateIcon className="h-4 w-4 text-muted-foreground" />
+          <span className="font-semibold text-sm flex items-center gap-2">
+            Profile Builder - <span className="text-primary font-bold">{builder.name}</span>
+            {hasDraft && (
+              <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-yellow-500/10 text-yellow-600 border border-yellow-500/20">
+                Ada Perubahan Belum Disimpan
+              </span>
+            )}
+          </span>
+
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={() => setIsSettingsSheetOpen(true)}
+            title="Pengaturan Profile Builder"
+          >
+            <Settings className="h-4 w-4" />
+          </Button>
         </div>
-      </header>
+      </PageHeader>
       
-      <div className="flex flex-1 overflow-hidden">
+      <PageContent scrollable={false} className="p-0 flex flex-1">
+
         <ProfileBuilderSidebar
           onAddField={handleAddField}
           sections={sections}
@@ -386,7 +383,7 @@ function BuilderPageContent() {
           onMoveFieldColumn={handleMoveFieldColumn}
           sampleRow={sampleRow}
         />
-      </div>
+      </PageContent>
       
       <Toaster position="top-right" closeButton richColors />
 
@@ -399,7 +396,7 @@ function BuilderPageContent() {
           refetch(); // Trigger update data di canvas & sidebar (headers)
         }}
       />
-    </div>
+    </PageLayout>
   );
 }
 

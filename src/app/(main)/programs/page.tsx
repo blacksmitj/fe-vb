@@ -25,14 +25,13 @@ import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { type Program } from "@/types";
 import { usePrograms } from "@/hooks/use-programs";
-import { SidebarTrigger } from "@/components/ui/sidebar";
-import { Separator } from "@/components/ui/separator";
 import {
   Breadcrumb,
   BreadcrumbItem,
   BreadcrumbList,
   BreadcrumbPage,
 } from "@/components/ui/breadcrumb";
+import { PageLayout, PageHeader, PageContent } from "@/components/dashboard";
 import { toast } from "sonner";
 import {
   useReactTable,
@@ -348,30 +347,28 @@ export default function ProgramsPage() {
   }
 
   return (
-    <div className="flex flex-col h-full bg-background overflow-hidden font-sans">
-      {/* ── Header ─────────────────────────────────────────── */}
-      <header className="flex h-16 shrink-0 items-center justify-between gap-2 border-b px-6">
-        <div className="flex items-center gap-2 px-1">
-          <SidebarTrigger className="-ml-1" />
-          <Separator orientation="vertical" className="mr-2 h-4" />
-          <Breadcrumb>
-            <BreadcrumbList>
-              <BreadcrumbItem>
-                <BreadcrumbPage>Programs</BreadcrumbPage>
-              </BreadcrumbItem>
-            </BreadcrumbList>
-          </Breadcrumb>
-        </div>
-        <Button asChild className="gap-2" size="sm">
-          <Link href="/programs/import">
-            <PlusIcon className="size-4" />
-            Tambah Program
-          </Link>
-        </Button>
-      </header>
+    <PageLayout>
+      <PageHeader
+        actions={
+          <Button asChild className="gap-2" size="sm">
+            <Link href="/programs/import">
+              <PlusIcon className="size-4" />
+              Tambah Program
+            </Link>
+          </Button>
+        }
+      >
+        <Breadcrumb>
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbPage>Programs</BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
+      </PageHeader>
 
-      {/* ── Content Area ───────────────────────────────────── */}
-      <div className="flex-1 overflow-y-auto p-6 space-y-6 flex flex-col">
+      <PageContent className="space-y-6 flex flex-col pt-4">
+
         {/* Title & Description */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 shrink-0">
           <div>
@@ -471,7 +468,7 @@ export default function ProgramsPage() {
             </div>
           )}
         </div>
-      </div>
-    </div>
+      </PageContent>
+    </PageLayout>
   );
 }

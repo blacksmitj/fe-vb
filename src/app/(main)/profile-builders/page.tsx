@@ -15,8 +15,6 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { SidebarTrigger } from "@/components/ui/sidebar";
-import { Separator } from "@/components/ui/separator";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -24,6 +22,7 @@ import {
   BreadcrumbPage,
 } from "@/components/ui/breadcrumb";
 import { toast } from "sonner";
+import { PageLayout, PageHeader, PageContent } from "@/components/dashboard";
 import { Input } from "@/components/ui/input";
 import {
   Dialog,
@@ -138,114 +137,113 @@ export default function ProfileBuildersPage() {
   });
 
   return (
-    <div className="flex flex-col flex-1 gap-6 p-6">
-      {/* Header & Breadcrumb */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <SidebarTrigger />
-          <Separator orientation="vertical" className="mr-2 h-4" />
-          <Breadcrumb>
-            <BreadcrumbList>
-              <BreadcrumbItem>
-                <BreadcrumbPage className="flex items-center gap-1.5 font-medium text-foreground">
-                  <LayoutTemplateIcon className="size-4 text-muted-foreground" />
-                  Profile Builder
-                </BreadcrumbPage>
-              </BreadcrumbItem>
-            </BreadcrumbList>
-          </Breadcrumb>
-        </div>
+    <PageLayout>
+      <PageHeader
+        actions={
+          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <DialogTrigger asChild>
+              <Button size="sm">
+                <PlusIcon className="mr-1.5 size-4" />
+                Buat Profile Builder
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <form onSubmit={handleCreate}>
+                <DialogHeader>
+                  <DialogTitle>Buat Profile Builder Baru</DialogTitle>
+                  <DialogDescription>
+                    Masukkan detail profile form kustom. Anda bisa menautkan program Excel untuk mengambil data header-nya.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-4 py-4">
+                  <Field>
+                    <FieldLabel htmlFor="name">
+                      Nama Profile Builder <span className="text-destructive">*</span>
+                    </FieldLabel>
+                    <Input
+                      id="name"
+                      placeholder="Contoh: Form Evaluasi NIK/Penerima"
+                      value={newName}
+                      onChange={(e) => setNewName(e.target.value)}
+                      required
+                    />
+                  </Field>
+                  
+                  <Field>
+                    <FieldLabel htmlFor="description">Deskripsi</FieldLabel>
+                    <Input
+                      id="description"
+                      placeholder="Penjelasan singkat mengenai form ini"
+                      value={newDescription}
+                      onChange={(e) => setNewDescription(e.target.value)}
+                    />
+                  </Field>
 
-        {/* Create Dialog */}
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <PlusIcon className="mr-1.5 size-4" />
-              Buat Profile Builder
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <form onSubmit={handleCreate}>
-              <DialogHeader>
-                <DialogTitle>Buat Profile Builder Baru</DialogTitle>
-                <DialogDescription>
-                  Masukkan detail profile form kustom. Anda bisa menautkan program Excel untuk mengambil data header-nya.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="grid gap-4 py-4">
-                <Field>
-                  <FieldLabel htmlFor="name">
-                    Nama Profile Builder <span className="text-destructive">*</span>
-                  </FieldLabel>
-                  <Input
-                    id="name"
-                    placeholder="Contoh: Form Evaluasi NIK/Penerima"
-                    value={newName}
-                    onChange={(e) => setNewName(e.target.value)}
-                    required
-                  />
-                </Field>
-                
-                <Field>
-                  <FieldLabel htmlFor="description">Deskripsi</FieldLabel>
-                  <Input
-                    id="description"
-                    placeholder="Penjelasan singkat mengenai form ini"
-                    value={newDescription}
-                    onChange={(e) => setNewDescription(e.target.value)}
-                  />
-                </Field>
-
-                <Field>
-                  <FieldLabel>Hubungkan Program (Opsional)</FieldLabel>
-                  <Select
-                    value={selectedProgramId}
-                    onValueChange={setSelectedProgramId}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Pilih program untuk mengambil header..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">Tidak Terhubung (Kosong)</SelectItem>
-                      {isLoadingPrograms ? (
-                        <SelectItem value="loading" disabled>
-                          Memuat program...
-                        </SelectItem>
-                      ) : (
-                        allPrograms.map((prog) => (
-                          <SelectItem key={prog.id} value={prog.id}>
-                            {prog.name}
+                  <Field>
+                    <FieldLabel>Hubungkan Program (Opsional)</FieldLabel>
+                    <Select
+                      value={selectedProgramId}
+                      onValueChange={setSelectedProgramId}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Pilih program untuk mengambil header..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Tidak Terhubung (Kosong)</SelectItem>
+                        {isLoadingPrograms ? (
+                          <SelectItem value="loading" disabled>
+                            Memuat program...
                           </SelectItem>
-                        ))
-                      )}
-                    </SelectContent>
-                  </Select>
-                </Field>
-              </div>
-              <DialogFooter>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setDialogOpen(false)}
-                  disabled={createMutation.isPending}
-                >
-                  Batal
-                </Button>
-                <Button type="submit" disabled={createMutation.isPending || !newName.trim()}>
-                  {createMutation.isPending ? (
-                    <>
-                      <Loader2Icon className="mr-1.5 size-4 animate-spin" />
-                      Membuat...
-                    </>
-                  ) : (
-                    "Buat & Mulai Edit"
-                  )}
-                </Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
-      </div>
+                        ) : (
+                          allPrograms.map((prog) => (
+                            <SelectItem key={prog.id} value={prog.id}>
+                              {prog.name}
+                            </SelectItem>
+                          ))
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </Field>
+                </div>
+                <DialogFooter>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setDialogOpen(false)}
+                    disabled={createMutation.isPending}
+                  >
+                    Batal
+                  </Button>
+                  <Button type="submit" disabled={createMutation.isPending || !newName.trim()}>
+                    {createMutation.isPending ? (
+                      <>
+                        <Loader2Icon className="mr-1.5 size-4 animate-spin" />
+                        Membuat...
+                      </>
+                    ) : (
+                      "Buat & Mulai Edit"
+                    )}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
+        }
+      >
+        <Breadcrumb>
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbPage className="flex items-center gap-1.5 font-medium text-foreground">
+                <LayoutTemplateIcon className="size-4 text-muted-foreground" />
+                Profile Builder
+              </BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
+      </PageHeader>
+
+      <PageContent className="space-y-6 flex flex-col pt-4">
+
 
       {/* Main List */}
       <Card className="shadow-sm">
@@ -357,6 +355,7 @@ export default function ProfileBuildersPage() {
           )}
         </CardContent>
       </Card>
-    </div>
-  );
+    </PageContent>
+  </PageLayout>
+);
 }
