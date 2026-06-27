@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Save, Eye, LayoutTemplateIcon, ArrowLeft, Loader2 } from "lucide-react";
+import { Save, Eye, LayoutTemplateIcon, ArrowLeft, Loader2, Settings, ChevronDown } from "lucide-react";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import { SidebarTrigger } from "@/components/ui/sidebar";
@@ -19,7 +19,21 @@ import {
   migrateSectionsSchema,
 } from "@/components/profile-builder";
 import ProfileBuilderFieldRenderer from "@/components/profile-builder/components/profile-builder-field-renderer";
-import { useProgram, useUpdateProgramSchema } from "@/hooks/use-programs";
+import { useProgram, useUpdateProgramSchema, useProgramsByTemplate } from "@/hooks/use-programs";
+import { TemplateSettingsSheet } from "@/components/profile-builder/components/template-settings-sheet";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 // Initial state is empty
 const initialSections: Section[] = [];
@@ -28,12 +42,25 @@ function BuilderPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const programId = searchParams.get("programId");
+  const templateId = searchParams.get("templateId");
 
   const { data: program, isLoading: isProgramLoading } = useProgram(programId, true);
   const updateSchemaMutation = useUpdateProgramSchema();
 
-  const sampleRow = (program?.data && Array.isArray(program.data) && program.data.length > 0)
-    ? program.data[0]
+  const [template, setTemplate] = useState<{ name: string; description: string; sections: any; isActive?: boolean } | null>(null);
+  const [isTemplateLoading, setIsTemplateLoading] = useState(false);
+  const [isSavingTemplate, setIsSavingTemplate] = useState(false);
+  const [isSettingsSheetOpen, setIsSettingsSheetOpen] = useState(false);
+
+  // For template mode: track which program is selected for preview context
+  const [selectedProgramId, setSelectedProgramId] = useState<string | null>(null);
+  const { data: programsUsingTemplate, isLoading: isProgramsLoading } = useProgramsByTemplate(templateId);
+  const { data: selectedProgram } = useProgram(selectedProgramId, true);
+
+  // In template mode, use selectedProgram for preview; otherwise use the main program
+  const previewProgram = templateId ? selectedProgram : program;
+  const sampleRow = (previewProgram?.data && Array.isArray(previewProgram.data) && previewProgram.data.length > 0)
+    ? previewProgram.data[0]
     : undefined;
 
   const [sections, setSections] = useState<Section[]>(initialSections);
@@ -48,30 +75,77 @@ function BuilderPageContent() {
     }
   }, [sections, activeSectionId]);
 
-  // Load profile schema from program details or localStorage draft if it exists
+  // Set default selected program when programs list is loaded
   useEffect(() => {
-    if (program && programId) {
-      const draftKey = `profile-builder-draft-${programId}`;
-      const draft = localStorage.getItem(draftKey);
+    if (programsUsingTemplate && programsUsingTemplate.length > 0 && !selectedProgramId) {
+      setSelectedProgramId(programsUsingTemplate[0].id);
+    }
+  }, [programsUsingTemplate, selectedProgramId]);
 
-      if (draft) {
-        try {
-          const parsedDraft = JSON.parse(draft);
-          if (Array.isArray(parsedDraft)) {
-            const loaded = migrateSectionsSchema(parsedDraft as Section[]);
-            setSections(loaded);
-            if (loaded.length > 0) {
-               setActiveSectionId(loaded[loaded.length - 1].id);
-            }
-            setHasDraft(true);
-            toast.info("Memulihkan draf perubahan yang belum disimpan", {
-              description: "Menampilkan layout yang belum Anda simpan sebelumnya.",
-            });
+  // If templateId is provided, fetch it
+  useEffect(() => {
+    if (templateId) {
+      setIsTemplateLoading(true);
+      fetch(`/api/profile-templates/${templateId}`)
+        .then((res) => res.json())
+        .then((data) => {
+          if (data && !data.error) {
+            setTemplate(data);
+          } else {
+            toast.error("Template tidak ditemukan.");
           }
-        } catch (e) {
-          console.error("Failed to parse draft from localStorage:", e);
+        })
+        .catch((err) => {
+          console.error(err);
+          toast.error("Gagal memuat template.");
+        })
+        .finally(() => {
+          setIsTemplateLoading(false);
+        });
+    }
+  }, [templateId]);
+
+  // Load profile schema from program details, template details, or localStorage draft if it exists
+  useEffect(() => {
+    const activeId = templateId || programId;
+    if (!activeId) return;
+
+    const draftKey = `profile-builder-draft-${activeId}`;
+    const draft = localStorage.getItem(draftKey);
+
+    if (draft) {
+      try {
+        const parsedDraft = JSON.parse(draft);
+        if (Array.isArray(parsedDraft)) {
+          const loaded = migrateSectionsSchema(parsedDraft as Section[]);
+          setSections(loaded);
+          if (loaded.length > 0) {
+             setActiveSectionId(loaded[loaded.length - 1].id);
+          }
+          setHasDraft(true);
+          toast.info("Memulihkan draf perubahan yang belum disimpan", {
+            description: "Menampilkan layout yang belum Anda simpan sebelumnya.",
+          });
+          setIsLoaded(true);
+          return;
         }
-      } else if (program.profileSchema) {
+      } catch (e) {
+        console.error("Failed to parse draft from localStorage:", e);
+      }
+    }
+
+    if (templateId && template) {
+      const parsed = template.sections;
+      if (Array.isArray(parsed)) {
+        const loaded = migrateSectionsSchema(parsed as Section[]);
+        setSections(loaded);
+        if (loaded.length > 0) {
+          setActiveSectionId(loaded[loaded.length - 1].id);
+        }
+      }
+      setIsLoaded(true);
+    } else if (programId && program) {
+      if (program.profileSchema) {
         try {
           const parsed = typeof program.profileSchema === "string" 
             ? JSON.parse(program.profileSchema) 
@@ -91,16 +165,20 @@ function BuilderPageContent() {
       }
       setIsLoaded(true);
     }
-  }, [program, programId]);
+  }, [program, programId, template, templateId]);
 
   // Sync modifications to localStorage draft
   useEffect(() => {
-    if (isLoaded && programId) {
-      const dbSchemaStr = typeof program?.profileSchema === "string"
-        ? program.profileSchema
-        : JSON.stringify(program?.profileSchema || []);
+    const activeId = templateId || programId;
+    if (isLoaded && activeId) {
+      const dbSchemaStr = templateId
+        ? JSON.stringify(template?.sections || [])
+        : typeof program?.profileSchema === "string"
+          ? program.profileSchema
+          : JSON.stringify(program?.profileSchema || []);
+      
       const currentSchemaStr = JSON.stringify(sections);
-      const draftKey = `profile-builder-draft-${programId}`;
+      const draftKey = `profile-builder-draft-${activeId}`;
 
       if (dbSchemaStr === currentSchemaStr) {
         localStorage.removeItem(draftKey);
@@ -110,15 +188,21 @@ function BuilderPageContent() {
         setHasDraft(true);
       }
     }
-  }, [sections, isLoaded, programId, program?.profileSchema]);
+  }, [sections, isLoaded, programId, templateId, program?.profileSchema, template?.sections]);
 
   const handleDiscardDraft = () => {
-    if (!programId) return;
-    const draftKey = `profile-builder-draft-${programId}`;
+    const activeId = templateId || programId;
+    if (!activeId) return;
+    const draftKey = `profile-builder-draft-${activeId}`;
     localStorage.removeItem(draftKey);
     setHasDraft(false);
 
-    if (program?.profileSchema) {
+    if (templateId && template) {
+      setSections(template.sections as Section[]);
+      if (template.sections.length > 0) {
+        setActiveSectionId(template.sections[template.sections.length - 1].id);
+      }
+    } else if (programId && program?.profileSchema) {
       try {
         const parsed = typeof program.profileSchema === "string" 
           ? JSON.parse(program.profileSchema) 
@@ -137,8 +221,6 @@ function BuilderPageContent() {
     }
     toast.success("Draf dibuang, kembali ke konfigurasi tersimpan.");
   };
-
-
 
   const handleUpdateSection = (index: number, updatedSection: Section) => {
     const updated = [...sections];
@@ -273,28 +355,57 @@ function BuilderPageContent() {
   };
 
   const handleSave = () => {
-    if (!programId) {
-      toast.error("Tidak dapat menyimpan: ID Program tidak ditemukan.");
+    const activeId = templateId || programId;
+    if (!activeId) {
+      toast.error("Tidak dapat menyimpan: ID tidak ditemukan.");
       return;
     }
 
-    updateSchemaMutation.mutate({
-      id: programId,
-      sections: sections,
-    }, {
-      onSuccess: () => {
-        const draftKey = `profile-builder-draft-${programId}`;
-        localStorage.removeItem(draftKey);
-        setHasDraft(false);
-        toast.success("Konfigurasi profile berhasil disimpan!", {
-          description: `Layout profile untuk program "${program?.name}" berhasil disimpan ke database.`,
+    if (templateId) {
+      setIsSavingTemplate(true);
+      fetch(`/api/profile-templates/${templateId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sections }),
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          if (data && !data.error) {
+            const draftKey = `profile-builder-draft-${templateId}`;
+            localStorage.removeItem(draftKey);
+            setHasDraft(false);
+            setTemplate(data);
+            toast.success("Layout template berhasil disimpan!");
+          } else {
+            toast.error("Gagal menyimpan layout template.");
+          }
+        })
+        .catch((err) => {
+          console.error(err);
+          toast.error("Gagal menyimpan layout template.");
+        })
+        .finally(() => {
+          setIsSavingTemplate(false);
         });
-      },
-      onError: (err) => {
-        toast.error("Gagal menyimpan konfigurasi profile.");
-        console.error(err);
-      }
-    });
+    } else {
+      updateSchemaMutation.mutate({
+        id: programId,
+        sections: sections,
+      }, {
+        onSuccess: () => {
+          const draftKey = `profile-builder-draft-${programId}`;
+          localStorage.removeItem(draftKey);
+          setHasDraft(false);
+          toast.success("Konfigurasi profile berhasil disimpan!", {
+            description: `Layout profile untuk program "${program?.name}" berhasil disimpan ke database.`,
+          });
+        },
+        onError: (err) => {
+          toast.error("Gagal menyimpan konfigurasi profile.");
+          console.error(err);
+        }
+      });
+    }
   };
 
   const handlePreview = () => {
@@ -306,7 +417,11 @@ function BuilderPageContent() {
     });
   };
 
-  if (isProgramLoading) {
+  const isLoading = templateId ? isTemplateLoading : isProgramLoading;
+  const activeId = templateId || programId;
+  const displayName = templateId ? template?.name : program?.name;
+
+  if (isLoading) {
     return (
       <div className="flex flex-col gap-6 p-4 md:p-6 items-center justify-center min-h-[400px] h-screen bg-background">
         <Loader2 className="size-8 animate-spin text-primary" />
@@ -315,10 +430,10 @@ function BuilderPageContent() {
     );
   }
 
-  if (!programId) {
+  if (!activeId) {
     return (
       <div className="flex flex-col gap-6 p-4 md:p-6 items-center justify-center min-h-[400px] h-screen bg-background">
-        <p className="text-destructive font-semibold">Error: ID Program diperlukan untuk mengakses workspace ini.</p>
+        <p className="text-destructive font-semibold">Error: ID Program atau ID Template diperlukan untuk mengakses workspace ini.</p>
         <Button asChild>
           <Link href="/programs">Kembali ke Daftar Program</Link>
         </Button>
@@ -336,14 +451,35 @@ function BuilderPageContent() {
           <div className="flex items-center gap-2">
             <LayoutTemplateIcon className="h-4 w-4 text-muted-foreground" />
             <span className="font-semibold text-sm flex items-center gap-2">
-              Profile Builder - <span className="text-primary font-bold">{program?.name}</span>
+              Profile Builder - <span className="text-primary font-bold">{displayName}</span>
               {hasDraft && (
                 <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-yellow-500/10 text-yellow-600 border border-yellow-500/20">
                   Ada Perubahan Belum Disimpan
                 </span>
               )}
             </span>
+
+            {/* Template mode: show settings button */}
+            {templateId && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => setIsSettingsSheetOpen(true)}
+                title="Pengaturan Template"
+              >
+                <Settings className="h-4 w-4" />
+              </Button>
+            )}
           </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" asChild>
+            <Link href={templateId ? "/profile-templates" : `/programs/${programId}/settings`}>
+              <ArrowLeft className="mr-1.5 size-4" />
+              Kembali
+            </Link>
+          </Button>
         </div>
       </header>
       
@@ -351,14 +487,14 @@ function BuilderPageContent() {
         <ProfileBuilderSidebar
           onAddField={handleAddField}
           sections={sections}
-          programHeaders={program?.headers}
+          programHeaders={previewProgram?.headers}
           sampleRow={sampleRow}
           onSave={handleSave}
-          isSaving={updateSchemaMutation.isPending}
+          isSaving={templateId ? isSavingTemplate : updateSchemaMutation.isPending}
           onPreview={handlePreview}
           onDiscardDraft={handleDiscardDraft}
           hasDraft={hasDraft}
-          programId={programId}
+          programId={programId || selectedProgramId}
         />
         
         <ProfileBuilderCanvas
@@ -376,6 +512,25 @@ function BuilderPageContent() {
       </div>
       
       <Toaster position="top-right" closeButton richColors />
+
+      {/* Template Settings Sheet */}
+      <TemplateSettingsSheet
+        open={isSettingsSheetOpen}
+        onOpenChange={setIsSettingsSheetOpen}
+        template={template}
+        programsUsingTemplate={programsUsingTemplate}
+        selectedProgramId={selectedProgramId}
+        onSelectedProgramChange={setSelectedProgramId}
+        onSave={(updatedData) => {
+          if (template) {
+            setTemplate({
+              ...template,
+              name: updatedData.name,
+              description: updatedData.description,
+            });
+          }
+        }}
+      />
     </div>
   );
 }

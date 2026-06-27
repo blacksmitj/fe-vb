@@ -156,6 +156,19 @@ export default function ImportProgramPage() {
   // Fields for Program Metadata
   const [name, setName] = React.useState("");
   const [description, setDescription] = React.useState("");
+  const [templates, setTemplates] = React.useState<{ id: string; name: string; version: number }[]>([]);
+  const [selectedTemplateId, setSelectedTemplateId] = React.useState<string>("");
+
+  React.useEffect(() => {
+    fetch("/api/profile-templates")
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data)) {
+          setTemplates(data);
+        }
+      })
+      .catch((err) => console.error("Failed to load templates", err));
+  }, []);
 
   // File uploading states
   const [file, setFile] = React.useState<File | null>(null);
@@ -388,6 +401,7 @@ export default function ImportProgramPage() {
           errorCount: dryRunResult?.stats.errorCount || 0,
           fileName: file.name,
           headers: headersList,
+          profileTemplateId: selectedTemplateId || undefined,
         }),
       });
 
@@ -511,6 +525,28 @@ export default function ImportProgramPage() {
                     disabled={isSubmitting}
                     rows={4}
                   />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="profile-template">Profile Template (Desain Form)</Label>
+                  <NativeSelect
+                    id="profile-template"
+                    value={selectedTemplateId}
+                    onChange={(e) => setSelectedTemplateId(e.target.value)}
+                    disabled={isSubmitting}
+                    className="w-full"
+                  >
+                    <NativeSelectOption value="">
+                      Tanpa Template (Kosong)
+                    </NativeSelectOption>
+                    {templates.map((t) => (
+                      <NativeSelectOption key={t.id} value={t.id}>
+                        {t.name} (v{t.version})
+                      </NativeSelectOption>
+                    ))}
+                  </NativeSelect>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Gunakan template layout yang sudah pernah Anda buat sebelumnya di Profile Builder.
+                  </p>
                 </div>
               </CardContent>
             </Card>

@@ -82,5 +82,18 @@ export function useUpdateProgramSchema() {
   });
 }
 
+export function useProgramsByTemplate(templateId: string | null) {
+  return useQuery<Program[]>({
+    queryKey: ["programs", "byTemplate", templateId],
+    queryFn: async () => {
+      if (!templateId) return [];
+      const res = await fetch(`${API_URL}?templateId=${templateId}`);
+      if (!res.ok) throw new Error("Failed to fetch programs by template");
+      return res.json();
+    },
+    enabled: !!templateId,
+  });
+}
+
 
 
