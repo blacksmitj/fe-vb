@@ -71,7 +71,7 @@ export async function GET(
       headers,
       data,
       profileSchema: program.profileTemplate?.sections ?? program.profileSchema?.sections ?? [],
-      profileTemplateId: program.profileTemplateId,
+      profileTemplateId: program.profileTemplate?.id ?? null,
       verifiedCount,
       rejectedCount,
       pendingCount,

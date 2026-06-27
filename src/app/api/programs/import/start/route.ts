@@ -42,7 +42,6 @@ export async function POST(req: Request) {
           errorCount: errorCount || 0,
           uniqueKeyColumn,
           headers: headers || [],
-          profileTemplateId: profileTemplateId || null,
           programMembers: {
             create: {
               userId: session.user.id,

@@ -20,7 +20,6 @@ import {
   ArrowLeft,
   RotateCcw,
   Loader2,
-  Plus,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -86,65 +85,7 @@ export default function ProfileBuilderSidebar({
   hasDraft = false,
   programId,
 }: ProfileBuilderSidebarProps) {
-  const EXCEL_HEADERS = [
-    "NIK",
-    "Nama Lengkap",
-    "Nama Panggilan",
-    "Tempat Lahir",
-    "Tanggal Lahir",
-    "Jenis Kelamin",
-    "Golongan Darah",
-    "Agama",
-    "Status Perkawinan",
-    "Alamat KTP",
-    "Alamat Domisili",
-    "RT",
-    "RW",
-    "Kelurahan",
-    "Kecamatan",
-    "Kota / Kabupaten",
-    "Provinsi",
-    "Kode Pos",
-    "Negara",
-    "Nomor Telepon",
-    "Nomor Handphone",
-    "Alamat Email",
-    "Kewarganegaraan",
-    "Nama Ibu Kandung",
-    "Nama Ayah Kandung",
-    "Nomor Kartu Keluarga",
-    "Nomor NPWP",
-    "Nama Wajib Pajak",
-    "Pekerjaan",
-    "Jabatan",
-    "Nama Perusahaan",
-    "Alamat Perusahaan",
-    "Nomor Telepon Perusahaan",
-    "Sektor Usaha",
-    "Omzet Tahunan",
-    "Total Karyawan",
-    "Tanggal Mulai Usaha",
-    "Nomor NIB",
-    "Nomor Akta Pendirian",
-    "Tanggal Akta Pendirian",
-    "Nama Komisaris Utama",
-    "Nama Direktur Utama",
-    "Nomor Rekening Bank",
-    "Nama Bank",
-    "Nama Pemilik Rekening",
-    "Pendidikan Terakhir",
-    "Institusi Pendidikan",
-    "Tahun Kelulusan",
-    "Hubungan Kontak Darurat",
-    "Nama Kontak Darurat",
-    "Telepon Kontak Darurat",
-    "Deskripsi Profil Singkat",
-    "URL LinkedIn",
-    "URL Website Perusahaan",
-  ];
-
   const [searchQuery, setSearchQuery] = useState("");
-  const [newHeaderName, setNewHeaderName] = useState("");
 
   const usedLabels = new Set(
     sections.flatMap((section) =>
@@ -154,30 +95,9 @@ export default function ProfileBuilderSidebar({
 
   const hasDbHeaders =
     Array.isArray(programHeaders) && programHeaders.length > 0;
-  const sourceHeaders = hasDbHeaders ? programHeaders : EXCEL_HEADERS;
-
-  const handleAddNewHeader = () => {
-    if (!newHeaderName.trim()) return;
-    if (sections.length === 0) {
-      toast.error("Silakan buat section terlebih dahulu!");
-      return;
-    }
-
-    const fieldName = newHeaderName.trim();
-
-    // Check locally if it already exists in the canvas
-    if (usedLabels.has(fieldName.toLowerCase())) {
-      toast.error(`Field "${fieldName}" sudah ada di canvas.`);
-      return;
-    }
-
-    onAddField("text", fieldName, `Enter ${fieldName}...`);
-    setNewHeaderName("");
-  };
-
+  const sourceHeaders = hasDbHeaders ? programHeaders : [];
 
   const filteredHeaders = sourceHeaders.filter(
-
     (header) =>
       header.toLowerCase().includes(searchQuery.toLowerCase()) &&
       !usedLabels.has(header.toLowerCase()),
@@ -200,12 +120,12 @@ export default function ProfileBuilderSidebar({
                       asChild
                       className="h-8 w-8 p-0 shrink-0"
                     >
-                      <Link href={`/programs`}>
+                      <Link href={`/profile-builders`}>
                         <ArrowLeft className="h-4 w-4" />
                       </Link>
                     </Button>
                   </TooltipTrigger>
-                  <TooltipContent side="bottom">Kembali</TooltipContent>
+                  <TooltipContent side="bottom">Kembali ke List</TooltipContent>
                 </Tooltip>
 
                 {hasDraft && (
@@ -261,84 +181,69 @@ export default function ProfileBuilderSidebar({
             </Button>
           </div>
 
-          <div className="flex items-center justify-between px-2 mb-1 shrink-0">
-            <div className="flex items-center gap-1.5">
-              <span className="text-[11px] font-bold text-muted-foreground/85 uppercase tracking-wider">
-                Excel Headers ({filteredHeaders.length})
+          {programId ? (
+            <>
+              <div className="flex items-center justify-between px-2 mb-1 shrink-0">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[11px] font-bold text-muted-foreground/85 uppercase tracking-wider">
+                    Program Headers ({filteredHeaders.length})
+                  </span>
+                </div>
+                {hasDbHeaders && (
+                  <span className="text-[9px] bg-emerald-500/10 text-emerald-600 px-1.5 py-0.5 rounded font-bold border border-emerald-500/20 shrink-0">
+                    DATABASE
+                  </span>
+                )}
+              </div>
+
+              {/* Search Input for Excel Headers */}
+              <div className="px-2 mb-2 relative flex items-center shrink-0">
+                <Search className="absolute left-4 h-3.5 w-3.5 text-muted-foreground/70 pointer-events-none" />
+                <Input
+                  placeholder="Search headers..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="h-8 pl-8 pr-8 text-xs font-sans"
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery("")}
+                    className="absolute right-4 p-0.5 rounded-full hover:bg-muted text-muted-foreground/70 hover:text-foreground transition-colors"
+                    aria-label="Clear search"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
+
+              <div className="flex-1 overflow-y-auto min-h-0 grid grid-cols-1 gap-1 pr-1 border border-border/40 rounded-lg p-1.5 bg-muted/10 content-start">
+                {filteredHeaders.map((header) => {
+                  const sampleVal = sampleRow?.[header];
+                  return (
+                    <HeaderItem
+                      key={header}
+                      header={header}
+                      sampleVal={sampleVal}
+                      onAddField={onAddField}
+                    />
+                  );
+                })}
+                {filteredHeaders.length === 0 && (
+                  <div className="text-[10px] text-muted-foreground/50 text-center py-4">
+                    No headers found
+                  </div>
+                )}
+              </div>
+            </>
+          ) : (
+            <div className="flex-1 flex flex-col items-center justify-center p-4 border border-dashed rounded-lg bg-muted/5 text-center gap-2">
+              <span className="text-xs font-semibold text-muted-foreground">Program Belum Dipilih</span>
+              <span className="text-[10px] text-muted-foreground/75 leading-normal">
+                Silakan pilih program terlebih dahulu di menu Pengaturan untuk memuat kolom header data.
               </span>
             </div>
-            {hasDbHeaders && (
-              <span className="text-[9px] bg-emerald-500/10 text-emerald-600 px-1.5 py-0.5 rounded font-bold border border-emerald-500/20 shrink-0">
-                DATABASE
-              </span>
-            )}
-          </div>
-
-          {/* Search Input for Excel Headers */}
-          <div className="px-2 mb-2 relative flex items-center shrink-0">
-            <Search className="absolute left-4 h-3.5 w-3.5 text-muted-foreground/70 pointer-events-none" />
-            <Input
-              placeholder="Search headers..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="h-8 pl-8 pr-8 text-xs font-sans"
-            />
-            {searchQuery && (
-              <button
-                type="button"
-                onClick={() => setSearchQuery("")}
-                className="absolute right-4 p-0.5 rounded-full hover:bg-muted text-muted-foreground/70 hover:text-foreground transition-colors"
-                aria-label="Clear search"
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
-            )}
-          </div>
-
-          {/* Add Custom Field Input */}
-          <div className="px-2 mb-2 flex items-center gap-1.5 shrink-0">
-            <Input
-              placeholder="Add custom field..."
-              value={newHeaderName}
-              onChange={(e) => setNewHeaderName(e.target.value)}
-              className="h-8 text-xs font-sans"
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  handleAddNewHeader();
-                }
-              }}
-            />
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-8 px-2.5 shrink-0"
-              onClick={handleAddNewHeader}
-              disabled={!newHeaderName.trim()}
-              aria-label="Add custom field"
-            >
-              <Plus className="h-3.5 w-3.5" />
-            </Button>
-          </div>
-
-
-          <div className="flex-1 overflow-y-auto min-h-0 grid grid-cols-1 gap-1 pr-1 border border-border/40 rounded-lg p-1.5 bg-muted/10 content-start">
-            {filteredHeaders.map((header) => {
-              const sampleVal = sampleRow?.[header];
-              return (
-                <HeaderItem
-                  key={header}
-                  header={header}
-                  sampleVal={sampleVal}
-                  onAddField={onAddField}
-                />
-              );
-            })}
-            {filteredHeaders.length === 0 && (
-              <div className="text-[10px] text-muted-foreground/50 text-center py-4">
-                No headers found
-              </div>
-            )}
-          </div>
+          )}
         </div>
       </div>
     </aside>

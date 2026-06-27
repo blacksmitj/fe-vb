@@ -51,4 +51,23 @@ export interface Program {
   verifiedCount?: number;
   rejectedCount?: number;
   pendingCount?: number;
+  profileTemplateId?: string | null;
 }
+
+export interface ProfileBuilder {
+  id: string;
+  name: string;
+  description: string;
+  sections: any;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+  programId: string | null;
+  program?: {
+    id: string;
+    name: string;
+    headers: string[];
+    data?: any;
+  } | null;
+}
+

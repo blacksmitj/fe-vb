@@ -46,8 +46,8 @@ const navItems: NavItem[] = [
     items: [],
   },
   {
-    title: "Profile Templates",
-    url: "/profile-templates",
+    title: "Profile Builder",
+    url: "/profile-builders",
     icon: LayoutTemplateIcon,
     items: [],
   },
@@ -65,9 +65,9 @@ export function NavMain() {
             item.url === "/dashboard"
               ? pathname === "/dashboard"
               : item.url === "/programs"
-                ? pathname.startsWith("/programs") || (pathname.startsWith("/builder") && !pathname.includes("templateId"))
-                : item.url === "/profile-templates"
-                  ? pathname.startsWith("/profile-templates") || (pathname.startsWith("/builder") && pathname.includes("templateId"))
+                ? pathname.startsWith("/programs") || (pathname.startsWith("/builder") && !pathname.includes("builderId"))
+                : item.url === "/profile-builders"
+                  ? pathname.startsWith("/profile-builders") || (pathname.startsWith("/builder") && pathname.includes("builderId"))
                   : pathname.startsWith(item.url) && item.url !== "/";
 
           // Simple items (no sub-items)

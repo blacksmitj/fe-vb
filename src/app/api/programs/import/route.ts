@@ -64,7 +64,6 @@ export async function POST(req: Request) {
           fieldCount: cleanHeaders.length,
           errorCount: errorsList.length,
           uniqueKeyColumn: sheetUniqueKey,
-          profileTemplateId: profileTemplateId || null,
           programMembers: {
             create: {
               userId: session.user.id,

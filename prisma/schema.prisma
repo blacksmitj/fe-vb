@@ -23,11 +23,10 @@ model Program {
   // Relasi ke tabel terpisah
   participants    Participant[]
   profileSchema   ProfileSchema?
-  profileTemplateId String?
-  profileTemplate   ProfileTemplate? @relation(fields: [profileTemplateId], references: [id], onDelete: SetNull)
   importLogs      ImportLog[]
   programMembers  ProgramMember[]
   activityLogs    ActivityLog[]
+  profileTemplate ProfileTemplate?
 
   @@index([createdAt(sort: Desc)])
 }
@@ -236,7 +235,8 @@ model ProfileTemplate {
   version     Int       @default(1)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
-  programs    Program[]
+  programId   String?   @unique
+  program     Program?  @relation(fields: [programId], references: [id], onDelete: SetNull)
 }
 
 

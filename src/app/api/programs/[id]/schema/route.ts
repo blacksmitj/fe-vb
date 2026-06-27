@@ -11,8 +11,12 @@ export async function GET(
     const program = await db.program.findUnique({
       where: { id },
       select: {
-        profileTemplateId: true,
-        profileTemplate: true,
+        profileTemplate: {
+          select: {
+            sections: true,
+            version: true,
+          },
+        },
       }
     });
 

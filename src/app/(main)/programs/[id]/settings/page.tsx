@@ -62,6 +62,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface DryRunResult {
   stats: {
@@ -474,7 +480,7 @@ export default function ProgramSettingsPage({ params }: { params: Promise<{ id: 
   };
 
   // Tabs state
-  const [activeTab, setActiveTab] = React.useState("export"); // "export" | "members" | "logs"
+  const [activeTab, setActiveTab] = React.useState("general"); // "general" | "export" | "members" | "logs"
   const [userRole, setUserRole] = React.useState<string | null>(null);
   const [members, setMembers] = React.useState<any[]>([]);
   const [isMembersLoading, setIsMembersLoading] = React.useState(false);
@@ -664,65 +670,26 @@ export default function ProgramSettingsPage({ params }: { params: Promise<{ id: 
                 </p>
               </div>
             </div>
-            {userRole === "ADMIN" && (
-              <div className="flex items-center gap-2">
-                {program && (
-                  program.status === "ACTIVE" ? (
-                    <Button
-                      variant="outline"
-                      onClick={() => handleToggleStatus("STOPPED")}
-                      disabled={isTogglingStatus}
-                      className="gap-2 h-9 px-4 border-rose-200 text-rose-600 hover:bg-rose-50 hover:text-rose-700 font-medium"
-                    >
-                      {isTogglingStatus ? (
-                        <Loader2Icon className="size-4 animate-spin" />
-                      ) : (
-                        <XIcon className="size-4" />
-                      )}
-                      Tutup Verifikasi
-                    </Button>
-                  ) : (
-                    <Button
-                      variant="outline"
-                      onClick={() => handleToggleStatus("ACTIVE")}
-                      disabled={isTogglingStatus}
-                      className="gap-2 h-9 px-4 border-emerald-200 text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700 animate-pulse font-medium"
-                    >
-                      {isTogglingStatus ? (
-                        <Loader2Icon className="size-4 animate-spin" />
-                      ) : (
-                        <PlayIcon className="size-4" />
-                      )}
-                      Buka Verifikasi
-                    </Button>
-                  )
-                )}
-                <Button variant="outline" asChild className="gap-2 h-9 px-4">
-                  <Link href={`/builder?programId=${id}`}>
-                    <LayoutTemplateIcon className="size-4" />
-                    Profile Builder
-                  </Link>
-                </Button>
-                <Button
-                  variant="destructive"
-                  className="gap-2 h-9 px-4"
-                  onClick={handleDeleteClick}
-                  disabled={deleteMutation.isPending}
-                >
-                  {deleteMutation.isPending ? (
-                    <Loader2Icon className="size-4 animate-spin" />
-                  ) : (
-                    <Trash2Icon className="size-4" />
-                  )}
-                  Hapus Program
-                </Button>
-              </div>
-            )}
+            <div className="flex items-center gap-2">
+              <Button variant="outline" asChild className="gap-2 h-9 px-4">
+                <Link href={`/programs/${id}/verification`}>
+                  <CheckCircle2Icon className="size-4 text-emerald-600" />
+                  Ke Halaman Verifikasi
+                </Link>
+              </Button>
+            </div>
           </div>
 
           {/* Tabbed Interface */}
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full space-y-6">
             <TabsList>
+              {userRole === "ADMIN" && (
+                <TabsTrigger value="general">
+                  <SettingsIcon className="h-4 w-4 mr-2" />
+                  Pengaturan Utama
+                </TabsTrigger>
+              )}
+
               {userRole === "ADMIN" && (
                 <TabsTrigger value="export">
                   <DatabaseIcon className="h-4 w-4 mr-2" />
@@ -749,6 +716,171 @@ export default function ProgramSettingsPage({ params }: { params: Promise<{ id: 
                 Log Aktivitas
               </TabsTrigger>
             </TabsList>
+
+            {/* TAB: GENERAL SETTINGS */}
+            {userRole === "ADMIN" && (
+              <TabsContent value="general" className="space-y-6 outline-none mt-0">
+                <div className="grid gap-6 md:grid-cols-3">
+                  <div className="md:col-span-2 space-y-6">
+                    {/* Card 1: Profile Builder */}
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                          <LayoutTemplateIcon className="h-5 w-5 text-primary" />
+                          Tata Letak & Profile Builder
+                        </CardTitle>
+                        <CardDescription>
+                          Sesuaikan formulir data verifikasi peserta. Anda dapat mengatur letak kolom (grid), jenis input, judul bagian, dan memetakan header dari data Excel yang diunggah ke kolom formulir.
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/30">
+                          <div className="space-y-1">
+                            <p className="text-sm font-medium">Status Hubungan</p>
+                            <p className="text-xs text-muted-foreground">
+                              {program?.profileTemplateId
+                                ? "Program ini sudah memiliki rancangan layout verifikasi."
+                                : "Program ini belum terhubung ke layout verifikasi. Silakan pilih atau buat layout baru terlebih dahulu."}
+                            </p>
+                          </div>
+                          <div>
+                            {program?.profileTemplateId ? (
+                              <Badge className="bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 hover:bg-emerald-500/10 font-medium">
+                                Terhubung
+                              </Badge>
+                            ) : (
+                              <Badge className="bg-amber-500/10 text-amber-600 border border-amber-500/20 hover:bg-amber-500/10 font-medium animate-pulse">
+                                Belum Terhubung
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex justify-end">
+                          {program?.profileTemplateId ? (
+                            <Button asChild className="gap-2">
+                              <Link href={`/builder?builderId=${program.profileTemplateId}`}>
+                                <LayoutTemplateIcon className="size-4" />
+                                Buka Profile Builder
+                              </Link>
+                            </Button>
+                          ) : (
+                            <Button asChild variant="outline" className="gap-2 border-amber-200 text-amber-700 bg-amber-50/10 hover:bg-amber-50">
+                              <Link href={`/profile-builders`}>
+                                <LayoutTemplateIcon className="size-4" />
+                                Pilih / Buat Profile Builder Baru
+                              </Link>
+                            </Button>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    {/* Card 2: Verification Status */}
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                          <ActivityIcon className="h-5 w-5 text-primary" />
+                          Aktivitas Verifikasi
+                        </CardTitle>
+                        <CardDescription>
+                          Membuka atau menutup akses verifikasi bagi verifikator. Jika status aktif, verifikator dapat mulai melakukan proses evaluasi data peserta.
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/30">
+                          <div className="space-y-1">
+                            <p className="text-sm font-medium">Status Akses</p>
+                            <p className="text-xs text-muted-foreground">
+                              {program?.status === "ACTIVE"
+                                ? "Verifikasi saat ini sedang dibuka. Verifikator dapat mengakses dan menilai data peserta."
+                                : "Verifikasi saat ini sedang ditutup. Akses penilaian untuk verifikator dinonaktifkan."}
+                            </p>
+                          </div>
+                          <div>
+                            {program?.status === "ACTIVE" ? (
+                              <Badge className="bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 hover:bg-emerald-500/10 font-medium">
+                                Aktif / Terbuka
+                              </Badge>
+                            ) : (
+                              <Badge className="bg-rose-500/10 text-rose-600 border border-rose-500/20 hover:bg-rose-500/10 font-medium">
+                                Ditutup
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex justify-end">
+                          {program && (
+                            program.status === "ACTIVE" ? (
+                              <Button
+                                variant="outline"
+                                onClick={() => handleToggleStatus("STOPPED")}
+                                disabled={isTogglingStatus}
+                                className="gap-2 border-rose-200 text-rose-600 hover:bg-rose-50 hover:text-rose-700 font-medium"
+                              >
+                                {isTogglingStatus ? (
+                                  <Loader2Icon className="size-4 animate-spin" />
+                                ) : (
+                                  <XIcon className="size-4" />
+                                )}
+                                Tutup Akses Verifikasi
+                              </Button>
+                            ) : (
+                              <Button
+                                onClick={() => handleToggleStatus("ACTIVE")}
+                                disabled={isTogglingStatus}
+                                className="gap-2 bg-emerald-600 hover:bg-emerald-600/90 text-white font-medium"
+                              >
+                                {isTogglingStatus ? (
+                                  <Loader2Icon className="size-4 animate-spin" />
+                                ) : (
+                                  <PlayIcon className="size-4" />
+                                )}
+                                Buka Akses Verifikasi
+                              </Button>
+                            )
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  {/* Sidebar Info/Danger Zone */}
+                  <div className="space-y-6">
+                    <Card className="border-destructive/30 bg-destructive/5">
+                      <CardHeader>
+                        <CardTitle className="text-destructive flex items-center gap-2">
+                          <Trash2Icon className="h-5 w-5" />
+                          Danger Zone
+                        </CardTitle>
+                        <CardDescription>
+                          Tindakan berikut bersifat permanen dan tidak dapat dibatalkan.
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <p className="text-xs text-muted-foreground leading-normal">
+                          Menghapus program ini akan menghapus seluruh data peserta yang diimpor, catatan evaluasi verifikasi, draf perubahan layout, serta log aktivitas terkait secara permanen dari database.
+                        </p>
+                        <Button
+                          variant="destructive"
+                          className="w-full gap-2"
+                          onClick={handleDeleteClick}
+                          disabled={deleteMutation.isPending}
+                        >
+                          {deleteMutation.isPending ? (
+                            <Loader2Icon className="size-4 animate-spin" />
+                          ) : (
+                            <Trash2Icon className="size-4" />
+                          )}
+                          Hapus Program Permanen
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  </div>
+                </div>
+              </TabsContent>
+            )}
 
             {/* TAB: EXPORT DATA */}
             {userRole === "ADMIN" && (

@@ -24,9 +24,6 @@ export async function GET(request: Request) {
             status: "APPROVED",
           },
         },
-        ...(templateId && {
-          profileTemplateId: templateId,
-        }),
       },
       select: {
         id: true,
@@ -38,7 +35,6 @@ export async function GET(request: Request) {
         createdAt: true,
         updatedAt: true,
         status: true,
-        profileTemplateId: true,
         importLogs: {
           select: {
             status: true,
