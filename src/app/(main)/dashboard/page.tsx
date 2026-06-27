@@ -294,7 +294,7 @@ export default function DashboardPage() {
                 const pendingPct = total > 0 ? (pending / total) * 100 : 0;
 
                 return (
-                  <Link key={program.id} href={`/programs/${program.id}`}>
+                  <Link key={program.id} href={`/programs/${program.id}/verification`}>
                     <Card className="hover:shadow-md transition-shadow duration-200 cursor-pointer h-full">
                       <CardHeader className="pb-3">
                         <div className="flex items-start justify-between gap-2">

@@ -65,7 +65,7 @@ function ComboboxInput({
   return (
     <InputGroup className={cn("w-auto", className)}>
       {leftAddon && (
-        <InputGroupAddon align="inline-start" className="pl-3 pr-0">
+        <InputGroupAddon align="inline-start">
           {leftAddon}
         </InputGroupAddon>
       )}

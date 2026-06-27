@@ -1,13 +1,25 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Inter } from "next/font/google";
+import {
+  Geist,
+  Geist_Mono,
+  Source_Sans_3,
+  Merriweather,
+} from "next/font/google";
 import "./globals.css";
 import { cn } from "@/lib/utils";
 import { QueryProvider } from "@/components/providers";
 import { ThemeProvider } from "@/components/theme-provider";
-
 import { Toaster } from "@/components/ui/sonner";
 
-const inter = Inter({subsets:['latin'],variable:'--font-sans'});
+const merriweatherHeading = Merriweather({
+  subsets: ["latin"],
+  variable: "--font-heading",
+});
+
+const sourceSans3 = Source_Sans_3({
+  subsets: ["latin"],
+  variable: "--font-sans",
+});
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -35,7 +47,15 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={cn("h-full", "antialiased", geistSans.variable, geistMono.variable, "font-sans", inter.variable)}
+      className={cn(
+        "h-full",
+        "antialiased",
+        geistSans.variable,
+        geistMono.variable,
+        "font-sans",
+        sourceSans3.variable,
+        merriweatherHeading.variable,
+      )}
       suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col">
@@ -54,5 +74,3 @@ export default function RootLayout({
     </html>
   );
 }
-
-
