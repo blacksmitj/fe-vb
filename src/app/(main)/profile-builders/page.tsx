@@ -43,6 +43,17 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import {
   useProfileBuilders,
   useCreateProfileBuilder,
   useDeleteProfileBuilder,
@@ -93,16 +104,14 @@ export default function ProfileBuildersPage() {
 
   const handleDelete = React.useCallback(
     (id: string, name: string) => {
-      if (confirm(`Apakah Anda yakin ingin menghapus Profile Builder "${name}"?`)) {
-        deleteMutation.mutate(id, {
-          onSuccess: () => {
-            toast.success(`Profile Builder "${name}" berhasil dihapus`);
-          },
-          onError: (err: any) => {
-            toast.error(err.message || "Gagal menghapus");
-          },
-        });
-      }
+      deleteMutation.mutate(id, {
+        onSuccess: () => {
+          toast.success(`Profile Builder "${name}" berhasil dihapus`);
+        },
+        onError: (err: any) => {
+          toast.error(err.message || "Gagal menghapus");
+        },
+      });
     },
     [deleteMutation]
   );
@@ -311,15 +320,35 @@ export default function ProfileBuildersPage() {
                         Edit Layout
                       </Link>
                     </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="text-destructive hover:bg-destructive/10"
-                      onClick={() => handleDelete(builder.id, builder.name)}
-                      disabled={deleteMutation.isPending}
-                    >
-                      <Trash2Icon className="size-3.5" />
-                    </Button>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-destructive hover:bg-destructive/10"
+                          disabled={deleteMutation.isPending}
+                        >
+                          <Trash2Icon className="size-3.5" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Hapus Profile Builder</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Apakah Anda yakin ingin menghapus Profile Builder &quot;{builder.name}&quot;? Tindakan ini tidak dapat dibatalkan.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Batal</AlertDialogCancel>
+                          <AlertDialogAction
+                            variant="destructive"
+                            onClick={() => handleDelete(builder.id, builder.name)}
+                          >
+                            Hapus
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                   </div>
                 </div>
               ))}

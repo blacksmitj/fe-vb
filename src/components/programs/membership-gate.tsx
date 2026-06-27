@@ -49,7 +49,7 @@ export function MembershipGate({ programId, children }: MembershipGateProps) {
         toast.success("Pendaftaran berhasil diajukan");
         checkMembership();
       } else {
-        const data = await res.json();
+        const data = await res.json().catch(() => ({ error: "Gagal mengajukan pendaftaran" }));
         toast.error(data.error || "Gagal mengajukan pendaftaran");
       }
     } catch (err) {

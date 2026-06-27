@@ -153,8 +153,7 @@ export default function ProfileBuilderFieldRenderer({
   sampleRow,
   isOverlay = false,
 }: FieldRendererProps) {
-  const [isEditingLabel, setIsEditingLabel] = useState(false);
-  const [labelValue, setLabelValue] = useState(field.label);
+  const [editIsEditable, setEditIsEditable] = useState(field.isEditable ?? false);
 
   // Dialog state to edit field details
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -177,6 +176,7 @@ export default function ProfileBuilderFieldRenderer({
   const handleOpenEditModal = () => {
     setEditType(field.type);
     setEditLabel(field.label);
+    setEditIsEditable(field.isEditable ?? false);
     setEditPlaceholder(field.placeholder || "");
     setEditDescription(field.description || "");
     setEditDateMode(field.dateMode || 'date-only');
@@ -227,6 +227,7 @@ export default function ProfileBuilderFieldRenderer({
       ...field,
       type: editType,
       label: editLabel,
+      isEditable: editType !== 'media' ? editIsEditable : false,
       placeholder: editPlaceholder,
       description: editDescription.trim() || undefined,
       dateMode: editDateMode,
@@ -239,15 +240,6 @@ export default function ProfileBuilderFieldRenderer({
     });
     setIsEditModalOpen(false);
     toast.success("Field settings updated");
-  };
-
-  const handleSaveLabel = () => {
-    if (!labelValue.trim()) {
-      toast.error("Label cannot be empty");
-      return;
-    }
-    onUpdateField({ ...field, label: labelValue });
-    setIsEditingLabel(false);
   };
 
   const getFieldIcon = () => {
@@ -759,52 +751,18 @@ export default function ProfileBuilderFieldRenderer({
               </div>
             </div>
 
-            {/* Editable / Readonly Label and lock symbol */}
+            {/* Label and lock symbol */}
             <div className="flex items-center gap-1.5 min-w-0 justify-end">
-              {isEditingLabel ? (
-                <div className="flex items-center gap-1 shrink-0">
-                  <Input
-                    size={12}
-                    className="h-6 w-32 px-1.5 py-0.5 text-[10px]"
-                    value={labelValue}
-                    onChange={(e) => setLabelValue(e.target.value)}
-                    autoFocus
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") handleSaveLabel();
-                      if (e.key === "Escape") {
-                        setLabelValue(field.label);
-                        setIsEditingLabel(false);
-                      }
-                    }}
-                  />
-                  <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleSaveLabel}>
-                    <Check className="h-3 w-3 text-green-600" />
-                  </Button>
-                </div>
-              ) : (
-                <div className="flex items-center gap-1 min-w-0 justify-end">
-                  <span 
-                    className="text-[11px] font-semibold text-foreground/80 truncate max-w-[120px] sm:max-w-[180px] md:max-w-[220px]"
-                    title={field.label}
-                  >
-                    {field.label}
-                  </span>
-                  {!field.locked && !isOverlay && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-5 w-5 opacity-0 group-hover/field:opacity-100 transition-opacity text-muted-foreground hover:text-primary shrink-0"
-                      onClick={() => setIsEditingLabel(true)}
-                    >
-                      <Edit3 className="h-3 w-3" />
-                    </Button>
-                  )}
-                  {field.locked && (
-                    <span title="Read-only field" className="shrink-0">
-                      <Lock className="h-2.5 w-2.5 text-muted-foreground/60" />
-                    </span>
-                  )}
-                </div>
+              <span 
+                className="text-[11px] font-semibold text-foreground/80 truncate max-w-[120px] sm:max-w-[180px] md:max-w-[220px]"
+                title={field.label}
+              >
+                {field.label}
+              </span>
+              {field.locked && (
+                <span title="Read-only field" className="shrink-0">
+                  <Lock className="h-2.5 w-2.5 text-muted-foreground/60" />
+                </span>
               )}
             </div>
           </div>
@@ -819,19 +777,7 @@ export default function ProfileBuilderFieldRenderer({
             </p>
           )}
 
-          {/* Switch below the input */}
-          {!field.locked && field.type !== "media" && !isOverlay && (
-            <div className="flex items-center gap-1 select-none bg-muted/20 px-1.5 py-0 rounded border border-border/30 w-fit mt-0.5">
-              <span className="text-[8px] text-muted-foreground font-semibold uppercase tracking-wider scale-90 origin-left">Editable</span>
-              <Switch
-                checked={field.isEditable ?? false}
-                onCheckedChange={(checked) => {
-                  onUpdateField({ ...field, isEditable: checked });
-                }}
-                className="h-3 w-5 [&>span]:h-2 [&>span]:w-2 [&>span]:data-[state=checked]:translate-x-2"
-              />
-            </div>
-          )}
+
         </div>
 
         {/* Delete field option */}
@@ -909,6 +855,21 @@ export default function ProfileBuilderFieldRenderer({
                       placeholder="e.g. Phone Number, Date of Birth"
                     />
                   </div>
+                  {editType !== "media" && (
+                    <div className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
+                      <div className="space-y-0.5">
+                        <Label htmlFor="editIsEditable" className="text-sm font-medium">Editable Field</Label>
+                        <p className="text-[11px] text-muted-foreground">
+                          Allow users/verifiers to edit the value of this field during validation.
+                        </p>
+                      </div>
+                      <Switch
+                        id="editIsEditable"
+                        checked={editIsEditable}
+                        onCheckedChange={setEditIsEditable}
+                      />
+                    </div>
+                  )}
                   <div className="grid gap-2">
                     <Label htmlFor="editDescription">
                       Description

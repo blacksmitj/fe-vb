@@ -57,6 +57,7 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
       setIsSchemaLoading(true);
       try {
         const res = await fetch(`/api/programs/${id}/schema`);
+        if (!res.ok) throw new Error("Failed to load schema");
         const data = await res.json();
         if (data.sections) {
           setSections(migrateSectionsSchema(data.sections));
@@ -76,6 +77,7 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
       setIsParticipantLoading(true);
       try {
         const res = await fetch(`/api/programs/${id}/participants?page=${currentRowIndex}`);
+        if (!res.ok) throw new Error("Failed to load participant");
         const data = await res.json();
         setParticipant(data.participant);
         
@@ -131,7 +133,12 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
           participant,
         }),
       });
-      const data = await res.json();
+      let data;
+      try {
+        data = await res.json();
+      } catch (err) {
+        data = { error: "An error occurred while saving the data" };
+      }
       if (res.ok && data.success) {
         toast.success(`Data saved successfully`);
         setParticipant(data.participant);

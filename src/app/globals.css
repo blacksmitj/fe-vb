@@ -127,6 +127,9 @@
   html {
     @apply font-sans;
   }
+  button {
+    cursor: pointer;
+  }
   [data-sidebar="sidebar"] {
     border-top-right-radius: 0.8rem;
     border-bottom-right-radius: 0.8rem;

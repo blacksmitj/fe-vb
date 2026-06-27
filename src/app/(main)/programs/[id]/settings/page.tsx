@@ -28,6 +28,17 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
@@ -193,18 +204,16 @@ export default function ProgramSettingsPage({ params }: { params: Promise<{ id: 
   const { data: program, isLoading: isProgramLoading, refetch: refetchProgram } = useProgram(id);
   const deleteMutation = useDeleteProgram();
 
-  const handleDeleteClick = React.useCallback(() => {
-    if (confirm(`Apakah Anda yakin ingin menghapus program "${program?.name}"?`)) {
-      deleteMutation.mutate(id, {
-        onSuccess: () => {
-          toast.success(`Program "${program?.name}" berhasil dihapus`);
-          router.push("/programs");
-        },
-        onError: () => {
-          toast.error("Gagal menghapus program");
-        },
-      });
-    }
+  const handleDeleteConfirm = React.useCallback(() => {
+    deleteMutation.mutate(id, {
+      onSuccess: () => {
+        toast.success(`Program "${program?.name}" berhasil dihapus`);
+        router.push("/programs");
+      },
+      onError: () => {
+        toast.error("Gagal menghapus program");
+      },
+    });
   }, [id, program, deleteMutation, router]);
 
   const [isExporting, setIsExporting] = React.useState(false);
@@ -223,7 +232,7 @@ export default function ProgramSettingsPage({ params }: { params: Promise<{ id: 
         toast.success(`Status verifikasi berhasil ${nextStatus === "ACTIVE" ? "dibuka" : "ditutup"}`, { id: toastId });
         refetchProgram();
       } else {
-        const data = await res.json();
+        const data = await res.json().catch(() => ({ error: "Gagal mengubah status verifikasi" }));
         toast.error(data.error || "Gagal mengubah status verifikasi", { id: toastId });
       }
     } catch (err) {
@@ -435,11 +444,6 @@ export default function ProgramSettingsPage({ params }: { params: Promise<{ id: 
       return;
     }
 
-    const confirmReplace = window.confirm(
-      "Apakah Anda yakin ingin menghapus seluruh data peserta yang lama dan menggantinya dengan data baru? Tindakan ini tidak dapat dibatalkan."
-    );
-    if (!confirmReplace) return;
-
     setIsReuploadSubmitting(true);
     const toastId = toast.loading("Sedang memperbarui data peserta...");
 
@@ -454,7 +458,12 @@ export default function ProgramSettingsPage({ params }: { params: Promise<{ id: 
         body: formData,
       });
 
-      const data = await res.json();
+      let data;
+      try {
+        data = await res.json();
+      } catch (err) {
+        data = { error: "Gagal memperbarui data peserta." };
+      }
 
       if (res.ok) {
         toast.success("Data peserta berhasil diperbarui!", { id: toastId });
@@ -555,7 +564,7 @@ export default function ProgramSettingsPage({ params }: { params: Promise<{ id: 
     try {
       const response = await fetch(`/api/programs/${id}/export`);
       if (!response.ok) {
-        const errData = await response.json();
+        const errData = await response.json().catch(() => ({ error: "Gagal mengunduh file." }));
         throw new Error(errData.error || "Gagal mengunduh file.");
       }
       
@@ -597,7 +606,7 @@ export default function ProgramSettingsPage({ params }: { params: Promise<{ id: 
         toast.success(`Pendaftaran verifikator berhasil di-${status === "APPROVED" ? "setujui" : "tolak"}`);
         fetchMembers();
       } else {
-        const data = await res.json();
+        const data = await res.json().catch(() => ({ error: "Gagal memperbarui status keanggotaan" }));
         toast.error(data.error || "Gagal memperbarui status keanggotaan");
       }
     } catch (err) {
@@ -862,19 +871,39 @@ export default function ProgramSettingsPage({ params }: { params: Promise<{ id: 
                         <p className="text-xs text-muted-foreground leading-normal">
                           Menghapus program ini akan menghapus seluruh data peserta yang diimpor, catatan evaluasi verifikasi, draf perubahan layout, serta log aktivitas terkait secara permanen dari database.
                         </p>
-                        <Button
-                          variant="destructive"
-                          className="w-full gap-2"
-                          onClick={handleDeleteClick}
-                          disabled={deleteMutation.isPending}
-                        >
-                          {deleteMutation.isPending ? (
-                            <Loader2Icon className="size-4 animate-spin" />
-                          ) : (
-                            <Trash2Icon className="size-4" />
-                          )}
-                          Hapus Program Permanen
-                        </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              variant="destructive"
+                              className="w-full gap-2"
+                              disabled={deleteMutation.isPending}
+                            >
+                              {deleteMutation.isPending ? (
+                                <Loader2Icon className="size-4 animate-spin" />
+                              ) : (
+                                <Trash2Icon className="size-4" />
+                              )}
+                              Hapus Program Permanen
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Hapus Program Permanen</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Apakah Anda yakin ingin menghapus program &quot;{program?.name}&quot;? Tindakan ini bersifat permanen dan tidak dapat dibatalkan.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Batal</AlertDialogCancel>
+                              <AlertDialogAction
+                                variant="destructive"
+                                onClick={handleDeleteConfirm}
+                              >
+                                Hapus
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
                       </CardContent>
                     </Card>
                   </div>
@@ -1119,24 +1148,44 @@ export default function ProgramSettingsPage({ params }: { params: Promise<{ id: 
                             )}
 
                             <div className="flex justify-end gap-3 pt-2">
-                              <Button
-                                type="button"
-                                onClick={handleReuploadSubmit}
-                                disabled={isReuploadSubmitting}
-                                className="bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-2 w-full justify-center"
-                              >
-                                {isReuploadSubmitting ? (
-                                  <>
-                                    <Loader2Icon className="h-4 w-4 animate-spin" />
-                                    Meng-update...
-                                  </>
-                                ) : (
-                                  <>
-                                    <DatabaseIcon className="h-4 w-4" />
-                                    Reupload & Ganti Data
-                                  </>
-                                )}
-                              </Button>
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button
+                                    type="button"
+                                    disabled={isReuploadSubmitting}
+                                    className="bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-2 w-full justify-center"
+                                  >
+                                    {isReuploadSubmitting ? (
+                                      <>
+                                        <Loader2Icon className="h-4 w-4 animate-spin" />
+                                        Meng-update...
+                                      </>
+                                    ) : (
+                                      <>
+                                        <DatabaseIcon className="h-4 w-4" />
+                                        Reupload & Ganti Data
+                                      </>
+                                    )}
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Reupload & Ganti Data</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      Apakah Anda yakin ingin menghapus seluruh data peserta yang lama dan menggantinya dengan data baru? Tindakan ini tidak dapat dibatalkan.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Batal</AlertDialogCancel>
+                                    <AlertDialogAction
+                                      className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                                      onClick={handleReuploadSubmit}
+                                    >
+                                      Reupload
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
                             </div>
                           </div>
                         )}

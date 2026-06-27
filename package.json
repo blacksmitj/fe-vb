@@ -13,6 +13,7 @@
     "@formkit/auto-animate": "^0.9.0",
     "@prisma/adapter-pg": "^7.8.0",
     "@prisma/client": "^7.8.0",
+    "@shadcn/react": "^0.1.0",
     "@tanstack/react-query": "^5.101.1",
     "@tanstack/react-table": "^8.21.3",
     "better-auth": "^1.6.20",

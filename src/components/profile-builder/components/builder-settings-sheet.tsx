@@ -83,7 +83,12 @@ export function BuilderSettingsSheet({
         }),
       });
 
-      const data = await res.json();
+      let data;
+      try {
+        data = await res.json();
+      } catch (err) {
+        data = { error: "Failed to update profile builder" };
+      }
 
       if (!res.ok) {
         throw new Error(data.error || "Failed to update profile builder");

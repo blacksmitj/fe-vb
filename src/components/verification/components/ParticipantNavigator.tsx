@@ -60,6 +60,7 @@ export function ParticipantNavigator({
         const res = await fetch(
           `/api/programs/${programId}/participants?search=${encodeURIComponent(searchVal)}`
         );
+        if (!res.ok) throw new Error("Search failed");
         const data = await res.json();
         if (data.matches) {
           setResults(data.matches);

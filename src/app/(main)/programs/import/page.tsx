@@ -29,7 +29,13 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 import { toast } from "sonner";
-import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -156,19 +162,7 @@ export default function ImportProgramPage() {
   // Fields for Program Metadata
   const [name, setName] = React.useState("");
   const [description, setDescription] = React.useState("");
-  const [templates, setTemplates] = React.useState<{ id: string; name: string; version: number }[]>([]);
-  const [selectedTemplateId, setSelectedTemplateId] = React.useState<string>("");
 
-  React.useEffect(() => {
-    fetch("/api/profile-templates")
-      .then((res) => res.json())
-      .then((data) => {
-        if (Array.isArray(data)) {
-          setTemplates(data);
-        }
-      })
-      .catch((err) => console.error("Failed to load templates", err));
-  }, []);
 
   // File uploading states
   const [file, setFile] = React.useState<File | null>(null);
@@ -401,12 +395,12 @@ export default function ImportProgramPage() {
           errorCount: dryRunResult?.stats.errorCount || 0,
           fileName: file.name,
           headers: headersList,
-          profileTemplateId: selectedTemplateId || undefined,
+
         }),
       });
 
       if (!startRes.ok) {
-        const startData = await startRes.json();
+        const startData = await startRes.json().catch(() => ({ error: "Gagal menginisiasi program." }));
         throw new Error(startData.error || "Gagal menginisiasi program.");
       }
 
@@ -433,7 +427,7 @@ export default function ImportProgramPage() {
         });
 
         if (!chunkRes.ok) {
-          const chunkData = await chunkRes.json();
+          const chunkData = await chunkRes.json().catch(() => ({ error: `Gagal mengimpor baris ke ${i + 1} sampai ${i + chunk.length}` }));
           throw new Error(chunkData.error || `Gagal mengimpor baris ke ${i + 1} sampai ${i + chunk.length}`);
         }
 
@@ -526,28 +520,7 @@ export default function ImportProgramPage() {
                     rows={4}
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="profile-template">Profile Template (Desain Form)</Label>
-                  <NativeSelect
-                    id="profile-template"
-                    value={selectedTemplateId}
-                    onChange={(e) => setSelectedTemplateId(e.target.value)}
-                    disabled={isSubmitting}
-                    className="w-full"
-                  >
-                    <NativeSelectOption value="">
-                      Tanpa Template (Kosong)
-                    </NativeSelectOption>
-                    {templates.map((t) => (
-                      <NativeSelectOption key={t.id} value={t.id}>
-                        {t.name} (v{t.version})
-                      </NativeSelectOption>
-                    ))}
-                  </NativeSelect>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Gunakan template layout yang sudah pernah Anda buat sebelumnya di Profile Builder.
-                  </p>
-                </div>
+
               </CardContent>
             </Card>
 
@@ -592,48 +565,47 @@ export default function ImportProgramPage() {
                     {sheets.length > 1 && (
                       <div className="space-y-2">
                         <Label htmlFor="sheetName">Pilih Sheet (Tab)</Label>
-                        <NativeSelect
-                          id="sheetName"
+                        <Select
                           value={sheetName}
-                          onChange={(e) => handleSheetChange(e.target.value)}
+                          onValueChange={(val) => handleSheetChange(val)}
                           disabled={isPreviewLoading || isSubmitting || isDryRunning}
-                          className="w-full"
                         >
-                          {sheets.map((s) => (
-                            <NativeSelectOption key={s} value={s}>
-                              {s}
-                            </NativeSelectOption>
-                          ))}
-                        </NativeSelect>
+                          <SelectTrigger id="sheetName" className="w-full">
+                            <SelectValue placeholder="Pilih Sheet" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {sheets.map((s) => (
+                              <SelectItem key={s} value={s}>
+                                {s}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
                     )}
 
                     <div className="space-y-2">
                       <Label htmlFor="sheetUniqueKey">Kolom ID Unik (Unique Key) <span className="text-rose-500">*</span></Label>
                       <div className="relative">
-                        <NativeSelect
-                          id="sheetUniqueKey"
+                        <Select
                           value={sheetUniqueKey}
-                          onChange={(e) => {
-                            setSheetUniqueKey(e.target.value);
+                          onValueChange={(val) => {
+                            setSheetUniqueKey(val);
                             setDryRunResult(null);
                           }}
-                          required
                           disabled={isPreviewLoading || isSubmitting || isDryRunning || headersList.length === 0}
-                          className="w-full pr-10"
                         >
-                          {headersList.length === 0 ? (
-                            <NativeSelectOption value="">
-                              {isPreviewLoading ? "Memuat kolom..." : "Tidak ada kolom tersedia"}
-                            </NativeSelectOption>
-                          ) : (
-                            headersList.map((h) => (
-                              <NativeSelectOption key={h} value={h}>
+                          <SelectTrigger id="sheetUniqueKey" className="w-full">
+                            <SelectValue placeholder={isPreviewLoading ? "Memuat kolom..." : "Pilih kolom ID Unik"} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {headersList.map((h) => (
+                              <SelectItem key={h} value={h}>
                                 {h}
-                              </NativeSelectOption>
-                            ))
-                          )}
-                        </NativeSelect>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
                       <p className="text-[11px] text-muted-foreground leading-snug">
                         Pilih kolom dengan nilai unik (contoh: NIK, NIM, Email, No. Pendaftaran) untuk mendeteksi keunikan data tiap peserta.

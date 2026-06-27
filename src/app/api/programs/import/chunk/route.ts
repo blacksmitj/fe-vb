@@ -29,12 +29,19 @@ export async function POST(req: Request) {
     const participantRecords = rows.map((row: any, idx: number) => {
       const { [uniqueKeyColumn]: uniqueKeyValue, __sheetRowIndex, ...rest } = row;
       const rowIndex = typeof startRowIndex === "number" ? startRowIndex + idx : idx;
+      const uniqueKeyValStr = String(uniqueKeyValue ?? "").trim();
+      
+      const combinedData = {
+        ...rest,
+        [uniqueKeyColumn]: uniqueKeyValStr,
+      };
+
       return {
         programId,
         rowIndex,
-        uniqueKey: String(uniqueKeyValue ?? "").trim(),
-        data: rest as any,
-        searchText: buildSearchText(rest),
+        uniqueKey: uniqueKeyValStr,
+        data: combinedData as any,
+        searchText: buildSearchText(combinedData),
       };
     });
 

@@ -24,7 +24,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { type Program } from "@/types";
-import { usePrograms, useDeleteProgram } from "@/hooks/use-programs";
+import { usePrograms } from "@/hooks/use-programs";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -55,27 +55,10 @@ import { Input } from "@/components/ui/input";
 
 export default function ProgramsPage() {
   const { data: programs = [], isLoading } = usePrograms();
-  const deleteMutation = useDeleteProgram();
   const [sorting, setSorting] = React.useState<SortingState>([
     { id: "createdAt", desc: true },
   ]);
   const [globalFilter, setGlobalFilter] = React.useState("");
-
-  const handleDelete = React.useCallback(
-    (id: string, name: string) => {
-      if (confirm(`Apakah Anda yakin ingin menghapus program "${name}"?`)) {
-        deleteMutation.mutate(id, {
-          onSuccess: () => {
-            toast.success(`Program "${name}" berhasil dihapus`);
-          },
-          onError: () => {
-            toast.error("Gagal menghapus program");
-          },
-        });
-      }
-    },
-    [deleteMutation],
-  );
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("id-ID", {
@@ -336,7 +319,7 @@ export default function ProgramsPage() {
         },
       },
     ],
-    [handleDelete],
+    [],
   );
 
   const table = useReactTable({
