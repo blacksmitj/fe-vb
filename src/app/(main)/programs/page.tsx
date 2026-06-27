@@ -299,7 +299,7 @@ export default function ProgramsPage() {
                 title="Salin Link Verifikasi"
                 className="gap-1.5 h-8 px-3 text-xs text-muted-foreground hover:text-foreground"
                 onClick={() => {
-                  const shareUrl = `${window.location.origin}/programs/${program.id}/verification`;
+                  const shareUrl = `${window.location.origin}/v/${program.id}`;
                   navigator.clipboard
                     .writeText(shareUrl)
                     .then(() => {
