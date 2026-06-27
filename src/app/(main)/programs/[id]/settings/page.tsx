@@ -28,6 +28,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Field, FieldLabel, FieldDescription } from "@/components/ui/field";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -1002,8 +1003,8 @@ export default function ProgramSettingsPage({ params }: { params: Promise<{ id: 
                         </CardDescription>
                       </CardHeader>
                       <CardContent className="space-y-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="reupload-file">File Spreadsheet (.xlsx, .xls, .csv)</Label>
+                        <Field>
+                          <FieldLabel htmlFor="reupload-file">File Spreadsheet (.xlsx, .xls, .csv)</FieldLabel>
                           <div className="relative">
                             <Input
                               id="reupload-file"
@@ -1021,17 +1022,17 @@ export default function ProgramSettingsPage({ params }: { params: Promise<{ id: 
                             )}
                           </div>
                           {isReuploadPreviewLoading && (
-                            <p className="text-xs text-muted-foreground mt-1">
+                            <FieldDescription>
                               Membaca metadata & sheet file...
-                            </p>
+                            </FieldDescription>
                           )}
-                        </div>
+                        </Field>
 
                         {reuploadFile && (
                           <>
                             {reuploadSheets.length > 1 && (
-                              <div className="space-y-2">
-                                <Label htmlFor="reuploadSheetName">Pilih Sheet (Tab)</Label>
+                              <Field>
+                                <FieldLabel htmlFor="reuploadSheetName">Pilih Sheet (Tab)</FieldLabel>
                                 <Select
                                   value={reuploadSheetName}
                                   onValueChange={handleReuploadSheetChange}
@@ -1048,11 +1049,11 @@ export default function ProgramSettingsPage({ params }: { params: Promise<{ id: 
                                     ))}
                                   </SelectContent>
                                 </Select>
-                              </div>
+                              </Field>
                             )}
 
-                            <div className="space-y-2">
-                              <Label htmlFor="reuploadSheetUniqueKey">Kolom ID Unik (Unique Key)</Label>
+                            <Field>
+                              <FieldLabel htmlFor="reuploadSheetUniqueKey">Kolom ID Unik (Unique Key)</FieldLabel>
                               <div className="relative">
                                 <Select
                                   value={reuploadSheetUniqueKey}
@@ -1079,10 +1080,10 @@ export default function ProgramSettingsPage({ params }: { params: Promise<{ id: 
                                   </div>
                                 )}
                               </div>
-                              <p className="text-[11px] text-muted-foreground leading-snug">
+                              <FieldDescription>
                                 Pilih kolom dengan nilai unik (contoh: NIK, NIM, Email) untuk mengidentifikasi setiap peserta secara akurat.
-                              </p>
-                            </div>
+                              </FieldDescription>
+                            </Field>
 
                             <div className="pt-2">
                               <Button

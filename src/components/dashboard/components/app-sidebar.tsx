@@ -1,4 +1,8 @@
-import { ShieldCheckIcon } from "lucide-react";
+"use client";
+
+import { ShieldCheckIcon, SettingsIcon } from "lucide-react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 import {
   Sidebar,
@@ -14,6 +18,8 @@ import { NavMain } from "./nav-main";
 import { NavUser } from "./nav-user";
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+  const pathname = usePathname();
+
   return (
     <Sidebar collapsible="icon" {...props}>
       {/* Header / Brand */}
@@ -45,6 +51,20 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
       {/* User footer */}
       <SidebarFooter>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              asChild
+              isActive={pathname === "/settings"}
+              tooltip="Pengaturan Akun"
+            >
+              <Link href="/settings">
+                <SettingsIcon className="size-4 shrink-0" />
+                <span>Pengaturan Akun</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
         <NavUser />
       </SidebarFooter>
 

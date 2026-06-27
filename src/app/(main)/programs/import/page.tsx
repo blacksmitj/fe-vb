@@ -17,6 +17,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Field, FieldLabel, FieldDescription } from "@/components/ui/field";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -498,8 +499,8 @@ export default function ImportProgramPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="program-name">Nama Program <span className="text-rose-500">*</span></Label>
+                <Field>
+                  <FieldLabel htmlFor="program-name">Nama Program <span className="text-rose-500">*</span></FieldLabel>
                   <Input
                     id="program-name"
                     placeholder="Contoh: Penerima Beasiswa Batch II 2026"
@@ -508,9 +509,9 @@ export default function ImportProgramPage() {
                     required
                     disabled={isSubmitting}
                   />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="program-desc">Deskripsi Program</Label>
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="program-desc">Deskripsi Program</FieldLabel>
                   <Textarea
                     id="program-desc"
                     placeholder="Contoh: Verifikasi keabsahan data penerima beasiswa batch II tingkat provinsi..."
@@ -519,7 +520,7 @@ export default function ImportProgramPage() {
                     disabled={isSubmitting}
                     rows={4}
                   />
-                </div>
+                </Field>
 
               </CardContent>
             </Card>
@@ -535,8 +536,8 @@ export default function ImportProgramPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="upload-file">Berkas Spreadsheet <span className="text-rose-500">*</span></Label>
+                <Field>
+                  <FieldLabel htmlFor="upload-file">Berkas Spreadsheet <span className="text-rose-500">*</span></FieldLabel>
                   <div className="relative">
                     <Input
                       id="upload-file"
@@ -554,17 +555,17 @@ export default function ImportProgramPage() {
                     )}
                   </div>
                   {isPreviewLoading && (
-                    <p className="text-xs text-muted-foreground mt-1">
+                    <FieldDescription>
                       Membaca metadata & sheet file...
-                    </p>
+                    </FieldDescription>
                   )}
-                </div>
+                </Field>
 
                 {file && (
                   <>
                     {sheets.length > 1 && (
-                      <div className="space-y-2">
-                        <Label htmlFor="sheetName">Pilih Sheet (Tab)</Label>
+                      <Field>
+                        <FieldLabel htmlFor="sheetName">Pilih Sheet (Tab)</FieldLabel>
                         <Select
                           value={sheetName}
                           onValueChange={(val) => handleSheetChange(val)}
@@ -581,11 +582,11 @@ export default function ImportProgramPage() {
                             ))}
                           </SelectContent>
                         </Select>
-                      </div>
+                      </Field>
                     )}
 
-                    <div className="space-y-2">
-                      <Label htmlFor="sheetUniqueKey">Kolom ID Unik (Unique Key) <span className="text-rose-500">*</span></Label>
+                    <Field>
+                      <FieldLabel htmlFor="sheetUniqueKey">Kolom ID Unik (Unique Key) <span className="text-rose-500">*</span></FieldLabel>
                       <div className="relative">
                         <Select
                           value={sheetUniqueKey}
@@ -607,10 +608,10 @@ export default function ImportProgramPage() {
                           </SelectContent>
                         </Select>
                       </div>
-                      <p className="text-[11px] text-muted-foreground leading-snug">
+                      <FieldDescription>
                         Pilih kolom dengan nilai unik (contoh: NIK, NIM, Email, No. Pendaftaran) untuk mendeteksi keunikan data tiap peserta.
-                      </p>
-                    </div>
+                      </FieldDescription>
+                    </Field>
 
                     <div className="pt-2">
                       <Button

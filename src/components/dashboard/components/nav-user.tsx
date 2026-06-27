@@ -2,13 +2,11 @@
 
 import * as React from "react";
 import {
-  BellIcon,
   ChevronsUpDownIcon,
-  CreditCardIcon,
   LogOutIcon,
-  UserIcon,
   SunIcon,
   MoonIcon,
+  SettingsIcon,
 } from "lucide-react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -114,18 +112,6 @@ export function NavUser() {
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
-              <DropdownMenuItem>
-                <UserIcon />
-                Account
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <CreditCardIcon />
-                Billing
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <BellIcon />
-                Notifications
-              </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
                 className="cursor-pointer"

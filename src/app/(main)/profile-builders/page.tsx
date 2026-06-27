@@ -42,6 +42,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { Field, FieldLabel, FieldDescription } from "@/components/ui/field";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -172,10 +173,10 @@ export default function ProfileBuildersPage() {
                 </DialogDescription>
               </DialogHeader>
               <div className="grid gap-4 py-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="name">
+                <Field>
+                  <FieldLabel htmlFor="name">
                     Nama Profile Builder <span className="text-destructive">*</span>
-                  </Label>
+                  </FieldLabel>
                   <Input
                     id="name"
                     placeholder="Contoh: Form Evaluasi NIK/Penerima"
@@ -183,20 +184,20 @@ export default function ProfileBuildersPage() {
                     onChange={(e) => setNewName(e.target.value)}
                     required
                   />
-                </div>
+                </Field>
                 
-                <div className="grid gap-2">
-                  <Label htmlFor="description">Deskripsi</Label>
+                <Field>
+                  <FieldLabel htmlFor="description">Deskripsi</FieldLabel>
                   <Input
                     id="description"
                     placeholder="Penjelasan singkat mengenai form ini"
                     value={newDescription}
                     onChange={(e) => setNewDescription(e.target.value)}
                   />
-                </div>
+                </Field>
 
-                <div className="grid gap-2">
-                  <Label>Hubungkan Program (Opsional)</Label>
+                <Field>
+                  <FieldLabel>Hubungkan Program (Opsional)</FieldLabel>
                   <Select
                     value={selectedProgramId}
                     onValueChange={setSelectedProgramId}
@@ -219,7 +220,7 @@ export default function ProfileBuildersPage() {
                       )}
                     </SelectContent>
                   </Select>
-                </div>
+                </Field>
               </div>
               <DialogFooter>
                 <Button

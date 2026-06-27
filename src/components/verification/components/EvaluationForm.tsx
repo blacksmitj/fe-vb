@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Field as ShadcnField, FieldLabel, FieldDescription } from "@/components/ui/field";
 import { Calendar, FileText, Image as ImageIcon, Video, Tag, Bookmark, Hash, ArrowUpRight, Eye, Play, Globe, X } from "lucide-react";
 import {
   Combobox,
@@ -635,19 +636,17 @@ export function EvaluationForm({ sections, participant, onFieldChange }: Evaluat
                 {section.fields
                   .filter((field) => field.column !== "right")
                   .map((field) => (
-                    <div key={field.id} className="space-y-1.5">
-                      <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block">
+                    <ShadcnField key={field.id}>
+                      <FieldLabel className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block">
                         {field.label}
-                      </span>
-                      <div className="pt-0.5">
-                        {renderFieldValue(field)}
-                      </div>
+                      </FieldLabel>
+                      {renderFieldValue(field)}
                       {field.description && (
-                        <p className="text-xs italic text-muted-foreground/80 mt-1 pl-0.5 leading-relaxed">
+                        <FieldDescription className="text-xs italic text-muted-foreground/80 mt-1 pl-0.5 leading-relaxed">
                           {field.description}
-                        </p>
+                        </FieldDescription>
                       )}
-                    </div>
+                    </ShadcnField>
                   ))}
               </div>
               {/* Right Column */}
@@ -655,38 +654,34 @@ export function EvaluationForm({ sections, participant, onFieldChange }: Evaluat
                 {section.fields
                   .filter((field) => field.column === "right")
                   .map((field) => (
-                    <div key={field.id} className="space-y-1.5">
-                      <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block">
+                    <ShadcnField key={field.id}>
+                      <FieldLabel className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block">
                         {field.label}
-                      </span>
-                      <div className="pt-0.5">
-                        {renderFieldValue(field)}
-                      </div>
+                      </FieldLabel>
+                      {renderFieldValue(field)}
                       {field.description && (
-                        <p className="text-xs italic text-muted-foreground/80 mt-1 pl-0.5 leading-relaxed">
+                        <FieldDescription className="text-xs italic text-muted-foreground/80 mt-1 pl-0.5 leading-relaxed">
                           {field.description}
-                        </p>
+                        </FieldDescription>
                       )}
-                    </div>
+                    </ShadcnField>
                   ))}
               </div>
             </div>
           ) : (
             <div className="space-y-5">
               {section.fields.map((field) => (
-                <div key={field.id} className="space-y-1.5">
-                  <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block">
+                <ShadcnField key={field.id}>
+                  <FieldLabel className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block">
                     {field.label}
-                  </span>
-                  <div className="pt-0.5">
-                    {renderFieldValue(field)}
-                  </div>
+                  </FieldLabel>
+                  {renderFieldValue(field)}
                   {field.description && (
-                    <p className="text-xs italic text-muted-foreground/80 mt-1 pl-0.5 leading-relaxed">
+                    <FieldDescription className="text-xs italic text-muted-foreground/80 mt-1 pl-0.5 leading-relaxed">
                       {field.description}
-                    </p>
+                    </FieldDescription>
                   )}
-                </div>
+                </ShadcnField>
               ))}
             </div>
           )}
