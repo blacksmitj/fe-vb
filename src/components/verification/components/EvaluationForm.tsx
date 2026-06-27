@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
+import DatePicker from "@/components/date-picker";
 import { Field as ShadcnField, FieldLabel, FieldDescription } from "@/components/ui/field";
 import { Calendar, FileText, Image as ImageIcon, Video, Tag, Bookmark, Hash, ArrowUpRight, Eye, Play, Globe, X } from "lucide-react";
 import {
@@ -499,10 +500,11 @@ export function EvaluationForm({ sections, participant, onFieldChange }: Evaluat
         const formattedDateValue = formatDateForInput(valueStr, field.dateMode === "date-time");
         if (field.isEditable) {
           return (
-            <Input
-              type={field.dateMode === "date-time" ? "datetime-local" : "date"}
+            <DatePicker
               value={formattedDateValue}
-              onChange={(e) => onFieldChange?.(field.label, e.target.value)}
+              dateMode={field.dateMode}
+              locale={field.dateLocale}
+              onChange={(val) => onFieldChange?.(field.label, val)}
               className="w-full text-sm"
             />
           );

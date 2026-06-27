@@ -44,6 +44,7 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
   } = useVerificationStore();
   
   const [participant, setParticipant] = React.useState<Record<string, any> | null>(null);
+  const [originalParticipant, setOriginalParticipant] = React.useState<Record<string, any> | null>(null);
   const [sections, setSections] = React.useState<Section[]>([]);
   
   const [isParticipantLoading, setIsParticipantLoading] = React.useState(true);
@@ -79,6 +80,7 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
         if (!res.ok) throw new Error("Failed to load participant");
         const data = await res.json();
         setParticipant(data.participant);
+        setOriginalParticipant(data.participant);
         
         if (data.totalRows !== undefined) {
           setTotalRows(data.totalRows);
@@ -95,6 +97,7 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
       } catch (err) {
         console.error("Failed to load participant", err);
         resetEvaluation();
+        setOriginalParticipant(null);
       } finally {
         setIsParticipantLoading(false);
       }
@@ -105,12 +108,40 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
   // Callback to update participant row locally after saving evaluation
   const handleParticipantUpdated = (updatedParticipant: Record<string, any>) => {
     setParticipant(updatedParticipant);
+    setOriginalParticipant(updatedParticipant);
     refetchProgram();
   };
 
   const handleFieldChange = (label: string, value: any) => {
     setParticipant((prev) => (prev ? { ...prev, [label]: value } : null));
   };
+
+  // Check if form fields or store fields are dirty compared to original
+  const hasChanges = React.useMemo(() => {
+    if (!participant || !originalParticipant) return false;
+    
+    // Compare non-internal fields in participant
+    const fieldChanged = Object.keys(participant).some((key) => {
+      if (key.startsWith("_") || key === "id" || key === "uniqueKey") return false;
+      return participant[key] !== originalParticipant[key];
+    });
+
+    if (fieldChanged) return true;
+
+    // Compare evaluation status and description
+    const statusChanged = (evaluationStatus || null) !== (originalParticipant._evaluationStatus || null);
+    const descChanged = approvalDescription !== (originalParticipant._evaluationDescription || "");
+
+    return statusChanged || descChanged;
+  }, [participant, originalParticipant, evaluationStatus, approvalDescription]);
+
+  const handleReset = React.useCallback(() => {
+    if (originalParticipant) {
+      setParticipant({ ...originalParticipant });
+      setEvaluationStatus(originalParticipant._evaluationStatus || null);
+      setApprovalDescription(originalParticipant._evaluationDescription || "");
+    }
+  }, [originalParticipant, setEvaluationStatus, setApprovalDescription]);
 
   const handleSave = async () => {
     if (program?.status === "STOPPED") {
@@ -141,6 +172,7 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
       if (res.ok && data.success) {
         toast.success(`Data saved successfully`);
         setParticipant(data.participant);
+        setOriginalParticipant(data.participant);
         refetchProgram();
       } else {
         toast.error(data.error || "Failed to save data");
@@ -302,6 +334,8 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
               <ParticipantNavigator
                 programId={id}
                 onSave={handleSave}
+                onReset={handleReset}
+                hasChanges={hasChanges}
                 isSaving={isSaving}
                 evaluationStatus={evaluationStatus}
                 verifiedCount={program?.verifiedCount}

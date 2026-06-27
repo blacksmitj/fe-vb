@@ -1,10 +1,10 @@
 "use client";
 
 import React from "react";
-import { Input } from "@/components/ui/input";
 import { Calendar } from "lucide-react";
 import { formatLocalDate } from "@/lib/utils";
 import { FieldInputProps } from "../shared";
+import DatePicker from "@/components/date-picker";
 
 /** Renders a "date" field — date/datetime picker or formatted read-only display */
 export function DatePreview({ field, sampleRow, onUpdateField }: FieldInputProps) {
@@ -20,12 +20,13 @@ export function DatePreview({ field, sampleRow, onUpdateField }: FieldInputProps
   if (field.isEditable) {
     return (
       <div className="space-y-1 w-full">
-        <Input
-          type={field.dateMode === "date-time" ? "datetime-local" : "date"}
+        <DatePicker
           value={field.value || ""}
+          dateMode={field.dateMode}
+          locale={field.dateLocale}
           disabled={field.locked}
-          onChange={(e) => onUpdateField({ ...field, value: e.target.value })}
-          className={field.locked ? "bg-muted cursor-not-allowed h-7 text-xs px-2" : "h-7 text-xs px-2"}
+          onChange={(val) => onUpdateField({ ...field, value: val })}
+          className={field.locked ? "bg-muted cursor-not-allowed h-7 text-xs px-2.5" : "h-7 text-xs px-2.5"}
         />
         {formattedDateStr && (
           <div className="text-[9px] text-muted-foreground flex items-center gap-1 px-0.5">

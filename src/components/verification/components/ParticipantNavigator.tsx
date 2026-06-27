@@ -4,13 +4,26 @@ import * as React from "react";
 import { useVerificationStore } from "@/stores";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, Search, Loader2, ArrowLeft } from "lucide-react";
+import { ChevronLeft, ChevronRight, Search, Loader2, ArrowLeft, RotateCcw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 interface ParticipantNavigatorProps {
   programId: string;
   onSave?: () => Promise<void> | void;
+  onReset?: () => void;
+  hasChanges?: boolean;
   isSaving?: boolean;
   evaluationStatus?: string | null;
   verifiedCount?: number;
@@ -27,6 +40,8 @@ interface SearchMatch {
 export function ParticipantNavigator({
   programId,
   onSave,
+  onReset,
+  hasChanges = false,
   isSaving = false,
   evaluationStatus = null,
   verifiedCount = 0,
@@ -134,17 +149,84 @@ export function ParticipantNavigator({
   };
 
   return (
-    <div className="flex items-center gap-3 w-full justify-between">
-      <div className="flex items-center gap-2 flex-1">
-        {/* Exit Button */}
-        <Button variant="outline" size="sm" asChild className="gap-1.5 h-8 text-xs shrink-0">
-          <Link href="/programs">
-            <ArrowLeft className="h-3.5 w-3.5" />
-            Exit
-          </Link>
-        </Button>
+    <div className="flex flex-col gap-3 w-full">
+      {/* Baris Atas: Exit, Info Progres, Reset & Save */}
+      <div className="flex items-center justify-between w-full gap-3">
+        {/* Sisi Kiri: Exit & Statistik Progres */}
+        <div className="flex items-center gap-3">
+          <Button variant="outline" size="sm" asChild className="gap-1.5 h-8 text-xs shrink-0">
+            <Link href="/programs">
+              <ArrowLeft className="h-3.5 w-3.5" />
+              Exit
+            </Link>
+          </Button>
 
-        {/* Search Bar (Full width flex-1) */}
+          {/* Statistik Progres (Selalu tampil di semua ukuran layar) */}
+          <div className="flex items-center gap-3 text-xs bg-muted/45 border px-3 py-1 rounded-lg font-mono select-none">
+            <span className="font-semibold text-muted-foreground font-sans text-[10px] uppercase tracking-wider mr-1">Progres:</span>
+            <span className="text-emerald-600 font-semibold">{verifiedCount} Verif</span>
+            <span className="text-muted-foreground/30">|</span>
+            <span className="text-red-600 font-semibold">{rejectedCount} Tolak</span>
+            <span className="text-muted-foreground/30">|</span>
+            <span className="text-amber-600 font-semibold">{pendingCount} Belum</span>
+          </div>
+        </div>
+
+        {/* Sisi Paling Kanan: Reset & Save */}
+        <div className="flex items-center gap-2 shrink-0">
+          {onReset && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={!hasChanges || isSaving || isPaused}
+                  size="sm"
+                  className="h-8 text-xs font-semibold px-3 shrink-0 gap-1.5"
+                >
+                  <RotateCcw className="h-3.5 w-3.5" />
+                  Reset
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Konfirmasi Reset Data</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Apakah Anda yakin ingin membatalkan semua perubahan lokal untuk data peserta ini? Perubahan Anda akan dikembalikan ke data terakhir yang tersimpan di database.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Batal</AlertDialogCancel>
+                  <AlertDialogAction onClick={onReset} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                    Reset Data
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
+
+          <Button
+            type="button"
+            onClick={onSave}
+            disabled={isSaving || isPaused}
+            size="sm"
+            className="h-8 text-xs font-semibold px-4 shrink-0 bg-emerald-600 hover:bg-emerald-700 text-white"
+          >
+            {isSaving ? (
+              <>
+                <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
+                Saving...
+              </>
+            ) : (
+              "Save"
+            )}
+          </Button>
+        </div>
+      </div>
+
+      {/* Baris Bawah: Search Bar & Pagination */}
+      <div className="flex items-center justify-between w-full gap-3">
+        {/* Sisi Kiri: Search Bar */}
         <div className="relative flex-1" ref={dropdownRef}>
           <div className="relative">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/70" />
@@ -202,21 +284,8 @@ export function ParticipantNavigator({
             </div>
           )}
         </div>
-      </div>
 
-      {/* Right aligned items */}
-      <div className="flex items-center gap-3 shrink-0">
-        {/* Progress stats */}
-        <div className="hidden lg:flex items-center gap-3 text-xs bg-muted/45 border px-3 py-1 rounded-lg font-mono select-none">
-          <span className="font-semibold text-muted-foreground font-sans text-[10px] uppercase tracking-wider mr-1">Progres:</span>
-          <span className="text-emerald-600 font-semibold">{verifiedCount} Verif</span>
-          <span className="text-muted-foreground/30">|</span>
-          <span className="text-red-600 font-semibold">{rejectedCount} Tolak</span>
-          <span className="text-muted-foreground/30">|</span>
-          <span className="text-amber-600 font-semibold">{pendingCount} Belum</span>
-        </div>
-
-        {/* Nav Buttons & Indicator */}
+        {/* Sisi Kanan: Nav Buttons & Indicator */}
         <div className="flex items-center gap-1 shrink-0">
           <Button
             variant="outline"
@@ -240,23 +309,6 @@ export function ParticipantNavigator({
             <ChevronRight className="h-4 w-4" />
           </Button>
         </div>
-
-        <Button
-          type="button"
-          onClick={onSave}
-          disabled={isSaving || isPaused}
-          size="sm"
-          className="h-8 text-xs font-semibold px-4 shrink-0 bg-emerald-600 hover:bg-emerald-700 text-white"
-        >
-          {isSaving ? (
-            <>
-              <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
-              Saving...
-            </>
-          ) : (
-            "Save"
-          )}
-        </Button>
       </div>
     </div>
   );
