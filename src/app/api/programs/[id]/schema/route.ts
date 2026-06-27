@@ -7,6 +7,22 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
+    
+    const program = await db.program.findUnique({
+      where: { id },
+      select: {
+        profileTemplateId: true,
+        profileTemplate: true,
+      }
+    });
+
+    if (program?.profileTemplate) {
+      return NextResponse.json({
+        sections: program.profileTemplate.sections,
+        version: program.profileTemplate.version,
+      });
+    }
+
     const schema = await db.profileSchema.findUnique({
       where: { programId: id },
     });

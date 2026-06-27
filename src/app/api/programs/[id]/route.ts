@@ -13,6 +13,7 @@ export async function GET(
       where: { id },
       include: {
         profileSchema: true,
+        profileTemplate: true,
       }
     });
 
@@ -69,7 +70,8 @@ export async function GET(
       updatedAt: program.updatedAt.toISOString(),
       headers,
       data,
-      profileSchema: program.profileSchema?.sections ?? [],
+      profileSchema: program.profileTemplate?.sections ?? program.profileSchema?.sections ?? [],
+      profileTemplateId: program.profileTemplateId,
       verifiedCount,
       rejectedCount,
       pendingCount,
@@ -110,12 +112,13 @@ export async function PATCH(
       return NextResponse.json({ error: "Forbidden: Admin only" }, { status: 403 });
     }
 
-    const { status, name, description } = await request.json();
+    const { status, name, description, profileTemplateId } = await request.json();
 
     const dataToUpdate: any = {};
     if (status !== undefined) dataToUpdate.status = status;
     if (name !== undefined) dataToUpdate.name = name;
     if (description !== undefined) dataToUpdate.description = description;
+    if (profileTemplateId !== undefined) dataToUpdate.profileTemplateId = profileTemplateId;
 
     const updated = await db.program.update({
       where: { id },

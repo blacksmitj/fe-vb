@@ -3,7 +3,7 @@ import { auth } from "@/lib/auth/auth";
 import { headers as getHeaders } from "next/headers";
 import { NextResponse } from "next/server";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const session = await auth.api.getSession({
       headers: await getHeaders(),
@@ -13,6 +13,9 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const { searchParams } = new URL(request.url);
+    const templateId = searchParams.get("templateId");
+
     const programs = await db.program.findMany({
       where: {
         programMembers: {
@@ -21,6 +24,9 @@ export async function GET() {
             status: "APPROVED",
           },
         },
+        ...(templateId && {
+          profileTemplateId: templateId,
+        }),
       },
       select: {
         id: true,
@@ -32,6 +38,7 @@ export async function GET() {
         createdAt: true,
         updatedAt: true,
         status: true,
+        profileTemplateId: true,
         importLogs: {
           select: {
             status: true,

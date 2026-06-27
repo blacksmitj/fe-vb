@@ -23,6 +23,8 @@ model Program {
   // Relasi ke tabel terpisah
   participants    Participant[]
   profileSchema   ProfileSchema?
+  profileTemplateId String?
+  profileTemplate   ProfileTemplate? @relation(fields: [profileTemplateId], references: [id], onDelete: SetNull)
   importLogs      ImportLog[]
   programMembers  ProgramMember[]
   activityLogs    ActivityLog[]
@@ -222,6 +224,21 @@ enum ProgramStatus {
   ACTIVE
   STOPPED
 }
+
+// ─────────────────────────────────────────────
+// Model: ProfileTemplate
+// ─────────────────────────────────────────────
+model ProfileTemplate {
+  id          String    @id @default(uuid())
+  name        String
+  description String    @default("")
+  sections    Json      // Section[] — array konfigurasi layout
+  version     Int       @default(1)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  programs    Program[]
+}
+
 
 
 

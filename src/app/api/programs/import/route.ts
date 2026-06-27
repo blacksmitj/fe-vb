@@ -26,6 +26,7 @@ export async function POST(req: Request) {
     const description = formData.get("description") as string | null;
     const sheetName = formData.get("sheetName") as string | null;
     const sheetUniqueKey = formData.get("sheetUniqueKey") as string | null;
+    const profileTemplateId = formData.get("profileTemplateId") as string | null;
     const file = formData.get("file") as File | null;
 
     if (!name) {
@@ -63,6 +64,7 @@ export async function POST(req: Request) {
           fieldCount: cleanHeaders.length,
           errorCount: errorsList.length,
           uniqueKeyColumn: sheetUniqueKey,
+          profileTemplateId: profileTemplateId || null,
           programMembers: {
             create: {
               userId: session.user.id,

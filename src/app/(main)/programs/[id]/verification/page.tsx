@@ -9,7 +9,7 @@ import {
 } from "@/components/verification";
 import { useVerificationStore } from "@/stores";
 import { Section, migrateSectionsSchema } from "@/components/profile-builder";
-import { Loader2, ArrowLeft, RefreshCw, AlertCircle } from "lucide-react";
+import { Loader2, ArrowLeft, RefreshCw, AlertCircle, CheckCircle2, XCircle, ClockIcon, UserCircle2 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { SidebarTrigger } from "@/components/ui/sidebar";
@@ -208,6 +208,90 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
                 </AlertDescription>
               </Alert>
             )}
+
+
+            {/* Verification Status Info Card */}
+            {!isLoading && participant && (() => {
+              const evalStatus = participant._evaluationStatus as string | null;
+              const verifiedBy = participant._verifiedByName as string | null;
+              const evaluatedAt = participant._evaluatedAt as string | null;
+
+              const formattedDate = evaluatedAt
+                ? new Date(evaluatedAt).toLocaleString("id-ID", {
+                    day: "2-digit",
+                    month: "short",
+                    year: "numeric",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })
+                : null;
+
+              if (evalStatus === "VERIFIED") {
+                return (
+                  <div className="flex items-center gap-3 rounded-lg border border-emerald-200 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/30 px-4 py-3">
+                    <CheckCircle2 className="size-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-emerald-800 dark:text-emerald-300">Data Telah Terverifikasi</p>
+                      <p className="text-xs text-emerald-700 dark:text-emerald-400 mt-0.5 flex items-center gap-1.5 flex-wrap">
+                        {verifiedBy && (
+                          <>
+                            <UserCircle2 className="size-3.5 shrink-0" />
+                            <span>Oleh <strong>{verifiedBy}</strong></span>
+                          </>
+                        )}
+                        {formattedDate && (
+                          <>
+                            <span className="text-emerald-500">·</span>
+                            <ClockIcon className="size-3.5 shrink-0" />
+                            <span>{formattedDate}</span>
+                          </>
+                        )}
+                      </p>
+                    </div>
+                    <Badge className="bg-emerald-500 text-white border-none text-[10px] font-bold h-5 px-2 shrink-0">
+                      Terverifikasi
+                    </Badge>
+                  </div>
+                );
+              }
+
+              if (evalStatus === "REJECTED") {
+                return (
+                  <div className="flex items-center gap-3 rounded-lg border border-rose-200 bg-rose-50 dark:border-rose-800 dark:bg-rose-950/30 px-4 py-3">
+                    <XCircle className="size-5 text-rose-600 dark:text-rose-400 shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-rose-800 dark:text-rose-300">Data Ditolak</p>
+                      <p className="text-xs text-rose-700 dark:text-rose-400 mt-0.5 flex items-center gap-1.5 flex-wrap">
+                        {verifiedBy && (
+                          <>
+                            <UserCircle2 className="size-3.5 shrink-0" />
+                            <span>Oleh <strong>{verifiedBy}</strong></span>
+                          </>
+                        )}
+                        {formattedDate && (
+                          <>
+                            <span className="text-rose-400">·</span>
+                            <ClockIcon className="size-3.5 shrink-0" />
+                            <span>{formattedDate}</span>
+                          </>
+                        )}
+                      </p>
+                    </div>
+                    <Badge variant="destructive" className="text-white text-[10px] font-bold h-5 px-2 shrink-0">
+                      Ditolak
+                    </Badge>
+                  </div>
+                );
+              }
+
+              // Pending
+              return (
+                <div className="flex items-center gap-3 rounded-lg border border-dashed px-4 py-3 text-muted-foreground">
+                  <ClockIcon className="size-4 shrink-0" />
+                  <p className="text-xs">Belum diverifikasi — belum ada tindakan untuk data ini.</p>
+                </div>
+              );
+            })()}
 
             {/* Sticky Navigator Container */}
             <div className="sticky top-0 z-20 bg-background/95 backdrop-blur-md pb-2.5 border-b pt-4 px-6 -mt-6 -mx-6">

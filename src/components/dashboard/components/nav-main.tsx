@@ -45,6 +45,12 @@ const navItems: NavItem[] = [
     icon: ClipboardListIcon,
     items: [],
   },
+  {
+    title: "Profile Templates",
+    url: "/profile-templates",
+    icon: LayoutTemplateIcon,
+    items: [],
+  },
 ];
 
 export function NavMain() {
@@ -59,8 +65,10 @@ export function NavMain() {
             item.url === "/dashboard"
               ? pathname === "/dashboard"
               : item.url === "/programs"
-                ? pathname.startsWith("/programs") || pathname.startsWith("/builder")
-                : pathname.startsWith(item.url) && item.url !== "/";
+                ? pathname.startsWith("/programs") || (pathname.startsWith("/builder") && !pathname.includes("templateId"))
+                : item.url === "/profile-templates"
+                  ? pathname.startsWith("/profile-templates") || (pathname.startsWith("/builder") && pathname.includes("templateId"))
+                  : pathname.startsWith(item.url) && item.url !== "/";
 
           // Simple items (no sub-items)
           if (item.items.length === 0) {
