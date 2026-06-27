@@ -25,6 +25,7 @@ import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { type Program } from "@/types";
 import { usePrograms } from "@/hooks/use-programs";
+import { formatShortDate } from "@/lib/utils";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -59,15 +60,6 @@ export default function ProgramsPage() {
   ]);
   const [globalFilter, setGlobalFilter] = React.useState("");
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("id-ID", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  };
 
   const columns = React.useMemo<ColumnDef<Program>[]>(
     () => [
@@ -248,7 +240,7 @@ export default function ProgramsPage() {
           return (
             <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground whitespace-nowrap">
               <CalendarIcon className="size-3.5" />
-              {formatDate(createdAt)}
+              {formatShortDate(createdAt)}
             </span>
           );
         },
