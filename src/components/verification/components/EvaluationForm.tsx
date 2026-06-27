@@ -117,15 +117,27 @@ function formatDisplayDate(valueStr: string, isDateTime: boolean = false): strin
   return dateObj.toLocaleDateString("id-ID", options);
 }
 
+import { cn } from "@/lib/utils";
+
+const dropdownColorMap: Record<string, string> = {
+  gray: "bg-slate-400 dark:bg-slate-500",
+  green: "bg-emerald-500",
+  yellow: "bg-amber-500",
+  red: "bg-red-500",
+  blue: "bg-sky-500",
+  purple: "bg-violet-500",
+};
+
 interface SearchableComboboxProps {
   value: string;
   options: string[];
+  optionColors?: Record<string, string>;
   placeholder?: string;
   onValueChange: (val: string) => void;
   disabled?: boolean;
 }
 
-function SearchableCombobox({ value, options, placeholder, onValueChange, disabled }: SearchableComboboxProps) {
+function SearchableCombobox({ value, options, optionColors, placeholder, onValueChange, disabled }: SearchableComboboxProps) {
   const [searchValue, setSearchValue] = React.useState("");
 
   React.useEffect(() => {
@@ -138,6 +150,9 @@ function SearchableCombobox({ value, options, placeholder, onValueChange, disabl
       opt.toLowerCase().includes(searchValue.toLowerCase())
     );
   }, [options, searchValue, value]);
+
+  const colorKey = optionColors?.[value];
+  const dotClass = colorKey ? dropdownColorMap[colorKey] : undefined;
 
   return (
     <Combobox
@@ -155,14 +170,24 @@ function SearchableCombobox({ value, options, placeholder, onValueChange, disabl
         className="w-full text-sm"
         value={searchValue}
         onChange={(e) => setSearchValue(e.target.value)}
+        leftAddon={
+          dotClass ? (
+            <span className={cn("h-2.5 w-2.5 rounded-full shrink-0", dotClass)} />
+          ) : null
+        }
       />
       <ComboboxContent>
         <ComboboxList>
-          {filteredOptions.map((opt) => (
-            <ComboboxItem key={opt} value={opt}>
-              {opt}
-            </ComboboxItem>
-          ))}
+          {filteredOptions.map((opt) => {
+            const colorKey = optionColors?.[opt];
+            const dotClass = colorKey ? dropdownColorMap[colorKey] : undefined;
+            return (
+              <ComboboxItem key={opt} value={opt} className="flex items-center gap-2 text-sm">
+                {dotClass && <span className={cn("h-2 w-2 rounded-full shrink-0", dotClass)} />}
+                <span>{opt}</span>
+              </ComboboxItem>
+            );
+          })}
           {filteredOptions.length === 0 && (
             <ComboboxEmpty className="text-[10px] text-muted-foreground p-2 text-center">
               Tidak ditemukan
@@ -505,17 +530,18 @@ export function EvaluationForm({ sections, participant, onFieldChange }: Evaluat
           </div>
         );
       case "textarea":
+        const isTextareaMono = field.previewFontMode === "mono";
         if (field.isEditable) {
           return (
             <Textarea
               value={valueStr}
               onChange={(e) => onFieldChange?.(field.label, e.target.value)}
-              className="w-full text-sm min-h-[80px]"
+              className={cn("w-full text-sm min-h-[80px]", isTextareaMono && "font-mono")}
             />
           );
         }
         return (
-          <div className="py-2.5 px-3 bg-muted/40 border border-border/50 rounded-lg text-sm select-all whitespace-pre-wrap text-foreground/80 font-medium">
+          <div className={cn("py-2.5 px-3 bg-muted/40 border border-border/50 rounded-lg text-sm select-all whitespace-pre-wrap text-foreground/80 font-medium", isTextareaMono && "font-mono")}>
             {valueStr}
           </div>
         );
@@ -554,34 +580,41 @@ export function EvaluationForm({ sections, participant, onFieldChange }: Evaluat
           </div>
         );
       case "dropdown":
+        const selectedColorKey = field.optionColors?.[valueStr];
+        const selectedDotClass = selectedColorKey ? dropdownColorMap[selectedColorKey] : undefined;
         if (field.isEditable) {
           const selectOptions = field.options || [];
           return (
             <SearchableCombobox
               value={valueStr}
               options={selectOptions}
+              optionColors={field.optionColors}
               placeholder={field.placeholder}
               onValueChange={(val) => onFieldChange?.(field.label, val)}
             />
           );
         }
         return (
-          <div className="py-2.5 px-3 bg-muted/40 border border-border/50 rounded-lg text-sm select-all whitespace-pre-wrap text-foreground/80 font-medium">
-            {valueStr || (field.placeholder || "Belum diisi")}
+          <div className="py-2.5 px-3 bg-muted/40 border border-border/50 rounded-lg text-sm select-all whitespace-pre-wrap text-foreground/80 font-medium flex items-center gap-2">
+            {valueStr && selectedDotClass && (
+              <span className={cn("h-2.5 w-2.5 rounded-full shrink-0", selectedDotClass)} />
+            )}
+            <span>{valueStr || (field.placeholder || "Belum diisi")}</span>
           </div>
         );
       default:
+        const isMono = field.previewFontMode === "mono";
         if (field.isEditable) {
           return (
             <Input
               value={valueStr}
               onChange={(e) => onFieldChange?.(field.label, e.target.value)}
-              className="w-full text-sm"
+              className={cn("w-full text-sm", isMono && "font-mono")}
             />
           );
         }
         return (
-          <div className="py-2.5 px-3 bg-muted/40 border border-border/50 rounded-lg text-sm select-all whitespace-pre-wrap text-foreground/80 font-medium">
+          <div className={cn("py-2.5 px-3 bg-muted/40 border border-border/50 rounded-lg text-sm select-all whitespace-pre-wrap text-foreground/80 font-medium", isMono && "font-mono")}>
             {valueStr}
           </div>
         );

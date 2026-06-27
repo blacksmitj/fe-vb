@@ -62,6 +62,16 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { detectMediaType } from "../utils/detect-media-type";
+import { cn } from "@/lib/utils";
+
+export const dropdownColorMap: Record<string, string> = {
+  gray: "bg-slate-400 dark:bg-slate-500",
+  green: "bg-emerald-500",
+  yellow: "bg-amber-500",
+  red: "bg-red-500",
+  blue: "bg-sky-500",
+  purple: "bg-violet-500",
+};
 
 interface FieldRendererProps {
   field: Field;
@@ -83,12 +93,13 @@ interface FieldRendererProps {
 interface SearchableComboboxProps {
   value: string;
   options: string[];
+  optionColors?: Record<string, string>;
   placeholder?: string;
   onValueChange: (val: string) => void;
   disabled?: boolean;
 }
 
-function SearchableCombobox({ value, options, placeholder, onValueChange, disabled }: SearchableComboboxProps) {
+function SearchableCombobox({ value, options, optionColors, placeholder, onValueChange, disabled }: SearchableComboboxProps) {
   const [searchValue, setSearchValue] = React.useState("");
 
   React.useEffect(() => {
@@ -101,6 +112,9 @@ function SearchableCombobox({ value, options, placeholder, onValueChange, disabl
       opt.toLowerCase().includes(searchValue.toLowerCase())
     );
   }, [options, searchValue, value]);
+
+  const colorKey = optionColors?.[value];
+  const dotClass = colorKey ? dropdownColorMap[colorKey] : undefined;
 
   return (
     <Combobox
@@ -118,14 +132,24 @@ function SearchableCombobox({ value, options, placeholder, onValueChange, disabl
         className="w-full text-xs"
         value={searchValue}
         onChange={(e) => setSearchValue(e.target.value)}
+        leftAddon={
+          dotClass ? (
+            <span className={cn("h-2.5 w-2.5 rounded-full shrink-0", dotClass)} />
+          ) : null
+        }
       />
       <ComboboxContent>
         <ComboboxList>
-          {filteredOptions.map((opt) => (
-            <ComboboxItem key={opt} value={opt}>
-              {opt}
-            </ComboboxItem>
-          ))}
+          {filteredOptions.map((opt) => {
+            const colorKey = optionColors?.[opt];
+            const dotClass = colorKey ? dropdownColorMap[colorKey] : undefined;
+            return (
+              <ComboboxItem key={opt} value={opt} className="flex items-center gap-2">
+                {dotClass && <span className={cn("h-2 w-2 rounded-full shrink-0", dotClass)} />}
+                <span>{opt}</span>
+              </ComboboxItem>
+            );
+          })}
           {filteredOptions.length === 0 && (
             <ComboboxEmpty className="text-[10px] text-muted-foreground p-2 text-center">
               Tidak ditemukan
@@ -170,6 +194,7 @@ export default function ProfileBuilderFieldRenderer({
     field.mediaSubType || 'auto'
   );
   const [editOptions, setEditOptions] = useState<string[]>(field.options || []);
+  const [editOptionColors, setEditOptionColors] = useState<Record<string, string>>(field.optionColors || {});
   const [newOptionText, setNewOptionText] = useState("");
   const [optionsBulkText, setOptionsBulkText] = useState("");
 
@@ -188,6 +213,7 @@ export default function ProfileBuilderFieldRenderer({
     
     const initialOptions = field.options || [];
     setEditOptions(initialOptions);
+    setEditOptionColors(field.optionColors || {});
     setNewOptionText("");
     setOptionsBulkText(initialOptions.join("\n"));
     
@@ -212,9 +238,17 @@ export default function ProfileBuilderFieldRenderer({
   };
 
   const handleRemoveOption = (index: number) => {
+    const optToRemove = editOptions[index];
     const updated = editOptions.filter((_, idx) => idx !== index);
     setEditOptions(updated);
     setOptionsBulkText(updated.join("\n"));
+    
+    // Clean up color for removed option
+    if (optToRemove) {
+      const updatedColors = { ...editOptionColors };
+      delete updatedColors[optToRemove];
+      setEditOptionColors(updatedColors);
+    }
   };
 
   const handleSaveFieldSettings = (e: React.FormEvent) => {
@@ -237,6 +271,7 @@ export default function ProfileBuilderFieldRenderer({
       pillsSeparator: editPillsSeparator,
       mediaSubType: editMediaSubType === 'auto' ? undefined : editMediaSubType,
       options: editType === 'dropdown' ? editOptions : undefined,
+      optionColors: editType === 'dropdown' ? editOptionColors : undefined,
     });
     setIsEditModalOpen(false);
     toast.success("Field settings updated");
@@ -657,11 +692,14 @@ export default function ProfileBuilderFieldRenderer({
       case "dropdown":
         const dropdownVal = field.value !== undefined && field.value !== "" ? field.value : (sampleValue !== undefined && sampleValue !== null ? String(sampleValue) : "");
         const selectOptions = field.options || [];
+        const selectedColorKey = field.optionColors?.[dropdownVal];
+        const selectedDotClass = selectedColorKey ? dropdownColorMap[selectedColorKey] : undefined;
         if (field.isEditable) {
           return (
             <SearchableCombobox
               value={dropdownVal}
               options={selectOptions}
+              optionColors={field.optionColors}
               placeholder={field.placeholder}
               onValueChange={(val) => onUpdateField({ ...field, value: val })}
               disabled={field.locked}
@@ -671,7 +709,10 @@ export default function ProfileBuilderFieldRenderer({
           const hasValue = dropdownVal !== "";
           const textVal = hasValue ? dropdownVal : (field.placeholder || "Belum diisi");
           return (
-            <div className="min-h-7 flex items-center py-1 px-2.5 bg-muted/40 border border-border/50 rounded-lg text-xs select-all">
+            <div className="min-h-7 flex items-center py-1 px-2.5 bg-muted/40 border border-border/50 rounded-lg text-xs select-all gap-2">
+              {hasValue && selectedDotClass && (
+                <span className={cn("h-2 w-2 rounded-full shrink-0", selectedDotClass)} />
+              )}
               <span className={`tracking-tight font-medium ${hasValue ? "text-foreground/80" : "text-muted-foreground/50 italic"}`}>
                 {textVal}
               </span>
@@ -965,20 +1006,45 @@ export default function ProfileBuilderFieldRenderer({
                         </Label>
                         <div className="max-h-[160px] overflow-y-auto border border-border/40 bg-background/50 rounded-md p-1.5 divide-y divide-border/30">
                           {editOptions.map((opt, idx) => (
-                            <div key={idx} className="flex items-center justify-between py-1 px-1.5 group/opt hover:bg-muted/30 rounded text-xs">
-                              <span className="font-medium truncate text-foreground/80 max-w-[85%]">
-                                <span className="text-[10px] text-muted-foreground font-mono mr-1.5">{idx + 1}.</span>
+                            <div key={idx} className="flex items-center justify-between py-1.5 px-2 group/opt hover:bg-muted/35 rounded text-xs gap-2">
+                              <span className="font-medium truncate text-foreground/85 max-w-[45%] flex-1">
+                                <span className="text-[10px] text-muted-foreground font-mono mr-1">{idx + 1}.</span>
                                 {opt}
                               </span>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                className="h-5 w-5 text-muted-foreground hover:text-destructive hover:bg-destructive/15 transition-colors"
-                                onClick={() => handleRemoveOption(idx)}
-                              >
-                                <Trash2 className="h-3 w-3" />
-                              </Button>
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                {Object.keys(dropdownColorMap).map((colorKey) => {
+                                  const isSelected = (editOptionColors[opt] || "gray") === colorKey;
+                                  return (
+                                    <button
+                                      key={colorKey}
+                                      type="button"
+                                      onClick={() => {
+                                        setEditOptionColors({
+                                          ...editOptionColors,
+                                          [opt]: colorKey,
+                                        });
+                                      }}
+                                      className={cn(
+                                        "w-3 h-3 rounded-full border transition-all shrink-0 cursor-pointer",
+                                        dropdownColorMap[colorKey],
+                                        isSelected 
+                                          ? "ring-1 ring-primary ring-offset-1 ring-offset-background scale-110 border-transparent" 
+                                          : "opacity-35 hover:opacity-100 hover:scale-105 border-border"
+                                      )}
+                                      title={colorKey}
+                                    />
+                                  );
+                                })}
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-5 w-5 ml-1 text-muted-foreground hover:text-destructive hover:bg-destructive/15 transition-colors"
+                                  onClick={() => handleRemoveOption(idx)}
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              </div>
                             </div>
                           ))}
                           {editOptions.length === 0 && (

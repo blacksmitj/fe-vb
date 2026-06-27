@@ -29,6 +29,7 @@ export interface Field {
   pillsSeparator?: string;
   mediaSubType?: MediaSubType;
   options?: string[];
+  optionColors?: Record<string, string>;
 }
 
 export interface Section {
