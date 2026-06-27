@@ -14,6 +14,22 @@ export async function GET() {
     }
 
     const builders = await db.profileTemplate.findMany({
+      where: {
+        OR: [
+          { programId: null },
+          {
+            program: {
+              programMembers: {
+                some: {
+                  userId: session.user.id,
+                  status: "APPROVED",
+                  role: "ADMIN",
+                },
+              },
+            },
+          },
+        ],
+      },
       include: {
         program: {
           select: {
@@ -47,8 +63,24 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Name is required" }, { status: 400 });
     }
 
-    // Jika programId dikirim, periksa apakah sudah ada profile builder lain yang memakainya
+    // Jika programId dikirim, periksa akses dan apakah sudah ada profile builder lain yang memakainya
     if (programId) {
+      // Periksa keanggotaan program
+      const member = await db.programMember.findFirst({
+        where: {
+          programId,
+          userId: session.user.id,
+          status: "APPROVED",
+          role: "ADMIN",
+        },
+      });
+      if (!member) {
+        return NextResponse.json(
+          { error: "Anda tidak memiliki akses ke program ini." },
+          { status: 403 }
+        );
+      }
+
       const existing = await db.profileTemplate.findUnique({
         where: { programId },
       });

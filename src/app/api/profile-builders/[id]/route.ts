@@ -34,6 +34,21 @@ export async function GET(
       return NextResponse.json({ error: "Profile Builder not found" }, { status: 404 });
     }
 
+    // Validasi akses program jika template terhubung ke program
+    if (builder.programId) {
+      const member = await db.programMember.findFirst({
+        where: {
+          programId: builder.programId,
+          userId: session.user.id,
+          status: "APPROVED",
+          role: "ADMIN",
+        },
+      });
+      if (!member) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+    }
+
     // Ambil data participant pertama untuk preview jika program terhubung
     let data: any[] = [];
     if (builder.program) {
@@ -78,6 +93,30 @@ export async function PATCH(
     }
 
     const { id } = await params;
+
+    // Ambil data builder lama untuk pengecekan akses
+    const existingBuilder = await db.profileTemplate.findUnique({
+      where: { id },
+    });
+    if (!existingBuilder) {
+      return NextResponse.json({ error: "Profile Builder not found" }, { status: 404 });
+    }
+
+    // Validasi akses program jika template terhubung ke program sebelumnya
+    if (existingBuilder.programId) {
+      const member = await db.programMember.findFirst({
+        where: {
+          programId: existingBuilder.programId,
+          userId: session.user.id,
+          status: "APPROVED",
+          role: "ADMIN",
+        },
+      });
+      if (!member) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+    }
+
     const { name, description, sections, programId } = await req.json();
 
     const dataToUpdate: any = {};
@@ -91,6 +130,22 @@ export async function PATCH(
     if (programId !== undefined) {
       // Jika ingin menghubungkan ke suatu program, pastikan tidak melanggar unique constraint
       if (programId !== null) {
+        // Periksa keanggotaan program baru
+        const member = await db.programMember.findFirst({
+          where: {
+            programId,
+            userId: session.user.id,
+            status: "APPROVED",
+            role: "ADMIN",
+          },
+        });
+        if (!member) {
+          return NextResponse.json(
+            { error: "Anda tidak memiliki akses ke program ini." },
+            { status: 403 }
+          );
+        }
+
         const existing = await db.profileTemplate.findFirst({
           where: {
             programId,
@@ -165,6 +220,29 @@ export async function DELETE(
     }
 
     const { id } = await params;
+
+    // Ambil data builder lama untuk pengecekan akses
+    const existingBuilder = await db.profileTemplate.findUnique({
+      where: { id },
+    });
+    if (!existingBuilder) {
+      return NextResponse.json({ error: "Profile Builder not found" }, { status: 404 });
+    }
+
+    // Validasi akses program jika template terhubung ke program
+    if (existingBuilder.programId) {
+      const member = await db.programMember.findFirst({
+        where: {
+          programId: existingBuilder.programId,
+          userId: session.user.id,
+          status: "APPROVED",
+          role: "ADMIN",
+        },
+      });
+      if (!member) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+    }
 
     await db.profileTemplate.delete({
       where: { id },
