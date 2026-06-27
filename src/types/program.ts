@@ -1,3 +1,26 @@
+export interface DashboardGlobalStats {
+  totalParticipants: number;
+  totalVerified: number;
+  totalRejected: number;
+  totalPending: number;
+  activePrograms: number;
+}
+
+export interface DashboardActivity {
+  id: string;
+  action: string;
+  details: string;
+  programName: string;
+  userName: string;
+  createdAt: string;
+}
+
+export interface DashboardData {
+  globalStats: DashboardGlobalStats;
+  programs: Program[];
+  recentActivity: DashboardActivity[];
+}
+
 export interface Participant {
   id: string;
   rowIndex: number;
