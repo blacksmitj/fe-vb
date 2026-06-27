@@ -16,6 +16,7 @@ import {
   useProfileBuilders,
   useCreateProfileBuilder,
   useDeleteProfileBuilder,
+  useDuplicateProfileBuilder,
 } from "@/hooks/use-profile-builders";
 import { usePrograms } from "@/hooks/use-programs";
 
@@ -27,6 +28,7 @@ export default function ProfileBuildersPage() {
   const { data: allPrograms = [], isLoading: isLoadingPrograms } = usePrograms();
   const createMutation = useCreateProfileBuilder();
   const deleteMutation = useDeleteProfileBuilder();
+  const duplicateMutation = useDuplicateProfileBuilder();
 
   // Component States
   const [dialogOpen, setDialogOpen] = React.useState(false);
@@ -73,6 +75,20 @@ export default function ProfileBuildersPage() {
     [deleteMutation]
   );
 
+  const handleDuplicate = React.useCallback(
+    (id: string) => {
+      duplicateMutation.mutate(id, {
+        onSuccess: (created) => {
+          toast.success(`Profile Builder "${created.name}" berhasil diduplikasi`);
+        },
+        onError: (err: any) => {
+          toast.error(err.message || "Gagal menduplikasi Profile Builder");
+        },
+      });
+    },
+    [duplicateMutation]
+  );
+
   return (
     <PageLayout>
       <PageHeader
@@ -105,6 +121,8 @@ export default function ProfileBuildersPage() {
           isLoading={isLoading}
           onDelete={handleDelete}
           isDeleting={deleteMutation.isPending}
+          onDuplicate={handleDuplicate}
+          isDuplicating={duplicateMutation.isPending}
           onOpenCreateDialog={() => setDialogOpen(true)}
         />
       </PageContent>

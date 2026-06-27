@@ -10,6 +10,7 @@ import {
   CalendarIcon,
   LinkIcon,
   Loader2Icon,
+  CopyIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,6 +34,8 @@ interface BuilderListProps {
   isLoading: boolean;
   onDelete: (id: string, name: string) => void;
   isDeleting: boolean;
+  onDuplicate: (id: string) => void;
+  isDuplicating: boolean;
   onOpenCreateDialog: () => void;
 }
 
@@ -41,6 +44,8 @@ export function BuilderList({
   isLoading,
   onDelete,
   isDeleting,
+  onDuplicate,
+  isDuplicating,
   onOpenCreateDialog,
 }: BuilderListProps) {
   const [searchQuery, setSearchQuery] = useState("");
@@ -126,6 +131,17 @@ export function BuilderList({
                       <SettingsIcon className="mr-1.5 size-3.5" />
                       Edit Layout
                     </Link>
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="text-muted-foreground hover:bg-muted"
+                    onClick={() => onDuplicate(builder.id)}
+                    disabled={isDuplicating || isDeleting}
+                    title="Duplikasi Profile"
+                    id={`duplicate-builder-${builder.id}`}
+                  >
+                    <CopyIcon className="size-3.5" />
                   </Button>
                   <AlertDialog>
                     <AlertDialogTrigger asChild>

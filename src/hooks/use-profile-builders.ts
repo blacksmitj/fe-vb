@@ -97,3 +97,23 @@ export function useDeleteProfileBuilder() {
     },
   });
 }
+
+export function useDuplicateProfileBuilder() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`${API_URL}/${id}/duplicate`, {
+        method: "POST",
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || "Failed to duplicate profile builder");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["profile-builders"] });
+    },
+  });
+}
+
