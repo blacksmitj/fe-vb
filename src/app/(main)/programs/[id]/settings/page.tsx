@@ -769,6 +769,53 @@ export default function ProgramSettingsPage({ params }: { params: Promise<{ id: 
               <TabsContent value="general" className="space-y-6 outline-none mt-0">
                 <div className="grid gap-6 md:grid-cols-3">
                   <div className="md:col-span-2 space-y-6">
+                    {/* Card 0: Program Information */}
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                          <SettingsIcon className="h-5 w-5 text-primary" />
+                          Informasi Program
+                        </CardTitle>
+                        <CardDescription>
+                          Ubah judul dan deskripsi singkat mengenai program verifikasi ini.
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <form onSubmit={handleUpdateProgramInfo} className="space-y-4">
+                          <Field>
+                            <FieldLabel htmlFor="program-name">Nama Program</FieldLabel>
+                            <Input
+                              id="program-name"
+                              value={editName}
+                              onChange={(e) => setEditName(e.target.value)}
+                              placeholder="Contoh: Verifikasi Bidikmisi 2026"
+                              required
+                            />
+                          </Field>
+                          <Field>
+                            <FieldLabel htmlFor="program-description">Deskripsi Program</FieldLabel>
+                            <Textarea
+                              id="program-description"
+                              value={editDescription}
+                              onChange={(e) => setEditDescription(e.target.value)}
+                              placeholder="Deskripsi singkat mengenai program..."
+                              rows={3}
+                            />
+                          </Field>
+                          <div className="flex justify-end">
+                            <Button type="submit" disabled={isUpdatingInfo} className="gap-2">
+                              {isUpdatingInfo ? (
+                                <Loader2Icon className="size-4 animate-spin" />
+                              ) : (
+                                <SaveIcon className="size-4" />
+                              )}
+                              Simpan Perubahan
+                            </Button>
+                          </div>
+                        </form>
+                      </CardContent>
+                    </Card>
+
                     {/* Card 1: Profile Builder */}
                     <Card>
                       <CardHeader>
