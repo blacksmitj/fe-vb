@@ -123,6 +123,7 @@ function BuilderPageContent() {
           onMoveField={handleMoveField}
           onMoveFieldColumn={handleMoveFieldColumn}
           sampleRow={sampleRow}
+          programHeaders={previewProgram?.headers}
         />
       </PageContent>
 

@@ -98,7 +98,7 @@ function parseCSV(text: string): string[][] {
   return result;
 }
 
-function parseWorksheet(worksheet: any): { headers: string[]; rows: Record<string, any>[] } {
+function parseWorksheet(worksheet: any): { headers: string[]; rawHeaders: string[]; rows: Record<string, any>[] } {
   const headers: string[] = [];
   let headerRow = worksheet.getRow(1);
   let headerRowNumber = 1;
@@ -124,38 +124,41 @@ function parseWorksheet(worksheet: any): { headers: string[]; rows: Record<strin
     }
   });
 
-  const cleanHeaders = Array.from(new Set(headers.filter(h => h.length > 0)));
+  const rawHeaders = headers.filter(h => h.length > 0);
+  const cleanHeaders = Array.from(new Set(rawHeaders));
 
   const rows: Record<string, any>[] = [];
   worksheet.eachRow({ includeEmpty: false }, (row: any, rowNumber: number) => {
     if (rowNumber <= (headerRowNumber || 1)) return;
 
     const rowData: Record<string, any> = {};
-    cleanHeaders.forEach((header, idx) => {
+    rawHeaders.forEach((header, idx) => {
       const cell = row.getCell(idx + 1);
-      let val = cell.value;
-      if (val !== null && val !== undefined) {
-        if (typeof val === "object") {
-          if ("text" in val) {
-            val = val.text;
-          } else if ("result" in val) {
-            val = val.result;
-          } else if (val instanceof Date) {
-            // Keep date
-          } else {
-            val = JSON.stringify(val);
+      if (rowData[header] === undefined) {
+        let val = cell.value;
+        if (val !== null && val !== undefined) {
+          if (typeof val === "object") {
+            if ("text" in val) {
+              val = val.text;
+            } else if ("result" in val) {
+              val = val.result;
+            } else if (val instanceof Date) {
+              // Keep date
+            } else {
+              val = JSON.stringify(val);
+            }
           }
+          rowData[header] = typeof val === "string" ? val.trim() : val;
+        } else {
+          rowData[header] = "";
         }
-        rowData[header] = typeof val === "string" ? val.trim() : val;
-      } else {
-        rowData[header] = "";
       }
     });
     rowData["__sheetRowIndex"] = rowNumber;
     rows.push(rowData);
   });
 
-  return { headers: cleanHeaders, rows };
+  return { headers: cleanHeaders, rawHeaders, rows };
 }
 
 export default function ImportProgramPage() {
@@ -170,6 +173,7 @@ export default function ImportProgramPage() {
   const [file, setFile] = React.useState<File | null>(null);
   const [sheets, setSheets] = React.useState<string[]>([]);
   const [headersList, setHeadersList] = React.useState<string[]>([]);
+  const [rawHeaders, setRawHeaders] = React.useState<string[]>([]);
   const [sheetName, setSheetName] = React.useState("");
   const [sheetUniqueKey, setSheetUniqueKey] = React.useState("");
   
@@ -185,7 +189,24 @@ export default function ImportProgramPage() {
   const [isImporting, setIsImporting] = React.useState(false);
   
   const workbookRef = React.useRef<any>(null);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
+
+  const handleResetFile = () => {
+    setFile(null);
+    setSheets([]);
+    setHeadersList([]);
+    setRawHeaders([]);
+    setSheetName("");
+    setSheetUniqueKey("");
+    setDryRunResult(null);
+    setCurrentSheetRows([]);
+    workbookRef.current = null;
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+    toast.success("Berkas dan hasil pengujian berhasil direset.");
+  };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -195,6 +216,7 @@ export default function ImportProgramPage() {
     setIsPreviewLoading(true);
     setSheets([]);
     setHeadersList([]);
+    setRawHeaders([]);
     setSheetName("");
     setSheetUniqueKey("");
     setDryRunResult(null);
@@ -205,6 +227,7 @@ export default function ImportProgramPage() {
       const nameLower = selectedFile.name.toLowerCase();
       let sheetNamesList: string[] = [];
       let initialHeaders: string[] = [];
+      let initialRawHeaders: string[] = [];
       let parsedRows: Record<string, any>[] = [];
 
       if (nameLower.endsWith(".csv")) {
@@ -214,11 +237,14 @@ export default function ImportProgramPage() {
           throw new Error("File CSV kosong.");
         }
         sheetNamesList = ["CSV Data"];
-        initialHeaders = csvData[0].map(h => h.trim()).filter(h => h.length > 0);
+        initialRawHeaders = csvData[0].map(h => h.trim()).filter(h => h.length > 0);
+        initialHeaders = Array.from(new Set(initialRawHeaders));
         parsedRows = csvData.slice(1).map((row, idx) => {
           const rowData: Record<string, any> = {};
-          initialHeaders.forEach((header, colIdx) => {
-            rowData[header] = (row[colIdx] || "").trim();
+          initialRawHeaders.forEach((header, colIdx) => {
+            if (rowData[header] === undefined) {
+              rowData[header] = (row[colIdx] || "").trim();
+            }
           });
           rowData["__sheetRowIndex"] = idx + 2;
           return rowData;
@@ -238,6 +264,7 @@ export default function ImportProgramPage() {
         const worksheet = workbook.worksheets[0];
         const parsed = parseWorksheet(worksheet);
         initialHeaders = parsed.headers;
+        initialRawHeaders = parsed.rawHeaders;
         parsedRows = parsed.rows;
       }
 
@@ -246,6 +273,7 @@ export default function ImportProgramPage() {
         setSheetName(sheetNamesList[0]);
       }
       setHeadersList(initialHeaders);
+      setRawHeaders(initialRawHeaders);
       if (initialHeaders.length > 0) {
         setSheetUniqueKey(initialHeaders[0]);
       }
@@ -266,22 +294,27 @@ export default function ImportProgramPage() {
 
     setIsPreviewLoading(true);
     setHeadersList([]);
+    setRawHeaders([]);
     setSheetUniqueKey("");
     setDryRunResult(null);
     setCurrentSheetRows([]);
 
     try {
       let initialHeaders: string[] = [];
+      let initialRawHeaders: string[] = [];
       let parsedRows: Record<string, any>[] = [];
 
       if (file.name.toLowerCase().endsWith(".csv")) {
         const text = await file.text();
         const csvData = parseCSV(text);
-        initialHeaders = csvData[0].map(h => h.trim()).filter(h => h.length > 0);
+        initialRawHeaders = csvData[0].map(h => h.trim()).filter(h => h.length > 0);
+        initialHeaders = Array.from(new Set(initialRawHeaders));
         parsedRows = csvData.slice(1).map((row, idx) => {
           const rowData: Record<string, any> = {};
-          initialHeaders.forEach((header, colIdx) => {
-            rowData[header] = (row[colIdx] || "").trim();
+          initialRawHeaders.forEach((header, colIdx) => {
+            if (rowData[header] === undefined) {
+              rowData[header] = (row[colIdx] || "").trim();
+            }
           });
           rowData["__sheetRowIndex"] = idx + 2;
           return rowData;
@@ -295,10 +328,12 @@ export default function ImportProgramPage() {
 
         const parsed = parseWorksheet(worksheet);
         initialHeaders = parsed.headers;
+        initialRawHeaders = parsed.rawHeaders;
         parsedRows = parsed.rows;
       }
 
       setHeadersList(initialHeaders);
+      setRawHeaders(initialRawHeaders);
       if (initialHeaders.length > 0) {
         setSheetUniqueKey(initialHeaders[0]);
       }
@@ -323,6 +358,29 @@ export default function ImportProgramPage() {
     setTimeout(() => {
       try {
         const errors: any[] = [];
+
+        // Detect duplicate headers
+        const seen = new Set<string>();
+        const duplicateHeaders: string[] = [];
+        rawHeaders.forEach((header) => {
+          const lowerHeader = header.toLowerCase();
+          if (seen.has(lowerHeader)) {
+            if (!duplicateHeaders.includes(header)) {
+              duplicateHeaders.push(header);
+            }
+          } else {
+            seen.add(lowerHeader);
+          }
+        });
+
+        duplicateHeaders.forEach((header) => {
+          errors.push({
+            row: 0,
+            column: header,
+            message: `Header duplikat: Kolom "${header}" muncul lebih dari satu kali.`
+          });
+        });
+
         const keyMap = new Map<string, number>();
 
         currentSheetRows.forEach((row) => {
@@ -537,6 +595,7 @@ export default function ImportProgramPage() {
                   <div className="relative">
                     <Input
                       id="upload-file"
+                      ref={fileInputRef}
                       type="file"
                       accept=".xlsx,.xls,.csv"
                       onChange={handleFileChange}
@@ -609,10 +668,19 @@ export default function ImportProgramPage() {
                       </FieldDescription>
                     </Field>
 
-                    <div className="pt-2">
+                    <div className="pt-2 flex gap-2">
                       <Button
                         type="button"
-                        className="w-full flex items-center justify-center gap-2"
+                        variant="outline"
+                        className="flex-1 text-destructive hover:bg-destructive/10 hover:text-destructive gap-1.5"
+                        onClick={handleResetFile}
+                        disabled={isPreviewLoading || isSubmitting || isDryRunning}
+                      >
+                        Reset File
+                      </Button>
+                      <Button
+                        type="button"
+                        className="flex-2 flex items-center justify-center gap-2"
                         variant="secondary"
                         onClick={handleDryRun}
                         disabled={!file || !sheetUniqueKey || isPreviewLoading || isSubmitting || isDryRunning}
@@ -637,11 +705,19 @@ export default function ImportProgramPage() {
                 {dryRunResult && (
                   <div className="mt-4 border-t pt-4 space-y-4">
                     <div className="flex items-start gap-3">
-                      <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0 mt-0.5" />
+                      {dryRunResult.stats.errorCount > 0 ? (
+                        <AlertTriangle className="h-5 w-5 text-rose-500 shrink-0 mt-0.5" />
+                      ) : (
+                        <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0 mt-0.5" />
+                      )}
                       <div>
-                        <h4 className="font-semibold text-emerald-950 text-sm">Uji Coba Dry Run Selesai</h4>
-                        <p className="text-xs text-emerald-700 mt-0.5">
-                          Silakan tinjau rangkuman data di bawah ini sebelum membuat program.
+                        <h4 className="font-semibold text-foreground text-sm">
+                          {dryRunResult.stats.errorCount > 0 ? "Uji Coba Dry Run Gagal" : "Uji Coba Dry Run Selesai"}
+                        </h4>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {dryRunResult.stats.errorCount > 0
+                            ? "Harap perbaiki error di bawah ini pada file Excel Anda."
+                            : "Silakan tinjau rangkuman data di bawah ini sebelum membuat program."}
                         </p>
                       </div>
                     </div>
@@ -663,13 +739,37 @@ export default function ImportProgramPage() {
                       </div>
                     </div>
 
-                    {dryRunResult.stats.errorCount > 0 && (
-                      <Alert variant="destructive" className="bg-destructive/5 py-2 border-destructive/20 text-destructive-foreground text-[11px]">
-                        <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-                        <AlertDescription>
-                          Terdapat {dryRunResult.stats.errorCount} duplikasi atau kolom unik kosong. Program tetap dapat dibuat, namun baris bermasalah akan diberi label error.
-                        </AlertDescription>
-                      </Alert>
+                    {dryRunResult.errors.length > 0 && (
+                      <div className="border border-destructive/20 rounded-lg overflow-hidden">
+                        <div className="bg-destructive/5 px-3 py-2 flex items-center gap-2 border-b border-destructive/15">
+                          <AlertTriangle className="h-3.5 w-3.5 text-destructive" />
+                          <span className="text-[11px] font-semibold text-destructive">
+                            Daftar {dryRunResult.errors.length} Error yang Harus Diperbaiki
+                          </span>
+                        </div>
+                        <div className="max-h-48 overflow-y-auto">
+                          <table className="w-full text-[11px] border-collapse">
+                            <thead className="bg-muted/50 sticky top-0 border-b border-border">
+                              <tr>
+                                <th className="text-left px-3 py-1.5 font-semibold text-muted-foreground w-20">Baris</th>
+                                <th className="text-left px-3 py-1.5 font-semibold text-muted-foreground w-24">Kolom</th>
+                                <th className="text-left px-3 py-1.5 font-semibold text-muted-foreground">Keterangan Error</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {dryRunResult.errors.map((err, i) => (
+                                <tr key={i} className="border-t border-border/40 hover:bg-muted/30">
+                                  <td className="px-3 py-1.5 text-muted-foreground">
+                                    {err.row === 0 ? "Header" : `Baris ${err.row}`}
+                                  </td>
+                                  <td className="px-3 py-1.5 font-medium text-foreground">{err.column}</td>
+                                  <td className="px-3 py-1.5 text-destructive">{err.message}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
                     )}
                   </div>
                 )}
@@ -718,23 +818,37 @@ export default function ImportProgramPage() {
                 )}
 
                 {dryRunResult && !isImporting && (
-                  <Button
-                    type="submit"
-                    className="w-full gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
-                    disabled={!name || !file || !sheetUniqueKey || isSubmitting || isPreviewLoading}
-                  >
-                    {isSubmitting ? (
-                      <>
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        Membuat...
-                      </>
-                    ) : (
-                      <>
-                        <Plus className="h-4 w-4" />
-                        Simpan & Buat Program
-                      </>
+                  <div className="space-y-2">
+                    <Button
+                      type="submit"
+                      className="w-full gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
+                      disabled={
+                        !name || 
+                        !file || 
+                        !sheetUniqueKey || 
+                        isSubmitting || 
+                        isPreviewLoading || 
+                        dryRunResult.stats.errorCount > 0
+                      }
+                    >
+                      {isSubmitting ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Membuat...
+                        </>
+                      ) : (
+                        <>
+                          <Plus className="h-4 w-4" />
+                          Simpan & Buat Program
+                        </>
+                      )}
+                    </Button>
+                    {dryRunResult.stats.errorCount > 0 && (
+                      <p className="text-[10px] text-destructive text-center leading-normal">
+                        Tombol dinonaktifkan. Silakan perbaiki semua error yang ditemukan saat Dry Run untuk melanjutkan.
+                      </p>
                     )}
-                  </Button>
+                  </div>
                 )}
               </CardContent>
             </Card>

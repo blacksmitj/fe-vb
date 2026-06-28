@@ -33,6 +33,7 @@ export interface FieldRendererProps {
   showColumnMove?: boolean;
   sampleRow?: Record<string, any>;
   isOverlay?: boolean;
+  programHeaders?: string[];
 }
 
 // ── Helper: get display icon per field type (string key, resolved in renderer)

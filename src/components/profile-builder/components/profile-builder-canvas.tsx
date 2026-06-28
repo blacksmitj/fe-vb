@@ -18,6 +18,7 @@ interface ProfileBuilderCanvasProps {
   onMoveField: (sectionId: string, fieldId: string, direction: "up" | "down") => void;
   onMoveFieldColumn: (sectionId: string, fieldId: string, column: "left" | "right") => void;
   sampleRow?: Record<string, any>;
+  programHeaders?: string[];
 }
 
 export default function ProfileBuilderCanvas({
@@ -31,6 +32,7 @@ export default function ProfileBuilderCanvas({
   onMoveField,
   onMoveFieldColumn,
   sampleRow,
+  programHeaders,
 }: ProfileBuilderCanvasProps) {
   const [parentRef] = useAutoAnimate();
 
@@ -54,6 +56,7 @@ export default function ProfileBuilderCanvas({
             isFirst={index === 0}
             isLast={index === sections.length - 1}
             sampleRow={sampleRow}
+            programHeaders={programHeaders}
           />
         ))}
 

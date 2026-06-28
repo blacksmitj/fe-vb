@@ -89,7 +89,7 @@ export default function ProfileBuilderSidebar({
 
   const usedLabels = new Set(
     sections.flatMap((section) =>
-      section.fields.map((field) => field.label.toLowerCase()),
+      section.fields.map((field) => field.label),
     ),
   );
 
@@ -100,7 +100,7 @@ export default function ProfileBuilderSidebar({
   const filteredHeaders = sourceHeaders.filter(
     (header) =>
       header.toLowerCase().includes(searchQuery.toLowerCase()) &&
-      !usedLabels.has(header.toLowerCase()),
+      !usedLabels.has(header),
   );
 
   return (

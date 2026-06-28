@@ -34,6 +34,7 @@ interface ProfileBuilderSectionProps {
   isFirst: boolean;
   isLast: boolean;
   sampleRow?: Record<string, any>;
+  programHeaders?: string[];
 }
 
 export default function ProfileBuilderSection({
@@ -50,6 +51,7 @@ export default function ProfileBuilderSection({
   isFirst,
   isLast,
   sampleRow,
+  programHeaders,
 }: ProfileBuilderSectionProps) {
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [titleValue, setTitleValue] = useState(section.title);
@@ -248,10 +250,11 @@ export default function ProfileBuilderSection({
                   isLast={fieldIndex === leftFields.length - 1}
                   showColumnMove={section.layout === "2-col"}
                   sampleRow={sampleRow}
+                  programHeaders={programHeaders}
                 />
               ))}
             </div>
-
+ 
             {/* Right panel (if 2-col, render second field column or empty zone) */}
             {section.layout === "2-col" && (
               <div className="h-full min-h-[60px]">
@@ -286,6 +289,7 @@ export default function ProfileBuilderSection({
                       isLast={fieldIndex === rightFields.length - 1}
                       showColumnMove={section.layout === "2-col"}
                       sampleRow={sampleRow}
+                      programHeaders={programHeaders}
                     />
                   ))}
                 </div>

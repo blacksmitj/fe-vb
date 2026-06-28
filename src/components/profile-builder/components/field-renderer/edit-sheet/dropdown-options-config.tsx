@@ -54,10 +54,11 @@ export function DropdownOptionsConfig({
         <Textarea
           id="editBulkOptions"
           rows={4}
+          wrap="off"
           value={optionsBulkText}
           onChange={(e) => onBulkChange(e.target.value)}
           placeholder={"Option 1\nOption 2\nOption 3"}
-          className="text-xs font-mono font-medium resize-y"
+          className="text-xs font-mono font-medium resize-y w-full max-w-full overflow-x-auto"
         />
       </div>
 

@@ -63,8 +63,15 @@ export default function ProfileBuilderFieldRenderer({
   showColumnMove = false,
   sampleRow,
   isOverlay = false,
+  programHeaders,
 }: FieldRendererProps) {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+
+  // Check if header exists in program spreadsheet (case-sensitive)
+  const isHeaderMissing = React.useMemo(() => {
+    if (!programHeaders) return false;
+    return !programHeaders.includes(field.label);
+  }, [programHeaders, field.label]);
 
   return (
     <div className="w-full">
@@ -111,6 +118,11 @@ export default function ProfileBuilderFieldRenderer({
                 {getFieldIcon(field)}
                 <span>{field.type}</span>
               </div>
+              {isHeaderMissing && (
+                <span className="bg-amber-500/10 text-amber-600 dark:text-amber-500 border border-amber-500/20 px-1 rounded text-[8px] font-bold tracking-wide uppercase select-none">
+                  Tidak ada di Header
+                </span>
+              )}
             </div>
 
             {/* Label + lock icon */}
