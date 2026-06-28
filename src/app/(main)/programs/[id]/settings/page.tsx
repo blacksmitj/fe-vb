@@ -29,6 +29,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Field, FieldLabel, FieldDescription } from "@/components/ui/field";
+import { Textarea } from "@/components/ui/textarea";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -204,6 +205,17 @@ export default function ProgramSettingsPage({ params }: { params: Promise<{ id: 
   const { data: program, isLoading: isProgramLoading, refetch: refetchProgram } = useProgram(id);
   const deleteMutation = useDeleteProgram();
 
+  const [editName, setEditName] = React.useState("");
+  const [editDescription, setEditDescription] = React.useState("");
+  const [isUpdatingInfo, setIsUpdatingInfo] = React.useState(false);
+
+  React.useEffect(() => {
+    if (program) {
+      setEditName(program.name || "");
+      setEditDescription(program.description || "");
+    }
+  }, [program]);
+
   const handleDeleteConfirm = React.useCallback(() => {
     deleteMutation.mutate(id, {
       onSuccess: () => {
@@ -218,6 +230,35 @@ export default function ProgramSettingsPage({ params }: { params: Promise<{ id: 
 
   const [isExporting, setIsExporting] = React.useState(false);
   const [isTogglingStatus, setIsTogglingStatus] = React.useState(false);
+
+  const handleUpdateProgramInfo = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editName.trim()) {
+      toast.error("Nama program tidak boleh kosong");
+      return;
+    }
+    setIsUpdatingInfo(true);
+    const toastId = toast.loading("Memperbarui informasi program...");
+    try {
+      const res = await fetch(`/api/programs/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: editName, description: editDescription }),
+      });
+      if (res.ok) {
+        toast.success("Informasi program berhasil diperbarui", { id: toastId });
+        refetchProgram();
+      } else {
+        const data = await res.json().catch(() => ({ error: "Gagal memperbarui informasi program" }));
+        toast.error(data.error || "Gagal memperbarui informasi program", { id: toastId });
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Terjadi kesalahan saat memperbarui informasi program", { id: toastId });
+    } finally {
+      setIsUpdatingInfo(false);
+    }
+  };
 
   const handleToggleStatus = async (nextStatus: "ACTIVE" | "STOPPED") => {
     setIsTogglingStatus(true);
