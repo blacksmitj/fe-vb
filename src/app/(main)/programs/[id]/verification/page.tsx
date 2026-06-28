@@ -41,6 +41,7 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
     resetEvaluation,
     evaluationStatus,
     approvalDescription,
+    closeMediaViewer,
   } = useVerificationStore();
   
   const [participant, setParticipant] = React.useState<Record<string, any> | null>(null);
@@ -71,11 +72,11 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
     loadSchema();
   }, [id]);
 
-  // Fetch Participant Data based on currentRowIndex
   React.useEffect(() => {
     async function loadParticipant() {
       setIsParticipantLoading(true);
       try {
+        closeMediaViewer();
         const res = await fetch(`/api/programs/${id}/participants?page=${currentRowIndex}`);
         if (!res.ok) throw new Error("Failed to load participant");
         const data = await res.json();
@@ -103,7 +104,7 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
       }
     }
     loadParticipant();
-  }, [currentRowIndex, id, setTotalRows, setEvaluationStatus, setApprovalDescription, resetEvaluation, setCurrentParticipantId]);
+  }, [currentRowIndex, id, setTotalRows, setEvaluationStatus, setApprovalDescription, resetEvaluation, setCurrentParticipantId, closeMediaViewer]);
 
   // Callback to update participant row locally after saving evaluation
   const handleParticipantUpdated = (updatedParticipant: Record<string, any>) => {
