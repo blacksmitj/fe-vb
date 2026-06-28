@@ -26,6 +26,7 @@ import { toast } from "sonner";
 import { MembershipGate } from "@/components/programs/membership-gate";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
+import { safeParseDate } from "@/lib/utils";
 
 export default function VerificationPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = React.use(params);
@@ -252,9 +253,10 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
               const evalStatus = participant._evaluationStatus as string | null;
               const verifiedBy = participant._verifiedByName as string | null;
               const evaluatedAt = participant._evaluatedAt as string | null;
+              const dateObj = evaluatedAt ? safeParseDate(evaluatedAt) : null;
 
-              const formattedDate = evaluatedAt
-                ? new Date(evaluatedAt).toLocaleString("id-ID", {
+              const formattedDate = dateObj
+                ? dateObj.toLocaleString("id-ID", {
                     day: "2-digit",
                     month: "short",
                     year: "numeric",

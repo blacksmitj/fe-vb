@@ -5,6 +5,7 @@ import { useVerificationStore } from "@/stores";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle2, AlertCircle, User, Calendar } from "lucide-react";
+import { safeParseDate } from "@/lib/utils/format-date";
 
 interface EvaluationControlsProps {
   programId: string;
@@ -29,7 +30,8 @@ export function EvaluationControls({
 
   const isVerified = evaluationStatus === "VERIFIED" || participant?._evaluationStatus === "VERIFIED";
   const verifiedBy = participant?._verifiedByName || null;
-  const verifiedAt = participant?._evaluatedAt ? new Date(participant._evaluatedAt).toLocaleString("id-ID") : null;
+  const dateObj = participant?._evaluatedAt ? safeParseDate(participant._evaluatedAt) : null;
+  const verifiedAt = dateObj ? dateObj.toLocaleString("id-ID") : null;
 
   return (
     <div className="border rounded-xl p-5 bg-card shadow-xs space-y-4 border-muted/80">

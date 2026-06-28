@@ -10,7 +10,7 @@ import {
 import { cn } from "@/lib/utils";
 import { Calendar } from "@/components/calendar";
 import { CalendarIcon, Clock } from "lucide-react";
-import { formatLocalDate } from "@/lib/utils/format-date";
+import { formatLocalDate, safeParseDate } from "@/lib/utils/format-date";
 
 interface DatePickerProps {
   value: string;
@@ -33,9 +33,7 @@ export default function DatePicker({
 }: DatePickerProps) {
   // Parse string value into Date object
   const dateValue = React.useMemo(() => {
-    if (!value) return undefined;
-    const d = new Date(value);
-    return isNaN(d.getTime()) ? undefined : d;
+    return safeParseDate(value) || undefined;
   }, [value]);
 
   // Extract time string (HH:MM) from value for input

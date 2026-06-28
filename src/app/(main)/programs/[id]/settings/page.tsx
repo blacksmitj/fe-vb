@@ -28,6 +28,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { safeParseDate } from "@/lib/utils";
 import { Field, FieldLabel, FieldDescription } from "@/components/ui/field";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -657,7 +658,9 @@ export default function ProgramSettingsPage({ params }: { params: Promise<{ id: 
   };
 
   const formatTimestamp = (dateString: string) => {
-    return new Date(dateString).toLocaleString("id-ID", {
+    const dateObj = safeParseDate(dateString);
+    if (!dateObj) return dateString;
+    return dateObj.toLocaleString("id-ID", {
       day: "2-digit",
       month: "short",
       year: "numeric",

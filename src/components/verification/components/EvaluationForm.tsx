@@ -11,6 +11,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import DatePicker from "@/components/date-picker";
 import { Field as ShadcnField, FieldLabel, FieldDescription } from "@/components/ui/field";
 import { Calendar, FileText, Image as ImageIcon, Video, Tag, Bookmark, Hash, ArrowUpRight, Eye, Play, Globe, X } from "lucide-react";
+import { safeParseDate } from "@/lib/utils/format-date";
 import {
   Combobox,
   ComboboxInput,
@@ -74,8 +75,8 @@ function formatDateForInput(valueStr: string, isDateTime: boolean = false): stri
   }
 
   // 4. Try JS Date parsing
-  const dateObj = new Date(normalizedStr);
-  if (!isNaN(dateObj.getTime())) {
+  const dateObj = safeParseDate(normalizedStr);
+  if (dateObj) {
     const year = dateObj.getFullYear();
     const month = String(dateObj.getMonth() + 1).padStart(2, '0');
     const day = String(dateObj.getDate()).padStart(2, '0');
@@ -103,8 +104,8 @@ function formatDisplayDate(valueStr: string, isDateTime: boolean = false): strin
   const inputFormatted = formatDateForInput(valueStr, isDateTime);
   if (!inputFormatted) return valueStr;
 
-  const dateObj = new Date(inputFormatted);
-  if (isNaN(dateObj.getTime())) return valueStr;
+  const dateObj = safeParseDate(inputFormatted);
+  if (!dateObj) return valueStr;
 
   const options: Intl.DateTimeFormatOptions = {
     day: "numeric",
