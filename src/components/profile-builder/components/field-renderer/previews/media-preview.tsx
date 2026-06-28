@@ -3,7 +3,7 @@
 import React from "react";
 import { Badge } from "@/components/ui/badge";
 import { Eye, Play, Volume2, Maximize, Contact2, FileText, Globe, Link2 } from "lucide-react";
-import { detectMediaType } from "../../../utils/detect-media-type";
+import { detectMediaType, resolveMediaUrl } from "../../../utils/detect-media-type";
 import { FieldInputProps } from "../shared";
 
 /** Renders a "media" field — image/video/pdf/link preview or empty state */
@@ -41,7 +41,7 @@ export function MediaPreview({ field, sampleRow }: Omit<FieldInputProps, "onUpda
       return (
         <div className="border border-border rounded-lg overflow-hidden bg-muted/20 flex items-center justify-center p-1 min-h-[80px]">
           <img
-            src={mediaUrl}
+            src={resolveMediaUrl(mediaUrl)}
             alt={field.label}
             className="max-h-[90px] max-w-full object-contain rounded-md shadow-sm"
           />

@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useVerificationStore } from "@/stores";
-import { Section, Field, detectMediaType } from "@/components/profile-builder";
+import { Section, Field, detectMediaType, resolveMediaUrl } from "@/components/profile-builder";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -314,19 +314,20 @@ export function EvaluationForm({ sections, participant, onFieldChange }: Evaluat
 
         switch (mediaSub) {
           case "image":
+            const resolvedUrl = resolveMediaUrl(valueStr);
             return (
               <div 
-                onClick={() => openMediaViewer("photo", valueStr)}
+                onClick={() => openMediaViewer("photo", resolvedUrl)}
                 className="group relative cursor-pointer overflow-hidden rounded-xl border border-border/80 bg-muted/40 hover:bg-muted/60 transition-all duration-300 shadow-sm hover:shadow-md hover:border-purple-500/50 dark:hover:border-purple-500/30 w-full max-w-md"
               >
                 <div className="aspect-video w-full relative overflow-hidden bg-slate-950/5 dark:bg-slate-950/40 flex items-center justify-center">
                   <img 
-                    src={valueStr} 
+                    src={resolvedUrl} 
                     alt="Image attachment"
                     className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                     onError={(e) => {
                       (e.target as HTMLElement).style.display = 'none';
-                      const fallback = document.getElementById(`fallback-img-${valueStr}`);
+                      const fallback = document.getElementById(`fallback-img-${resolvedUrl}`);
                       if (fallback) {
                         fallback.classList.remove('hidden');
                         fallback.classList.add('flex');
@@ -334,7 +335,7 @@ export function EvaluationForm({ sections, participant, onFieldChange }: Evaluat
                     }}
                   />
                   <div 
-                    id={`fallback-img-${valueStr}`} 
+                    id={`fallback-img-${resolvedUrl}`} 
                     className="hidden absolute inset-0 flex-col items-center justify-center gap-2 text-muted-foreground p-4 text-center"
                   >
                     <ImageIcon className="h-8 w-8 text-purple-500/70" />

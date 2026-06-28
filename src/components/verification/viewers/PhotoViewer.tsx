@@ -5,17 +5,20 @@ import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 import { Button } from "@/components/ui/button";
 import { ZoomIn, ZoomOut, RotateCcw, RotateCw, RefreshCw } from "lucide-react";
 
+import { resolveMediaUrl } from "@/components/profile-builder";
+
 interface PhotoViewerProps {
   url: string;
 }
 
 export function PhotoViewer({ url }: PhotoViewerProps) {
+  const resolvedUrl = resolveMediaUrl(url);
   const [rotation, setRotation] = React.useState(0);
 
   // Reset rotation when image URL changes
   React.useEffect(() => {
     setRotation(0);
-  }, [url]);
+  }, [resolvedUrl]);
 
   const rotateRight = () => {
     setRotation((prev) => (prev + 90) % 360);
@@ -111,7 +114,7 @@ export function PhotoViewer({ url }: PhotoViewerProps) {
                     style={{ transform: `rotate(${rotation}deg)` }}
                   >
                     <img
-                      src={url}
+                      src={resolvedUrl}
                       alt="Evaluation Attachment"
                       className="max-h-[70vh] max-w-full object-contain select-none pointer-events-none rounded-sm shadow-md"
                     />
