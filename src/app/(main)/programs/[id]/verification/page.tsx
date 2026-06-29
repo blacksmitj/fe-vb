@@ -74,18 +74,33 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
     loadUserMembership();
   }, [id]);
 
-  // Handle ?page= query parameter to jump to a specific row
+  // Synchronize program ID and page query parameter changes synchronously during render to avoid stale fetch cycles
+  const pageParam = searchParams.get("page");
+  // null means no ?page= in URL — user is navigating normally with the store
+  const targetPageIndex = pageParam !== null ? parseInt(pageParam, 10) : null;
+
+  const [prevProgramId, setPrevProgramId] = React.useState<string | null>(null);
+
+  // Synchronize program ID changes and one-shot ?page= jump inside useEffect
   React.useEffect(() => {
-    const pageParam = searchParams.get("page");
-    if (pageParam !== null) {
-      const pageIndex = parseInt(pageParam, 10);
-      if (!isNaN(pageIndex) && pageIndex !== currentRowIndex) {
-        setCurrentRowIndex(pageIndex);
-        // Clear the query parameter after consuming it so it doesn't get stuck
+    if (id !== prevProgramId) {
+      // New program — reset evaluation and jump to the requested page (or 0)
+      resetEvaluation();
+      setPrevProgramId(id);
+      const initialIndex = targetPageIndex !== null && !isNaN(targetPageIndex) ? targetPageIndex : 0;
+      setCurrentRowIndex(initialIndex);
+      // Clear ?page= from URL after consuming it so it doesn't block future navigations
+      if (targetPageIndex !== null) {
         router.replace(pathname, { scroll: false });
       }
+    } else if (targetPageIndex !== null && !isNaN(targetPageIndex) && targetPageIndex !== currentRowIndex) {
+      // Same program, but URL has a specific ?page= that differs from store — apply it
+      setCurrentRowIndex(targetPageIndex);
+      // Clear ?page= from URL after consuming it
+      router.replace(pathname, { scroll: false });
     }
-  }, [searchParams, currentRowIndex, setCurrentRowIndex, router, pathname]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, prevProgramId, targetPageIndex]);
 
   const canUnverify = React.useMemo(() => {
     if (!session || !currentUserMember || !participant) return false;
@@ -140,6 +155,11 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
   }, [id]);
 
   React.useEffect(() => {
+    // Skip fetching until the program ID synchronization has settled
+    if (id !== prevProgramId) return;
+    // If a ?page= URL param is present, wait until currentRowIndex has caught up before fetching
+    if (targetPageIndex !== null && !isNaN(targetPageIndex) && currentRowIndex !== targetPageIndex) return;
+
     async function loadParticipant() {
       setIsParticipantLoading(true);
       setValidationErrors({});
@@ -200,7 +220,7 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
       }
     }
     loadParticipant();
-  }, [currentRowIndex, id, setTotalRows, setEvaluationStatus, setApprovalDescription, resetEvaluation, setCurrentParticipantId, closeMediaViewer]);
+  }, [currentRowIndex, id, prevProgramId, targetPageIndex, setTotalRows, setEvaluationStatus, setApprovalDescription, resetEvaluation, setCurrentParticipantId, closeMediaViewer]);
 
   // Callback to update participant row locally after saving evaluation
   const handleParticipantUpdated = (updatedParticipant: Record<string, any>) => {
@@ -250,10 +270,10 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
     }
   }, [originalParticipant, setEvaluationStatus, setApprovalDescription, clearDraftFromLocalStorage]);
 
-  const handleSave = async (status: "VERIFIED" | "REJECTED") => {
+  const handleSave = async (status: "VERIFIED" | "REJECTED"): Promise<boolean> => {
     if (program?.status === "STOPPED") {
       toast.error("Tidak dapat menyimpan perubahan karena verifikasi program ini ditangguhkan.");
-      return;
+      return false;
     }
 
     // Validate required fields only if status is VERIFIED
@@ -263,7 +283,28 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
         for (const field of section.fields) {
           if (field.isRequired) {
             const val = participant?.[field.label];
-            const isEmpty = val === undefined || val === null || (typeof val === "string" && val.trim() === "");
+            let isEmpty = val === undefined || val === null || (typeof val === "string" && val.trim() === "");
+            
+            // Required checkbox must be checked ("true")
+            if (field.type === "checkbox" && val !== "true" && val !== true) {
+              isEmpty = true;
+            }
+
+            // Required array-pills must not be empty or "[]"
+            if (field.type === "array-pills") {
+              const strVal = val !== undefined && val !== null ? String(val).trim() : "";
+              if (strVal === "" || strVal === "[]") {
+                isEmpty = true;
+              } else if (strVal.startsWith("[") && strVal.endsWith("]")) {
+                try {
+                  const parsed = JSON.parse(strVal);
+                  if (Array.isArray(parsed) && parsed.length === 0) {
+                    isEmpty = true;
+                  }
+                } catch (e) {}
+              }
+            }
+
             if (isEmpty) {
               errors[field.label] = "harus diisi";
             }
@@ -283,7 +324,7 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
           firstErrorEl.scrollIntoView({ behavior: "smooth", block: "center" });
         }
       }, 100);
-      return;
+      return false;
     }
 
     setValidationErrors({});
@@ -315,12 +356,15 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
         clearDraftFromLocalStorage(data.participant.id);
         setIsUsingLocalDraft(false);
         refetchProgram();
+        return true;
       } else {
         toast.error(data.error || "Failed to save data");
+        return false;
       }
     } catch (err) {
       console.error(err);
       toast.error("An error occurred while saving the data");
+      return false;
     } finally {
       setIsSaving(false);
     }

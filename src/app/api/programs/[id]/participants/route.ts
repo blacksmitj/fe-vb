@@ -162,7 +162,15 @@ export async function PATCH(
     const [program, member] = await Promise.all([
       db.program.findUnique({
         where: { id: programId },
-        select: { status: true },
+        select: { 
+          status: true,
+          profileTemplate: {
+            select: { sections: true }
+          },
+          profileSchema: {
+            select: { sections: true }
+          }
+        },
       }),
       db.programMember.findUnique({
         where: {
@@ -246,6 +254,61 @@ export async function PATCH(
       ...(targetParticipant.data as Record<string, any>),
       ...cleanFields,
     };
+
+    // Server-side required field validation
+    if (status === "VERIFIED") {
+      let sections: any[] = [];
+      if (program.profileTemplate && program.profileTemplate.sections) {
+        sections = program.profileTemplate.sections as any[];
+      } else if (program.profileSchema && program.profileSchema.sections) {
+        sections = program.profileSchema.sections as any[];
+      }
+
+      if (sections && sections.length > 0) {
+        const requiredFields: { label: string; type: string }[] = [];
+        sections.forEach((section: any) => {
+          if (section.fields && Array.isArray(section.fields)) {
+            section.fields.forEach((field: any) => {
+              if (field.isRequired && field.label) {
+                requiredFields.push({ label: field.label, type: field.type });
+              }
+            });
+          }
+        });
+
+        for (const reqField of requiredFields) {
+          const val = mergedData[reqField.label];
+          let isEmpty = val === undefined || val === null || (typeof val === "string" && val.trim() === "");
+          
+          // Required checkbox must be checked ("true")
+          if (reqField.type === "checkbox" && val !== "true" && val !== true) {
+            isEmpty = true;
+          }
+
+          // Required array-pills must not be empty or "[]"
+          if (reqField.type === "array-pills") {
+            const strVal = val !== undefined && val !== null ? String(val).trim() : "";
+            if (strVal === "" || strVal === "[]") {
+              isEmpty = true;
+            } else if (strVal.startsWith("[") && strVal.endsWith("]")) {
+              try {
+                const parsed = JSON.parse(strVal);
+                if (Array.isArray(parsed) && parsed.length === 0) {
+                  isEmpty = true;
+                }
+              } catch (e) {}
+            }
+          }
+
+          if (isEmpty) {
+            return NextResponse.json(
+              { error: `Kolom wajib '${reqField.label}' tidak boleh kosong.` },
+              { status: 400 }
+            );
+          }
+        }
+      }
+    }
 
     // Save back to db in-place
     const updated = await db.participant.update({

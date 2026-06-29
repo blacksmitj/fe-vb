@@ -21,7 +21,7 @@ import {
 
 interface ParticipantNavigatorProps {
   programId: string;
-  onSave?: (status: "VERIFIED" | "REJECTED") => Promise<void> | void;
+  onSave?: (status: "VERIFIED" | "REJECTED") => Promise<boolean | void> | boolean | void;
   onUnverify?: () => Promise<void> | void;
   onSaveDraft?: () => void;
   onReset?: () => void;
@@ -444,16 +444,22 @@ export function ParticipantNavigator({
               onClick={async () => {
                 setIsNavSaving(true);
                 try {
+                  let success = true;
                   if (onSave) {
-                    await onSave("VERIFIED");
+                    const res = await onSave("VERIFIED");
+                    if (res === false) {
+                      success = false;
+                    }
                   }
-                  const target = pendingIndex;
-                  setPendingIndex(null);
-                  if (target !== null) {
-                    setCurrentRowIndex(target);
-                    setSearchVal("");
-                    setResults([]);
-                    setShowDropdown(false);
+                  if (success) {
+                    const target = pendingIndex;
+                    setPendingIndex(null);
+                    if (target !== null) {
+                      setCurrentRowIndex(target);
+                      setSearchVal("");
+                      setResults([]);
+                      setShowDropdown(false);
+                    }
                   }
                 } catch (err) {
                   console.error(err);
