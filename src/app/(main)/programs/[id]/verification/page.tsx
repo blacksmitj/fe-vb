@@ -350,7 +350,7 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
         data = { error: "An error occurred while saving the data" };
       }
       if (res.ok && data.success) {
-        toast.success(`Data saved successfully`);
+        toast.success(status === "VERIFIED" ? "Data berhasil diverifikasi" : "Data berhasil ditolak");
         setParticipant(data.participant);
         setOriginalParticipant(data.participant);
         clearDraftFromLocalStorage(data.participant.id);
@@ -358,12 +358,12 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
         refetchProgram();
         return true;
       } else {
-        toast.error(data.error || "Failed to save data");
+        toast.error(data.error || "Gagal menyimpan data");
         return false;
       }
     } catch (err) {
       console.error(err);
-      toast.error("An error occurred while saving the data");
+      toast.error("Terjadi kesalahan saat menyimpan data");
       return false;
     } finally {
       setIsSaving(false);
@@ -400,7 +400,7 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
       }
 
       if (res.ok && data.success) {
-        toast.success("Verifikasi berhasil dibatalkan");
+        toast.success("Status verifikasi berhasil di-reset");
         setParticipant(data.participant);
         setOriginalParticipant(data.participant);
         setEvaluationStatus(null);
