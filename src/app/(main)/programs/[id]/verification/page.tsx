@@ -28,13 +28,18 @@ import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { safeParseDate } from "@/lib/utils";
 import { useSession } from "@/lib/auth/auth-client";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
 
 export default function VerificationPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = React.use(params);
   const { data: program, refetch: refetchProgram } = useProgram(id);
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
   
   const {
     currentRowIndex,
+    setCurrentRowIndex,
     setCurrentParticipantId,
     currentParticipantId,
     setTotalRows,
@@ -68,6 +73,19 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
     }
     loadUserMembership();
   }, [id]);
+
+  // Handle ?page= query parameter to jump to a specific row
+  React.useEffect(() => {
+    const pageParam = searchParams.get("page");
+    if (pageParam !== null) {
+      const pageIndex = parseInt(pageParam, 10);
+      if (!isNaN(pageIndex) && pageIndex !== currentRowIndex) {
+        setCurrentRowIndex(pageIndex);
+        // Clear the query parameter after consuming it so it doesn't get stuck
+        router.replace(pathname, { scroll: false });
+      }
+    }
+  }, [searchParams, currentRowIndex, setCurrentRowIndex, router, pathname]);
 
   const canUnverify = React.useMemo(() => {
     if (!session || !currentUserMember || !participant) return false;

@@ -7,7 +7,11 @@ import {
   LayoutDashboardIcon,
   LayoutTemplateIcon,
   ClipboardListIcon,
+  WrenchIcon,
 } from "lucide-react";
+
+import { useFixDataCount } from "@/hooks/use-fix-data";
+import { Badge } from "@/components/ui/badge";
 
 import {
   Collapsible,
@@ -23,6 +27,7 @@ import {
   SidebarMenuSub,
   SidebarMenuSubButton,
   SidebarMenuSubItem,
+  useSidebar,
 } from "@/components/ui/sidebar";
 
 interface NavItem {
@@ -30,6 +35,7 @@ interface NavItem {
   url: string;
   icon: React.ComponentType;
   items: { title: string; url: string }[];
+  isFixData?: boolean;
 }
 
 const navItems: NavItem[] = [
@@ -51,10 +57,20 @@ const navItems: NavItem[] = [
     icon: LayoutTemplateIcon,
     items: [],
   },
+  {
+    title: "Perbaikan Data",
+    url: "/fix-data",
+    icon: WrenchIcon,
+    items: [],
+    isFixData: true,
+  },
 ];
 
 export function NavMain() {
   const pathname = usePathname();
+  const { data: fixDataCount } = useFixDataCount();
+  const { state } = useSidebar();
+  const isCollapsed = state === "collapsed";
 
   return (
     <SidebarGroup>
@@ -72,12 +88,25 @@ export function NavMain() {
 
           // Simple items (no sub-items)
           if (item.items.length === 0) {
+            const hasNotification = item.isFixData && fixDataCount !== undefined && fixDataCount > 0;
             return (
               <SidebarMenuItem key={item.title}>
                 <SidebarMenuButton asChild isActive={isActive} tooltip={item.title}>
-                  <Link href={item.url}>
-                    <item.icon />
-                    <span>{item.title}</span>
+                  <Link href={item.url} className="flex justify-between items-center w-full">
+                    <div className="flex items-center gap-2">
+                      <div className="relative flex items-center justify-center">
+                        <item.icon />
+                        {isCollapsed && hasNotification && (
+                          <span className="absolute -top-1 -right-1 flex h-2 w-2 rounded-full bg-destructive ring-2 ring-sidebar" />
+                        )}
+                      </div>
+                      <span>{item.title}</span>
+                    </div>
+                    {!isCollapsed && hasNotification && (
+                      <Badge variant="destructive" className="ml-auto flex h-5 w-5 shrink-0 items-center justify-center rounded-full p-0 text-[10px]">
+                        {fixDataCount}
+                      </Badge>
+                    )}
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
