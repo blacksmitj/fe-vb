@@ -97,13 +97,13 @@ export function NavMain() {
                       <div className="relative flex items-center justify-center">
                         <item.icon />
                         {isCollapsed && hasNotification && (
-                          <span className="absolute -top-1 -right-1 flex h-2 w-2 rounded-full bg-destructive ring-2 ring-sidebar" />
+                          <span className="absolute -top-1 -right-1 flex h-2 w-2 rounded-full bg-destructive ring-2 ring-sidebar animate-gentle-glow animate-gentle-bounce" />
                         )}
                       </div>
                       <span>{item.title}</span>
                     </div>
                     {!isCollapsed && hasNotification && (
-                      <Badge variant="destructive" className="ml-auto flex h-5 w-5 shrink-0 items-center justify-center rounded-full p-0 text-[10px]">
+                      <Badge className="ml-auto flex h-5 w-5 shrink-0 items-center justify-center rounded-full p-0 text-[10px] font-bold bg-destructive text-destructive-foreground animate-gentle-bounce shadow-[0_0_6px_rgba(239,68,68,0.5)]">
                         {fixDataCount}
                       </Badge>
                     )}

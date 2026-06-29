@@ -72,12 +72,14 @@ export async function GET(req: Request) {
 
       if (requiredFields.length === 0) continue;
 
-      // Find participants verified by this user
+      const isAdmin = member.role === "ADMIN";
+
+      // Find participants: if Admin, fetch all verified. If Verifier, fetch only verified by self.
       const participants = await db.participant.findMany({
         where: {
           programId: program.id,
-          evalByUserId: userId,
           evalStatus: "VERIFIED",
+          ...(isAdmin ? {} : { evalByUserId: userId }),
         },
       });
 
@@ -102,6 +104,7 @@ export async function GET(req: Request) {
               uniqueKey: participant.uniqueKey,
               rowIndex: participant.rowIndex,
               missingFields,
+              verifiedBy: participant.evalByUserName || "Sistem",
             });
           }
         }

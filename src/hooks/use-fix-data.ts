@@ -7,6 +7,7 @@ export interface FixDataEntry {
   uniqueKey: string;
   rowIndex: number;
   missingFields: string[];
+  verifiedBy?: string;
 }
 
 export function useFixDataCount() {
