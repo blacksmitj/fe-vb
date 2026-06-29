@@ -42,6 +42,7 @@ export async function POST(
       errorCount,
       fileName,
       headers,
+      filterMode = "ALL", // "ALL" | "UNVERIFIED" | "VERIFIED" | "REJECTED"
     } = await req.json();
 
     if (!uniqueKeyColumn) {
@@ -52,24 +53,63 @@ export async function POST(
     }
 
     const result = await db.$transaction(async (tx) => {
-      // Delete all existing participants
-      await tx.participant.deleteMany({
-        where: { programId: id },
+      let allowedUniqueKeys: string[] = [];
+      let existingHeaders: string[] = [];
+
+      // Ambil data program yang ada saat ini
+      const existingProgram = await tx.program.findUnique({
+        where: { id },
+        select: { headers: true, uniqueKeyColumn: true },
       });
 
-      // Update program metadata
-      const prog = await tx.program.update({
-        where: { id },
-        data: {
-          totalRows: totalRows || 0,
-          fieldCount: fieldCount || 0,
-          errorCount: errorCount || 0,
-          uniqueKeyColumn,
-          headers,
-        },
-      });
+      if (!existingProgram) {
+        throw new Error("Program tidak ditemukan.");
+      }
+
+      existingHeaders = existingProgram.headers;
+
+      if (filterMode === "ALL") {
+        // Hapus semua peserta lama jika mode ALL
+        await tx.participant.deleteMany({
+          where: { programId: id },
+        });
+
+        // Update program metadata
+        await tx.program.update({
+          where: { id },
+          data: {
+            totalRows: totalRows || 0,
+            fieldCount: fieldCount || 0,
+            errorCount: errorCount || 0,
+            uniqueKeyColumn,
+            headers,
+          },
+        });
+      } else {
+        // Jika mode filter, cari peserta yang boleh diupdate sesuai filterMode
+        const whereClause: any = { programId: id };
+        if (filterMode === "UNVERIFIED") {
+          whereClause.evalStatus = null;
+        } else if (filterMode === "VERIFIED") {
+          whereClause.evalStatus = "VERIFIED";
+        } else if (filterMode === "REJECTED") {
+          whereClause.evalStatus = "REJECTED";
+        }
+
+        const participants = await tx.participant.findMany({
+          where: whereClause,
+          select: { uniqueKey: true },
+        });
+
+        allowedUniqueKeys = participants.map((p) => p.uniqueKey);
+      }
 
       // Create Reupload Import Log
+      const filterLabel = 
+        filterMode === "ALL" ? "Semua data" :
+        filterMode === "UNVERIFIED" ? "Hanya yang belum dievaluasi" :
+        filterMode === "VERIFIED" ? "Hanya yang VERIFIED" : "Hanya yang REJECTED";
+
       await tx.importLog.create({
         data: {
           programId: id,
@@ -77,10 +117,10 @@ export async function POST(
           totalRows: totalRows || 0,
           errorCount: errorCount || 0,
           status: errorCount > 0 ? "PARTIAL" : "COMPLETED",
-          notes: `Reupload data. ${
+          notes: `Reupload data (${filterLabel}). ${
             errorCount > 0
               ? `${errorCount} baris memiliki masalah validasi.`
-              : "Berhasil diperbarui dengan bersih."
+              : "Berhasil diperbarui."
           }`,
         },
       });
@@ -91,17 +131,21 @@ export async function POST(
           programId: id,
           userId: session.user.id,
           action: "REUPLOAD_DATA",
-          details: `Meng-upload ulang database peserta menggunakan file "${fileName || "file_reupload"}" (${totalRows} baris, ${errorCount} validasi error).`,
+          details: `Meng-upload ulang database peserta (${filterLabel}) menggunakan file "${fileName || "file_reupload"}" (${totalRows} baris, ${errorCount} validasi error).`,
         },
       });
 
-      return prog;
+      return {
+        programId: id,
+        allowedUniqueKeys,
+        existingHeaders,
+      };
     }, {
       maxWait: 15000,
       timeout: 30000,
     });
 
-    return NextResponse.json({ programId: result.id });
+    return NextResponse.json(result);
   } catch (error: any) {
     console.error("POST /api/programs/[id]/reupload/start error:", error);
     return NextResponse.json(

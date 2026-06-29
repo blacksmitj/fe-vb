@@ -295,6 +295,7 @@ export default function ProgramSettingsPage({ params }: { params: Promise<{ id: 
   const [reuploadHeadersList, setReuploadHeadersList] = React.useState<string[]>([]);
   const [reuploadRawHeaders, setReuploadRawHeaders] = React.useState<string[]>([]);
   const [reuploadSheetUniqueKey, setReuploadSheetUniqueKey] = React.useState("");
+  const [reuploadFilterMode, setReuploadFilterMode] = React.useState<"ALL" | "UNVERIFIED" | "VERIFIED" | "REJECTED">("ALL");
   const [isReuploadPreviewLoading, setIsReuploadPreviewLoading] = React.useState(false);
   const [isReuploadDryRunning, setIsReuploadDryRunning] = React.useState(false);
   const [isReuploadSubmitting, setIsReuploadSubmitting] = React.useState(false);
@@ -313,6 +314,7 @@ export default function ProgramSettingsPage({ params }: { params: Promise<{ id: 
     setReuploadRawHeaders([]);
     setReuploadSheetName("");
     setReuploadSheetUniqueKey("");
+    setReuploadFilterMode("ALL");
     setReuploadDryRunResult(null);
     setReuploadCurrentSheetRows([]);
     reuploadWorkbookRef.current = null;
@@ -578,6 +580,7 @@ export default function ProgramSettingsPage({ params }: { params: Promise<{ id: 
           errorCount: reuploadDryRunResult.stats.errorCount,
           fileName: reuploadFile.name,
           headers: reuploadHeadersList,
+          filterMode: reuploadFilterMode,
         }),
       });
 
@@ -585,6 +588,9 @@ export default function ProgramSettingsPage({ params }: { params: Promise<{ id: 
         const startData = await startRes.json().catch(() => ({ error: "Gagal menginisiasi reupload." }));
         throw new Error(startData.error || "Gagal menginisiasi reupload.");
       }
+
+      const startResult = await startRes.json();
+      const { allowedUniqueKeys = [], existingHeaders = [] } = startResult;
 
       // Step 2: Insert rows in chunks of 100
       const chunkSize = 100;
@@ -601,6 +607,9 @@ export default function ProgramSettingsPage({ params }: { params: Promise<{ id: 
             headers: reuploadHeadersList,
             uniqueKeyColumn: reuploadSheetUniqueKey,
             startRowIndex: i,
+            filterMode: reuploadFilterMode,
+            allowedUniqueKeys,
+            existingHeaders,
           }),
         });
 
@@ -1250,7 +1259,7 @@ export default function ProgramSettingsPage({ params }: { params: Promise<{ id: 
                               </Field>
                             )}
 
-                            <Field>
+                             <Field>
                               <FieldLabel htmlFor="reuploadSheetUniqueKey">Kolom ID Unik (Unique Key)</FieldLabel>
                               <div className="relative">
                                 <Select
@@ -1280,6 +1289,31 @@ export default function ProgramSettingsPage({ params }: { params: Promise<{ id: 
                               </div>
                               <FieldDescription>
                                 Pilih kolom dengan nilai unik (contoh: NIK, NIM, Email) untuk mengidentifikasi setiap peserta secara akurat.
+                              </FieldDescription>
+                            </Field>
+
+                            <Field>
+                              <FieldLabel htmlFor="reuploadFilterMode">Metode Update / Filter Data</FieldLabel>
+                              <Select
+                                value={reuploadFilterMode}
+                                onValueChange={(val: any) => {
+                                  setReuploadFilterMode(val);
+                                  setReuploadDryRunResult(null);
+                                }}
+                                disabled={isReuploadPreviewLoading || isReuploadSubmitting || isReuploadDryRunning}
+                              >
+                                <SelectTrigger id="reuploadFilterMode" className="w-full justify-between">
+                                  <SelectValue placeholder="Pilih Metode" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="ALL">Semua Data (Hapus &amp; Ganti Baru)</SelectItem>
+                                  <SelectItem value="UNVERIFIED">Hanya yang Belum Dievaluasi / Kosong</SelectItem>
+                                  <SelectItem value="VERIFIED">Hanya yang VERIFIED</SelectItem>
+                                  <SelectItem value="REJECTED">Hanya yang REJECTED</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <FieldDescription>
+                                Pilih kelompok data peserta mana yang akan diperbarui dari file Excel ini.
                               </FieldDescription>
                             </Field>
 
@@ -1421,7 +1455,9 @@ export default function ProgramSettingsPage({ params }: { params: Promise<{ id: 
                                         <DatabaseIcon className="h-4 w-4" />
                                         {reuploadDryRunResult.stats.errorCount > 0
                                           ? "Perbaiki Error Sebelum Reupload"
-                                          : "Reupload & Ganti Data"}
+                                          : reuploadFilterMode === "ALL"
+                                            ? "Reupload & Ganti Data"
+                                            : "Reupload & Update Data Filtered"}
                                       </>
                                     )}
                                   </Button>
@@ -1429,9 +1465,23 @@ export default function ProgramSettingsPage({ params }: { params: Promise<{ id: 
                                 {reuploadDryRunResult.stats.errorCount === 0 && (
                                   <AlertDialogContent>
                                     <AlertDialogHeader>
-                                      <AlertDialogTitle>Reupload & Ganti Data</AlertDialogTitle>
+                                      <AlertDialogTitle>
+                                        {reuploadFilterMode === "ALL" ? "Reupload & Ganti Data" : "Reupload & Update Data"}
+                                      </AlertDialogTitle>
                                       <AlertDialogDescription>
-                                        Apakah Anda yakin ingin menghapus seluruh data peserta yang lama dan menggantinya dengan data baru dari file <strong>{reuploadFile?.name}</strong>? Tindakan ini tidak dapat dibatalkan.
+                                        {reuploadFilterMode === "ALL" ? (
+                                          <>
+                                            Apakah Anda yakin ingin menghapus seluruh data peserta yang lama dan menggantinya dengan data baru dari file <strong>{reuploadFile?.name}</strong>? Tindakan ini tidak dapat dibatalkan.
+                                          </>
+                                        ) : (
+                                          <>
+                                            Apakah Anda yakin ingin memperbarui data peserta (<strong>
+                                              {reuploadFilterMode === "UNVERIFIED" && "Hanya yang belum dievaluasi"}
+                                              {reuploadFilterMode === "VERIFIED" && "Hanya yang VERIFIED"}
+                                              {reuploadFilterMode === "REJECTED" && "Hanya yang REJECTED"}
+                                            </strong>) menggunakan file <strong>{reuploadFile?.name}</strong>? Baris dengan ID Unik yang cocok akan diperbarui, kolom baru akan diabaikan, dan data peserta lain tetap dipertahankan.
+                                          </>
+                                        )}
                                       </AlertDialogDescription>
                                     </AlertDialogHeader>
                                     <AlertDialogFooter>

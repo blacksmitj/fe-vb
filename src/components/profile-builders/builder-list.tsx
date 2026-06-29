@@ -11,7 +11,10 @@ import {
   LinkIcon,
   Loader2Icon,
   CopyIcon,
+  FileSpreadsheet,
 } from "lucide-react";
+
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -49,6 +52,8 @@ export function BuilderList({
   onOpenCreateDialog,
 }: BuilderListProps) {
   const [searchQuery, setSearchQuery] = useState("");
+
+
 
   const filteredBuilders = builders.filter((b) => {
     const query = searchQuery.toLowerCase();
@@ -126,12 +131,26 @@ export function BuilderList({
                 </div>
 
                 <div className="flex items-center gap-2 shrink-0">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="text-muted-foreground hover:bg-muted"
+                    asChild
+                    title="Cocokkan Header"
+                    id={`match-header-${builder.id}`}
+                  >
+                    <Link href={`/profile-builders/${builder.id}/match`}>
+                      <FileSpreadsheet className="size-3.5" />
+                    </Link>
+                  </Button>
+
                   <Button size="sm" variant="outline" asChild>
                     <Link href={`/builder?builderId=${builder.id}`}>
                       <SettingsIcon className="mr-1.5 size-3.5" />
                       Edit Layout
                     </Link>
                   </Button>
+
                   <Button
                     size="sm"
                     variant="ghost"
@@ -180,5 +199,7 @@ export function BuilderList({
         )}
       </CardContent>
     </Card>
+
+
   );
 }
