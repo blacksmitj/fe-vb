@@ -30,41 +30,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 
-interface NavItem {
-  title: string;
-  url: string;
-  icon: React.ComponentType;
-  items: { title: string; url: string }[];
-  isFixData?: boolean;
-}
 
-const navItems: NavItem[] = [
-  {
-    title: "Dashboard",
-    url: "/dashboard",
-    icon: LayoutDashboardIcon,
-    items: [],
-  },
-  {
-    title: "Programs",
-    url: "/programs",
-    icon: ClipboardListIcon,
-    items: [],
-  },
-  {
-    title: "Profile Builder",
-    url: "/profile-builders",
-    icon: LayoutTemplateIcon,
-    items: [],
-  },
-  {
-    title: "Perbaikan Data",
-    url: "/fix-data",
-    icon: WrenchIcon,
-    items: [],
-    isFixData: true,
-  },
-];
 
 export function NavMain() {
   const pathname = usePathname();
@@ -72,83 +38,98 @@ export function NavMain() {
   const { state } = useSidebar();
   const isCollapsed = state === "collapsed";
 
+  const isProgramsActive =
+    pathname.startsWith("/programs") ||
+    (pathname.startsWith("/builder") && !pathname.includes("builderId"));
+
+  const isProfileBuilderActive =
+    pathname.startsWith("/profile-builders") ||
+    (pathname.startsWith("/builder") && pathname.includes("builderId"));
+
+  const hasNotification = fixDataCount !== undefined && fixDataCount > 0;
+
   return (
-    <SidebarGroup>
-      <SidebarGroupLabel>Platform</SidebarGroupLabel>
-      <SidebarMenu>
-        {navItems.map((item) => {
-          const isActive =
-            item.url === "/dashboard"
-              ? pathname === "/dashboard"
-              : item.url === "/programs"
-                ? pathname.startsWith("/programs") || (pathname.startsWith("/builder") && !pathname.includes("builderId"))
-                : item.url === "/profile-builders"
-                  ? pathname.startsWith("/profile-builders") || (pathname.startsWith("/builder") && pathname.includes("builderId"))
-                  : pathname.startsWith(item.url) && item.url !== "/";
-
-          // Simple items (no sub-items)
-          if (item.items.length === 0) {
-            const hasNotification = item.isFixData && fixDataCount !== undefined && fixDataCount > 0;
-            return (
-              <SidebarMenuItem key={item.title}>
-                <SidebarMenuButton asChild isActive={isActive} tooltip={item.title}>
-                  <Link href={item.url} className="flex justify-between items-center w-full">
-                    <div className="flex items-center gap-2">
-                      <div className="relative flex items-center justify-center">
-                        <item.icon />
-                        {isCollapsed && hasNotification && (
-                          <span className="absolute -top-1 -right-1 flex h-2 w-2 rounded-full bg-destructive ring-2 ring-sidebar animate-gentle-glow animate-gentle-bounce" />
-                        )}
-                      </div>
-                      <span>{item.title}</span>
-                    </div>
-                    {!isCollapsed && hasNotification && (
-                      <Badge className="ml-auto flex h-5 w-5 shrink-0 items-center justify-center rounded-full p-0 text-[10px] font-bold bg-destructive text-destructive-foreground animate-gentle-bounce shadow-[0_0_6px_rgba(239,68,68,0.5)]">
-                        {fixDataCount}
-                      </Badge>
-                    )}
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            );
-          }
-
-          // Collapsible items with sub-menu
-          const isOpen = item.items.some((sub) => pathname === sub.url) || isActive;
-
-          return (
-            <Collapsible
-              key={item.title}
+    <>
+      {/* KATEGORI: UTAMA */}
+      <SidebarGroup>
+        <SidebarGroupLabel>Utama</SidebarGroupLabel>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton
               asChild
-              defaultOpen={isOpen}
-              className="group/collapsible"
+              isActive={pathname === "/dashboard"}
+              tooltip="Dashboard"
             >
-              <SidebarMenuItem>
-                <CollapsibleTrigger asChild>
-                  <SidebarMenuButton tooltip={item.title}>
-                    <item.icon />
-                    <span>{item.title}</span>
-                    <ChevronRightIcon className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
-                  </SidebarMenuButton>
-                </CollapsibleTrigger>
-                <CollapsibleContent>
-                  <SidebarMenuSub>
-                    {item.items.map((sub) => (
-                      <SidebarMenuSubItem key={sub.title}>
-                        <SidebarMenuSubButton asChild isActive={pathname === sub.url}>
-                          <Link href={sub.url}>
-                            <span>{sub.title}</span>
-                          </Link>
-                        </SidebarMenuSubButton>
-                      </SidebarMenuSubItem>
-                    ))}
-                  </SidebarMenuSub>
-                </CollapsibleContent>
-              </SidebarMenuItem>
-            </Collapsible>
-          );
-        })}
-      </SidebarMenu>
-    </SidebarGroup>
+              <Link href="/dashboard">
+                <LayoutDashboardIcon />
+                <span>Dashboard</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarGroup>
+
+      {/* KATEGORI: VERIFIKASI */}
+      <SidebarGroup>
+        <SidebarGroupLabel>Verifikasi</SidebarGroupLabel>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              asChild
+              isActive={isProgramsActive}
+              tooltip="Programs"
+            >
+              <Link href="/programs">
+                <ClipboardListIcon />
+                <span>Programs</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              asChild
+              isActive={pathname === "/fix-data"}
+              tooltip="Perbaikan Data"
+            >
+              <Link href="/fix-data" className="flex justify-between items-center w-full">
+                <div className="flex items-center gap-2">
+                  <div className="relative flex items-center justify-center">
+                    <WrenchIcon />
+                    {isCollapsed && hasNotification && (
+                      <span className="absolute -top-1 -right-1 flex h-2 w-2 rounded-full bg-destructive ring-2 ring-sidebar animate-gentle-glow animate-gentle-bounce" />
+                    )}
+                  </div>
+                  <span>Perbaikan Data</span>
+                </div>
+                {!isCollapsed && hasNotification && (
+                  <Badge className="ml-auto flex h-5 w-5 shrink-0 items-center justify-center rounded-full p-0 text-[10px] font-bold bg-destructive text-destructive-foreground animate-gentle-bounce shadow-[0_0_6px_rgba(239,68,68,0.5)]">
+                    {fixDataCount}
+                  </Badge>
+                )}
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarGroup>
+
+      {/* KATEGORI: BUILDER */}
+      <SidebarGroup>
+        <SidebarGroupLabel>Builder</SidebarGroupLabel>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              asChild
+              isActive={isProfileBuilderActive}
+              tooltip="Profile Builder"
+            >
+              <Link href="/profile-builders">
+                <LayoutTemplateIcon />
+                <span>Profile Builder</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarGroup>
+    </>
   );
 }

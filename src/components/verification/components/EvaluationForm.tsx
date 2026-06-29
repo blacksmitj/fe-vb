@@ -668,8 +668,12 @@ export function EvaluationForm({ sections, participant, onFieldChange, errors }:
                       </FieldLabel>
                       {renderFieldValue(field)}
                       {errors?.[field.label] && (
-                        <FieldError className="mt-1 pl-0.5 font-semibold text-xs">
-                          {errors[field.label]}
+                        <FieldError className="mt-1 pl-0.5 font-semibold text-xs flex items-center gap-1.5 text-rose-500">
+                          <span className="relative flex h-2 w-2 shrink-0">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500"></span>
+                          </span>
+                          <span>{errors[field.label]}</span>
                         </FieldError>
                       )}
                       {field.description && (
@@ -691,8 +695,12 @@ export function EvaluationForm({ sections, participant, onFieldChange, errors }:
                       </FieldLabel>
                       {renderFieldValue(field)}
                       {errors?.[field.label] && (
-                        <FieldError className="mt-1 pl-0.5 font-semibold text-xs">
-                          {errors[field.label]}
+                        <FieldError className="mt-1 pl-0.5 font-semibold text-xs flex items-center gap-1.5 text-rose-500">
+                          <span className="relative flex h-2 w-2 shrink-0">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500"></span>
+                          </span>
+                          <span>{errors[field.label]}</span>
                         </FieldError>
                       )}
                       {field.description && (
@@ -713,8 +721,12 @@ export function EvaluationForm({ sections, participant, onFieldChange, errors }:
                   </FieldLabel>
                   {renderFieldValue(field)}
                   {errors?.[field.label] && (
-                    <FieldError className="mt-1 pl-0.5 font-semibold text-xs">
-                      {errors[field.label]}
+                    <FieldError className="mt-1 pl-0.5 font-semibold text-xs flex items-center gap-1.5 text-rose-500">
+                      <span className="relative flex h-2 w-2 shrink-0">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500"></span>
+                      </span>
+                      <span>{errors[field.label]}</span>
                     </FieldError>
                   )}
                   {field.description && (

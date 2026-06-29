@@ -273,6 +273,14 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
     if (Object.keys(errors).length > 0) {
       setValidationErrors(errors);
       toast.error("Mohon lengkapi semua field yang wajib diisi.");
+      
+      // Auto-scroll to the first field that fails validation
+      setTimeout(() => {
+        const firstErrorEl = document.querySelector('[data-invalid="true"]');
+        if (firstErrorEl) {
+          firstErrorEl.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+      }, 100);
       return;
     }
 

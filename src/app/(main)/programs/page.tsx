@@ -149,40 +149,7 @@ export default function ProgramsPage() {
           );
         },
       },
-      {
-        accessorKey: "errorCount",
-        header: ({ column }) => {
-          return (
-            <Button
-              variant="ghost"
-              onClick={() =>
-                column.toggleSorting(column.getIsSorted() === "asc")
-              }
-              className="-ml-4 hover:bg-transparent"
-            >
-              Status Import
-              <ArrowUpDownIcon className="ml-2 size-4" />
-            </Button>
-          );
-        },
-        cell: ({ row }) => {
-          const errorCount = row.getValue("errorCount") as number;
-          return errorCount > 0 ? (
-            <Badge variant="destructive" className="gap-1 px-2 py-0.5">
-              <AlertCircleIcon className="size-3" />
-              {errorCount} Error
-            </Badge>
-          ) : (
-            <Badge
-              variant="secondary"
-              className="bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border-none gap-1 px-2 py-0.5"
-            >
-              <CheckCircle2Icon className="size-3" />
-              Clean
-            </Badge>
-          );
-        },
-      },
+
       {
         id: "verificationProgress",
         header: "Progress Verifikasi",
@@ -359,7 +326,7 @@ export default function ProgramsPage() {
         </Breadcrumb>
       </PageHeader>
 
-      <PageContent className="space-y-6 flex flex-col pt-4">
+      <PageContent scrollable={false} className="space-y-6 flex flex-col pt-4 h-full">
 
         {/* Title & Description */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 shrink-0">
@@ -385,9 +352,9 @@ export default function ProgramsPage() {
         </div>
 
         {/* ── Program Table / Empty State ────────────────────── */}
-        <div className="flex-1 min-h-0">
+        <div className="flex-1 min-h-0 flex flex-col">
           {programs.length === 0 ? (
-            <Card className="flex flex-col items-center justify-center p-12 text-center border-dashed">
+            <Card className="flex flex-col items-center justify-center p-12 text-center border-dashed shrink-0">
               <div className="flex aspect-square size-12 items-center justify-center rounded-full bg-primary/10 text-primary mb-4">
                 <FileSpreadsheetIcon className="size-6" />
               </div>
@@ -406,7 +373,7 @@ export default function ProgramsPage() {
               </Button>
             </Card>
           ) : (
-            <div className="rounded-md border bg-card overflow-hidden">
+            <div className="rounded-md border bg-card flex-1 overflow-y-auto min-h-0">
               <Table>
                 <TableHeader>
                   {table.getHeaderGroups().map((headerGroup) => (
