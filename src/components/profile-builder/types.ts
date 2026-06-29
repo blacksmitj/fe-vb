@@ -21,6 +21,7 @@ export interface Field {
   locked?: boolean;
   column?: 'left' | 'right';
   isEditable?: boolean; // Toggle between editable and preview mode
+  isRequired?: boolean; // Make this field mandatory during verification save
   // New customizable properties
   dateMode?: 'date-only' | 'date-time';
   dateLocale?: 'id' | 'en';

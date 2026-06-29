@@ -22,11 +22,14 @@ import {
 interface ParticipantNavigatorProps {
   programId: string;
   onSave?: () => Promise<void> | void;
+  onUnverify?: () => Promise<void> | void;
   onSaveDraft?: () => void;
   onReset?: () => void;
   hasChanges?: boolean;
   isSaving?: boolean;
   evaluationStatus?: string | null;
+  originalStatus?: string | null;
+  canUnverify?: boolean;
   verifiedCount?: number;
   rejectedCount?: number;
   pendingCount?: number;
@@ -41,11 +44,14 @@ interface SearchMatch {
 export function ParticipantNavigator({
   programId,
   onSave,
+  onUnverify,
   onSaveDraft,
   onReset,
   hasChanges = false,
   isSaving = false,
   evaluationStatus = null,
+  originalStatus = null,
+  canUnverify = false,
   verifiedCount = 0,
   rejectedCount = 0,
   pendingCount = 0,
@@ -212,6 +218,38 @@ export function ParticipantNavigator({
                   <AlertDialogCancel>Batal</AlertDialogCancel>
                   <AlertDialogAction onClick={onReset} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
                     Reset Data
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
+
+          {/* Unverif Button */}
+          {onUnverify && (originalStatus === "VERIFIED" || originalStatus === "REJECTED") && canUnverify && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  type="button"
+                  disabled={isSaving || isPaused}
+                  size="sm"
+                  variant="outline"
+                  className="h-8 text-xs font-semibold px-3 shrink-0 gap-1.5 text-rose-600 hover:text-rose-700 hover:bg-rose-50 border-rose-200"
+                >
+                  <RotateCcw className="h-3.5 w-3.5" />
+                  Unverif
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Konfirmasi Pembatalan Verifikasi</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Apakah Anda yakin ingin membatalkan status verifikasi/penolakan data peserta ini? Data peserta ini akan dikembalikan ke status "Belum Diverifikasi".
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Batal</AlertDialogCancel>
+                  <AlertDialogAction onClick={onUnverify} className="bg-rose-600 text-white hover:bg-rose-700">
+                    Batalkan Verifikasi
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>

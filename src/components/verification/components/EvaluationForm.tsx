@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import DatePicker from "@/components/date-picker";
-import { Field as ShadcnField, FieldLabel, FieldDescription } from "@/components/ui/field";
+import { Field as ShadcnField, FieldLabel, FieldDescription, FieldError } from "@/components/ui/field";
 import { Calendar, FileText, Image as ImageIcon, Video, Tag, Bookmark, Hash, ArrowUpRight, Eye, Play, Globe, X } from "lucide-react";
 import { safeParseDate } from "@/lib/utils/format-date";
 import {
@@ -313,9 +313,10 @@ interface EvaluationFormProps {
   sections: Section[];
   participant: Record<string, any>;
   onFieldChange?: (label: string, value: any) => void;
+  errors?: Record<string, string>;
 }
 
-export function EvaluationForm({ sections, participant, onFieldChange }: EvaluationFormProps) {
+export function EvaluationForm({ sections, participant, onFieldChange, errors }: EvaluationFormProps) {
   const { openMediaViewer } = useVerificationStore();
 
   const renderFieldValue = (field: Field) => {
@@ -661,11 +662,16 @@ export function EvaluationForm({ sections, participant, onFieldChange }: Evaluat
                 {section.fields
                   .filter((field) => field.column !== "right")
                   .map((field) => (
-                    <ShadcnField key={field.id}>
+                    <ShadcnField key={field.id} data-invalid={!!errors?.[field.label]}>
                       <FieldLabel className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block">
-                        {field.label}
+                        {field.label} {field.isRequired && <span className="text-rose-500 font-bold ml-0.5">*</span>}
                       </FieldLabel>
                       {renderFieldValue(field)}
+                      {errors?.[field.label] && (
+                        <FieldError className="mt-1 pl-0.5 font-semibold text-xs">
+                          {errors[field.label]}
+                        </FieldError>
+                      )}
                       {field.description && (
                         <FieldDescription className="text-xs italic text-muted-foreground/80 mt-1 pl-0.5 leading-relaxed">
                           {field.description}
@@ -679,11 +685,16 @@ export function EvaluationForm({ sections, participant, onFieldChange }: Evaluat
                 {section.fields
                   .filter((field) => field.column === "right")
                   .map((field) => (
-                    <ShadcnField key={field.id}>
+                    <ShadcnField key={field.id} data-invalid={!!errors?.[field.label]}>
                       <FieldLabel className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block">
-                        {field.label}
+                        {field.label} {field.isRequired && <span className="text-rose-500 font-bold ml-0.5">*</span>}
                       </FieldLabel>
                       {renderFieldValue(field)}
+                      {errors?.[field.label] && (
+                        <FieldError className="mt-1 pl-0.5 font-semibold text-xs">
+                          {errors[field.label]}
+                        </FieldError>
+                      )}
                       {field.description && (
                         <FieldDescription className="text-xs italic text-muted-foreground/80 mt-1 pl-0.5 leading-relaxed">
                           {field.description}
@@ -696,11 +707,16 @@ export function EvaluationForm({ sections, participant, onFieldChange }: Evaluat
           ) : (
             <div className="space-y-5">
               {section.fields.map((field) => (
-                <ShadcnField key={field.id}>
+                <ShadcnField key={field.id} data-invalid={!!errors?.[field.label]}>
                   <FieldLabel className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block">
-                    {field.label}
+                    {field.label} {field.isRequired && <span className="text-rose-500 font-bold ml-0.5">*</span>}
                   </FieldLabel>
                   {renderFieldValue(field)}
+                  {errors?.[field.label] && (
+                    <FieldError className="mt-1 pl-0.5 font-semibold text-xs">
+                      {errors[field.label]}
+                    </FieldError>
+                  )}
                   {field.description && (
                     <FieldDescription className="text-xs italic text-muted-foreground/80 mt-1 pl-0.5 leading-relaxed">
                       {field.description}

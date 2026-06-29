@@ -82,6 +82,7 @@ export async function GET(
         data: true,
         evalStatus: true,
         evalDescription: true,
+        evalByUserId: true,
         evalByUserName: true,
         evalAt: true,
       },
@@ -94,6 +95,7 @@ export async function GET(
           _evaluationStatus: participantRecord.evalStatus,
           _evaluationDescription: participantRecord.evalDescription,
           _verifiedByName: participantRecord.evalByUserName,
+          _verifiedByUserId: participantRecord.evalByUserId,
           _evaluatedAt: participantRecord.evalAt ? participantRecord.evalAt.toISOString() : null,
           ...(participantRecord.data as Record<string, any>),
         }
@@ -130,14 +132,31 @@ export async function PATCH(
   try {
     const { id: programId } = await params;
 
-    // Check program status first
-    const program = await db.program.findUnique({
-      where: { id: programId },
-      select: { status: true },
-    });
+    // Check program status and membership role first
+    const [program, member] = await Promise.all([
+      db.program.findUnique({
+        where: { id: programId },
+        select: { status: true },
+      }),
+      db.programMember.findUnique({
+        where: {
+          programId_userId: {
+            programId,
+            userId: session.user.id,
+          },
+        },
+      }),
+    ]);
 
     if (!program) {
       return NextResponse.json({ error: "Program tidak ditemukan" }, { status: 404 });
+    }
+
+    if (!member || member.status !== "APPROVED") {
+      return NextResponse.json(
+        { error: "Anda bukan anggota program ini atau pendaftaran Anda belum disetujui." },
+        { status: 403 }
+      );
     }
 
     if (program.status === "STOPPED") {
@@ -172,6 +191,21 @@ export async function PATCH(
       return NextResponse.json({ error: "Participant data not found" }, { status: 404 });
     }
 
+    const isUnverif = status === null || status === "UNVERIFIED";
+
+    // Validate authorization for Unverif
+    if (isUnverif) {
+      const isAdmin = member.role === "ADMIN";
+      const isOriginalVerifier = targetParticipant.evalByUserId === session.user.id;
+
+      if (!isAdmin && !isOriginalVerifier) {
+        return NextResponse.json(
+          { error: "Hanya Administrator atau Verifikator yang memverifikasi data ini yang dapat membatalkannya." },
+          { status: 403 }
+        );
+      }
+    }
+
     // Filter out internal application properties if present
     const cleanFields = { ...(updatedFields || {}) };
     delete cleanFields.id;
@@ -179,6 +213,7 @@ export async function PATCH(
     delete cleanFields._evaluationStatus;
     delete cleanFields._evaluationDescription;
     delete cleanFields._verifiedByName;
+    delete cleanFields._verifiedByUserId;
     delete cleanFields._evaluatedAt;
 
     const mergedData = {
@@ -191,11 +226,11 @@ export async function PATCH(
       where: { id: targetParticipant.id },
       data: {
         data: mergedData,
-        evalStatus: status || "VERIFIED",
-        evalDescription: description || "",
-        evalByUserId: session.user.id,
-        evalByUserName: session.user.name || session.user.email,
-        evalAt: new Date(),
+        evalStatus: isUnverif ? null : (status || "VERIFIED"),
+        evalDescription: isUnverif ? null : (description || ""),
+        evalByUserId: isUnverif ? null : session.user.id,
+        evalByUserName: isUnverif ? null : (session.user.name || session.user.email),
+        evalAt: isUnverif ? null : new Date(),
         searchText: buildSearchText(mergedData),
       },
     });
@@ -206,21 +241,22 @@ export async function PATCH(
       _evaluationStatus: updated.evalStatus,
       _evaluationDescription: updated.evalDescription,
       _verifiedByName: updated.evalByUserName,
+      _verifiedByUserId: updated.evalByUserId,
       _evaluatedAt: updated.evalAt ? updated.evalAt.toISOString() : null,
       ...(updated.data as Record<string, any>),
     };
 
     // Create activity log
     try {
-      const details = `Memverifikasi data peserta (ID: ${updated.uniqueKey}).${
-        description ? ` Catatan: ${description}` : ""
-      }`;
+      const details = isUnverif
+        ? `Membatalkan verifikasi data peserta (ID: ${updated.uniqueKey}).`
+        : `Memverifikasi data peserta (ID: ${updated.uniqueKey}).${description ? ` Catatan: ${description}` : ""}`;
 
       await db.activityLog.create({
         data: {
           programId,
           userId: session.user.id,
-          action: "VERIFIED",
+          action: isUnverif ? "UNVERIFIED" : "VERIFIED",
           details,
         },
       });

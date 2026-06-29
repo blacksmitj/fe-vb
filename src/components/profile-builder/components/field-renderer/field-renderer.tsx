@@ -123,6 +123,11 @@ export default function ProfileBuilderFieldRenderer({
                   Tidak ada di Header
                 </span>
               )}
+              {field.isRequired && (
+                <span className="bg-rose-500/10 text-rose-600 dark:text-rose-500 border border-rose-500/20 px-1.5 py-0.5 rounded text-[8px] font-bold tracking-wide uppercase select-none">
+                  Required
+                </span>
+              )}
             </div>
 
             {/* Label + lock icon */}

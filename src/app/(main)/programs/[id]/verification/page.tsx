@@ -27,6 +27,7 @@ import { MembershipGate } from "@/components/programs/membership-gate";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { safeParseDate } from "@/lib/utils";
+import { useSession } from "@/lib/auth/auth-client";
 
 export default function VerificationPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = React.use(params);
@@ -49,10 +50,36 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
   const [originalParticipant, setOriginalParticipant] = React.useState<Record<string, any> | null>(null);
   const [sections, setSections] = React.useState<Section[]>([]);
   
+  const { data: session } = useSession();
+  const [currentUserMember, setCurrentUserMember] = React.useState<{ role: string | null; status: string | null } | null>(null);
+
+  // Fetch current user's membership in this program
+  React.useEffect(() => {
+    async function loadUserMembership() {
+      try {
+        const res = await fetch(`/api/programs/${id}/membership`);
+        if (res.ok) {
+          const data = await res.json();
+          setCurrentUserMember(data);
+        }
+      } catch (err) {
+        console.error("Failed to load user membership", err);
+      }
+    }
+    loadUserMembership();
+  }, [id]);
+
+  const canUnverify = React.useMemo(() => {
+    if (!session || !currentUserMember || !participant) return false;
+    if (currentUserMember.role === "ADMIN") return true;
+    return participant._verifiedByUserId === session.user.id;
+  }, [session, currentUserMember, participant]);
+  
   const [isParticipantLoading, setIsParticipantLoading] = React.useState(true);
   const [isSchemaLoading, setIsSchemaLoading] = React.useState(true);
   const [isSaving, setIsSaving] = React.useState(false);
   const [isUsingLocalDraft, setIsUsingLocalDraft] = React.useState(false);
+  const [validationErrors, setValidationErrors] = React.useState<Record<string, string>>({});
 
   // Helper to save draft to localStorage
   const saveDraftToLocalStorage = React.useCallback(() => {
@@ -97,6 +124,7 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
   React.useEffect(() => {
     async function loadParticipant() {
       setIsParticipantLoading(true);
+      setValidationErrors({});
       try {
         closeMediaViewer();
         const res = await fetch(`/api/programs/${id}/participants?page=${currentRowIndex}`);
@@ -167,6 +195,12 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
 
   const handleFieldChange = (label: string, value: any) => {
     setParticipant((prev) => (prev ? { ...prev, [label]: value } : null));
+    setValidationErrors((prev) => {
+      if (!prev[label]) return prev;
+      const updated = { ...prev };
+      delete updated[label];
+      return updated;
+    });
   };
 
   // Check if form fields or store fields are dirty compared to original
@@ -203,6 +237,28 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
       toast.error("Tidak dapat menyimpan perubahan karena verifikasi program ini ditangguhkan.");
       return;
     }
+
+    // Validate required fields
+    const errors: Record<string, string> = {};
+    for (const section of sections) {
+      for (const field of section.fields) {
+        if (field.isRequired) {
+          const val = participant?.[field.label];
+          const isEmpty = val === undefined || val === null || (typeof val === "string" && val.trim() === "");
+          if (isEmpty) {
+            errors[field.label] = "harus diisi";
+          }
+        }
+      }
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setValidationErrors(errors);
+      toast.error("Mohon lengkapi semua field yang wajib diisi.");
+      return;
+    }
+
+    setValidationErrors({});
     setIsSaving(true);
     try {
       const url = currentParticipantId 
@@ -237,6 +293,55 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
     } catch (err) {
       console.error(err);
       toast.error("An error occurred while saving the data");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleUnverify = async () => {
+    if (program?.status === "STOPPED") {
+      toast.error("Tidak dapat membatalkan verifikasi karena verifikasi program ini ditangguhkan.");
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const url = currentParticipantId 
+        ? `/api/programs/${id}/participants?participantId=${currentParticipantId}`
+        : `/api/programs/${id}/participants?page=${currentRowIndex}`;
+
+      const res = await fetch(url, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          status: null,
+          description: "",
+          participant,
+        }),
+      });
+
+      let data;
+      try {
+        data = await res.json();
+      } catch (err) {
+        data = { error: "Terjadi kesalahan saat memproses data" };
+      }
+
+      if (res.ok && data.success) {
+        toast.success("Verifikasi berhasil dibatalkan");
+        setParticipant(data.participant);
+        setOriginalParticipant(data.participant);
+        setEvaluationStatus(null);
+        setApprovalDescription("");
+        clearDraftFromLocalStorage(data.participant.id);
+        setIsUsingLocalDraft(false);
+        refetchProgram();
+      } else {
+        toast.error(data.error || "Gagal membatalkan verifikasi");
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Terjadi kesalahan saat memproses data");
     } finally {
       setIsSaving(false);
     }
@@ -413,11 +518,14 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
               <ParticipantNavigator
                 programId={id}
                 onSave={handleSave}
+                onUnverify={handleUnverify}
                 onSaveDraft={saveDraftToLocalStorage}
                 onReset={handleReset}
                 hasChanges={hasChanges}
                 isSaving={isSaving}
                 evaluationStatus={evaluationStatus}
+                originalStatus={originalParticipant?._evaluationStatus}
+                canUnverify={canUnverify}
                 verifiedCount={program?.verifiedCount}
                 rejectedCount={program?.rejectedCount}
                 pendingCount={program?.pendingCount}
@@ -441,6 +549,7 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
                         sections={sections}
                         participant={participant}
                         onFieldChange={handleFieldChange}
+                        errors={validationErrors}
                       />
                     ) : (
                       // Fallback: Display raw key-value mapping if schema is empty/not built yet

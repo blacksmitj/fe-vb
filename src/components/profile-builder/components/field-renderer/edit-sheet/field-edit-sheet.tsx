@@ -37,6 +37,7 @@ export function FieldEditSheet({ field, isOpen, onOpenChange, onUpdateField }: F
   const [editType, setEditType] = useState<FieldType>(field.type);
   const [editLabel, setEditLabel] = useState(field.label);
   const [editIsEditable, setEditIsEditable] = useState(field.isEditable ?? false);
+  const [editIsRequired, setEditIsRequired] = useState(field.isRequired ?? false);
   const [editPlaceholder, setEditPlaceholder] = useState(field.placeholder || "");
   const [editDescription, setEditDescription] = useState(field.description || "");
   const [editDateMode, setEditDateMode] = useState<"date-only" | "date-time">(field.dateMode || "date-only");
@@ -56,6 +57,7 @@ export function FieldEditSheet({ field, isOpen, onOpenChange, onUpdateField }: F
       setEditType(field.type);
       setEditLabel(field.label);
       setEditIsEditable(field.isEditable ?? false);
+      setEditIsRequired(field.isRequired ?? false);
       setEditPlaceholder(field.placeholder || "");
       setEditDescription(field.description || "");
       setEditDateMode(field.dateMode || "date-only");
@@ -112,6 +114,7 @@ export function FieldEditSheet({ field, isOpen, onOpenChange, onUpdateField }: F
       type: editType,
       label: editLabel,
       isEditable: editType !== "media" ? editIsEditable : false,
+      isRequired: editIsRequired,
       placeholder: editPlaceholder,
       description: editDescription.trim() || undefined,
       dateMode: editDateMode,
@@ -203,6 +206,19 @@ export function FieldEditSheet({ field, isOpen, onOpenChange, onUpdateField }: F
                   <Switch id="editIsEditable" checked={editIsEditable} onCheckedChange={setEditIsEditable} />
                 </div>
               )}
+
+              {/* Required toggle */}
+              <div className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
+                <div className="space-y-0.5">
+                  <Label htmlFor="editIsRequired" className="text-sm font-medium">
+                    Required Field
+                  </Label>
+                  <p className="text-[11px] text-muted-foreground">
+                    Make this field mandatory. Verification cannot be saved if this field is empty.
+                  </p>
+                </div>
+                <Switch id="editIsRequired" checked={editIsRequired} onCheckedChange={setEditIsRequired} />
+              </div>
 
               {/* Description */}
               <div className="grid gap-2">
