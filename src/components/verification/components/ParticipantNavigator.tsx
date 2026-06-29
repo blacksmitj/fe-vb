@@ -22,6 +22,7 @@ import {
 interface ParticipantNavigatorProps {
   programId: string;
   onSave?: () => Promise<void> | void;
+  onSaveDraft?: () => void;
   onReset?: () => void;
   hasChanges?: boolean;
   isSaving?: boolean;
@@ -40,6 +41,7 @@ interface SearchMatch {
 export function ParticipantNavigator({
   programId,
   onSave,
+  onSaveDraft,
   onReset,
   hasChanges = false,
   isSaving = false,
@@ -60,6 +62,9 @@ export function ParticipantNavigator({
   const [results, setResults] = React.useState<SearchMatch[]>([]);
   const [showDropdown, setShowDropdown] = React.useState(false);
   
+  const [pendingIndex, setPendingIndex] = React.useState<number | null>(null);
+  const [isNavSaving, setIsNavSaving] = React.useState(false);
+
   const dropdownRef = React.useRef<HTMLDivElement>(null);
 
   // Debounced search logic
@@ -101,23 +106,31 @@ export function ParticipantNavigator({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  const navigateTo = (targetIndex: number) => {
+    if (hasChanges) {
+      setPendingIndex(targetIndex);
+    } else {
+      setCurrentRowIndex(targetIndex);
+      setSearchVal("");
+      setResults([]);
+      setShowDropdown(false);
+    }
+  };
+
   const handleNext = () => {
     if (currentRowIndex < totalRows - 1) {
-      setCurrentRowIndex(currentRowIndex + 1);
+      navigateTo(currentRowIndex + 1);
     }
   };
 
   const handlePrev = () => {
     if (currentRowIndex > 0) {
-      setCurrentRowIndex(currentRowIndex - 1);
+      navigateTo(currentRowIndex - 1);
     }
   };
 
   const selectParticipant = (globalIndex: number) => {
-    setCurrentRowIndex(globalIndex);
-    setSearchVal("");
-    setResults([]);
-    setShowDropdown(false);
+    navigateTo(globalIndex);
   };
 
   // Helper to extract a display name from row
@@ -310,6 +323,81 @@ export function ParticipantNavigator({
           </Button>
         </div>
       </div>
+
+      {/* Alert Dialog untuk konfirmasi perubahan belum disimpan saat navigasi */}
+      <AlertDialog open={pendingIndex !== null} onOpenChange={(open) => { if (!open) setPendingIndex(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-sm font-bold">Simpan Perubahan?</AlertDialogTitle>
+            <AlertDialogDescription className="text-xs space-y-2">
+              <span className="block">Anda memiliki perubahan data yang belum disimpan untuk peserta saat ini. Apakah Anda ingin menyimpannya ke database sekarang?</span>
+              <span className="block font-medium text-amber-600 dark:text-amber-400 bg-amber-50/70 dark:bg-amber-950/20 p-2.5 rounded-lg border border-amber-200/60 dark:border-amber-900 mt-1 leading-relaxed">
+                Jika dilewati (Skip), data Anda tetap aman dan tersimpan sementara sebagai draf di browser ini (Local Storage) dan akan otomatis dipulihkan kembali saat Anda membuka peserta ini lagi.
+              </span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex flex-col sm:flex-row gap-2 mt-4">
+            <AlertDialogCancel disabled={isNavSaving} onClick={() => setPendingIndex(null)} className="h-8 text-xs font-semibold mt-0">
+              Batal
+            </AlertDialogCancel>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={isNavSaving}
+              onClick={() => {
+                if (onSaveDraft) {
+                  onSaveDraft();
+                }
+                const target = pendingIndex;
+                setPendingIndex(null);
+                if (target !== null) {
+                  setCurrentRowIndex(target);
+                  setSearchVal("");
+                  setResults([]);
+                  setShowDropdown(false);
+                }
+              }}
+              className="h-8 text-xs font-semibold text-amber-600 hover:text-amber-700 hover:bg-amber-50"
+            >
+              Lewati (Simpan Draf)
+            </Button>
+            <Button
+              type="button"
+              disabled={isNavSaving}
+              onClick={async () => {
+                setIsNavSaving(true);
+                try {
+                  if (onSave) {
+                    await onSave();
+                  }
+                  const target = pendingIndex;
+                  setPendingIndex(null);
+                  if (target !== null) {
+                    setCurrentRowIndex(target);
+                    setSearchVal("");
+                    setResults([]);
+                    setShowDropdown(false);
+                  }
+                } catch (err) {
+                  console.error(err);
+                } finally {
+                  setIsNavSaving(false);
+                }
+              }}
+              className="h-8 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white"
+            >
+              {isNavSaving ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
+                  Menyimpan...
+                </>
+              ) : (
+                "Simpan & Lanjutkan"
+              )}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

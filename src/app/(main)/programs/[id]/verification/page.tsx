@@ -52,6 +52,27 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
   const [isParticipantLoading, setIsParticipantLoading] = React.useState(true);
   const [isSchemaLoading, setIsSchemaLoading] = React.useState(true);
   const [isSaving, setIsSaving] = React.useState(false);
+  const [isUsingLocalDraft, setIsUsingLocalDraft] = React.useState(false);
+
+  // Helper to save draft to localStorage
+  const saveDraftToLocalStorage = React.useCallback(() => {
+    if (!participant || !currentParticipantId) return;
+    const draftKey = `draft_${id}_${currentParticipantId}`;
+    const draftData = {
+      participant,
+      evaluationStatus,
+      approvalDescription,
+    };
+    localStorage.setItem(draftKey, JSON.stringify(draftData));
+    setIsUsingLocalDraft(true);
+  }, [id, currentParticipantId, participant, evaluationStatus, approvalDescription]);
+
+  // Helper to clear draft from localStorage
+  const clearDraftFromLocalStorage = React.useCallback((pId?: string) => {
+    const targetId = pId || currentParticipantId;
+    if (!targetId) return;
+    localStorage.removeItem(`draft_${id}_${targetId}`);
+  }, [id, currentParticipantId]);
 
   // Fetch Program Profile Builder Schema
   React.useEffect(() => {
@@ -81,8 +102,6 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
         const res = await fetch(`/api/programs/${id}/participants?page=${currentRowIndex}`);
         if (!res.ok) throw new Error("Failed to load participant");
         const data = await res.json();
-        setParticipant(data.participant);
-        setOriginalParticipant(data.participant);
         
         if (data.totalRows !== undefined) {
           setTotalRows(data.totalRows);
@@ -91,15 +110,45 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
         // Sync local store evaluation state with the fetched participant's evaluation
         if (data.participant) {
           setCurrentParticipantId(data.participant.id || null);
-          setEvaluationStatus(data.participant._evaluationStatus || null);
-          setApprovalDescription(data.participant._evaluationDescription || "");
+          
+          // Check if local draft exists
+          const draftKey = `draft_${id}_${data.participant.id}`;
+          const localDraft = localStorage.getItem(draftKey);
+          if (localDraft) {
+            try {
+              const parsed = JSON.parse(localDraft);
+              setParticipant(parsed.participant);
+              setOriginalParticipant(data.participant);
+              setEvaluationStatus(parsed.evaluationStatus || null);
+              setApprovalDescription(parsed.approvalDescription || "");
+              setIsUsingLocalDraft(true);
+            } catch (e) {
+              console.error("Failed to parse local draft", e);
+              setParticipant(data.participant);
+              setOriginalParticipant(data.participant);
+              setEvaluationStatus(data.participant._evaluationStatus || null);
+              setApprovalDescription(data.participant._evaluationDescription || "");
+              setIsUsingLocalDraft(false);
+            }
+          } else {
+            setParticipant(data.participant);
+            setOriginalParticipant(data.participant);
+            setEvaluationStatus(data.participant._evaluationStatus || null);
+            setApprovalDescription(data.participant._evaluationDescription || "");
+            setIsUsingLocalDraft(false);
+          }
         } else {
+          setParticipant(null);
+          setOriginalParticipant(null);
           resetEvaluation();
+          setIsUsingLocalDraft(false);
         }
       } catch (err) {
         console.error("Failed to load participant", err);
         resetEvaluation();
         setOriginalParticipant(null);
+        setParticipant(null);
+        setIsUsingLocalDraft(false);
       } finally {
         setIsParticipantLoading(false);
       }
@@ -111,6 +160,8 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
   const handleParticipantUpdated = (updatedParticipant: Record<string, any>) => {
     setParticipant(updatedParticipant);
     setOriginalParticipant(updatedParticipant);
+    clearDraftFromLocalStorage(updatedParticipant.id);
+    setIsUsingLocalDraft(false);
     refetchProgram();
   };
 
@@ -142,8 +193,10 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
       setParticipant({ ...originalParticipant });
       setEvaluationStatus(originalParticipant._evaluationStatus || null);
       setApprovalDescription(originalParticipant._evaluationDescription || "");
+      clearDraftFromLocalStorage();
+      setIsUsingLocalDraft(false);
     }
-  }, [originalParticipant, setEvaluationStatus, setApprovalDescription]);
+  }, [originalParticipant, setEvaluationStatus, setApprovalDescription, clearDraftFromLocalStorage]);
 
   const handleSave = async () => {
     if (program?.status === "STOPPED") {
@@ -175,6 +228,8 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
         toast.success(`Data saved successfully`);
         setParticipant(data.participant);
         setOriginalParticipant(data.participant);
+        clearDraftFromLocalStorage(data.participant.id);
+        setIsUsingLocalDraft(false);
         refetchProgram();
       } else {
         toast.error(data.error || "Failed to save data");
@@ -267,58 +322,62 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
 
               if (evalStatus === "VERIFIED") {
                 return (
-                  <div className="flex items-center gap-3 rounded-lg border border-emerald-200 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/30 px-4 py-3">
-                    <CheckCircle2 className="size-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-emerald-800 dark:text-emerald-300">Data Telah Terverifikasi</p>
-                      <p className="text-xs text-emerald-700 dark:text-emerald-400 mt-0.5 flex items-center gap-1.5 flex-wrap">
-                        {verifiedBy && (
-                          <>
-                            <UserCircle2 className="size-3.5 shrink-0" />
-                            <span>Oleh <strong>{verifiedBy}</strong></span>
-                          </>
-                        )}
-                        {formattedDate && (
-                          <>
-                            <span className="text-emerald-500">·</span>
-                            <ClockIcon className="size-3.5 shrink-0" />
-                            <span>{formattedDate}</span>
-                          </>
-                        )}
-                      </p>
+                  <div className="flex flex-col gap-3">
+                    <div className="flex items-center gap-3 rounded-lg border border-emerald-200 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/30 px-4 py-3">
+                      <CheckCircle2 className="size-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-emerald-800 dark:text-emerald-300">Data Telah Terverifikasi</p>
+                        <p className="text-xs text-emerald-700 dark:text-emerald-400 mt-0.5 flex items-center gap-1.5 flex-wrap">
+                          {verifiedBy && (
+                            <>
+                              <UserCircle2 className="size-3.5 shrink-0" />
+                              <span>Oleh <strong>{verifiedBy}</strong></span>
+                            </>
+                          )}
+                          {formattedDate && (
+                            <>
+                              <span className="text-emerald-500">·</span>
+                              <ClockIcon className="size-3.5 shrink-0" />
+                              <span>{formattedDate}</span>
+                            </>
+                          )}
+                        </p>
+                      </div>
+                      <Badge className="bg-emerald-500 text-white border-none text-[10px] font-bold h-5 px-2 shrink-0">
+                        Terverifikasi
+                      </Badge>
                     </div>
-                    <Badge className="bg-emerald-500 text-white border-none text-[10px] font-bold h-5 px-2 shrink-0">
-                      Terverifikasi
-                    </Badge>
                   </div>
                 );
               }
 
               if (evalStatus === "REJECTED") {
                 return (
-                  <div className="flex items-center gap-3 rounded-lg border border-rose-200 bg-rose-50 dark:border-rose-800 dark:bg-rose-950/30 px-4 py-3">
-                    <XCircle className="size-5 text-rose-600 dark:text-rose-400 shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-rose-800 dark:text-rose-300">Data Ditolak</p>
-                      <p className="text-xs text-rose-700 dark:text-rose-400 mt-0.5 flex items-center gap-1.5 flex-wrap">
-                        {verifiedBy && (
-                          <>
-                            <UserCircle2 className="size-3.5 shrink-0" />
-                            <span>Oleh <strong>{verifiedBy}</strong></span>
-                          </>
-                        )}
-                        {formattedDate && (
-                          <>
-                            <span className="text-rose-400">·</span>
-                            <ClockIcon className="size-3.5 shrink-0" />
-                            <span>{formattedDate}</span>
-                          </>
-                        )}
-                      </p>
+                  <div className="flex flex-col gap-3">
+                    <div className="flex items-center gap-3 rounded-lg border border-rose-200 bg-rose-50 dark:border-rose-800 dark:bg-rose-950/30 px-4 py-3">
+                      <XCircle className="size-5 text-rose-600 dark:text-rose-400 shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-rose-800 dark:text-rose-300">Data Ditolak</p>
+                        <p className="text-xs text-rose-700 dark:text-rose-400 mt-0.5 flex items-center gap-1.5 flex-wrap">
+                          {verifiedBy && (
+                            <>
+                              <UserCircle2 className="size-3.5 shrink-0" />
+                              <span>Oleh <strong>{verifiedBy}</strong></span>
+                            </>
+                          )}
+                          {formattedDate && (
+                            <>
+                              <span className="text-rose-400">·</span>
+                              <ClockIcon className="size-3.5 shrink-0" />
+                              <span>{formattedDate}</span>
+                            </>
+                          )}
+                        </p>
+                      </div>
+                      <Badge variant="destructive" className="text-white text-[10px] font-bold h-5 px-2 shrink-0">
+                        Ditolak
+                      </Badge>
                     </div>
-                    <Badge variant="destructive" className="text-white text-[10px] font-bold h-5 px-2 shrink-0">
-                      Ditolak
-                    </Badge>
                   </div>
                 );
               }
@@ -332,11 +391,29 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
               );
             })()}
 
+            {isUsingLocalDraft && (
+              <Alert className="border-amber-500 bg-amber-500/5 text-amber-600 dark:border-amber-800 dark:bg-amber-950/20 dark:text-amber-400">
+                <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                <div className="flex-1">
+                  <AlertTitle className="font-bold flex items-center gap-2 text-xs">
+                    Draft Lokal Aktif
+                    <Badge variant="outline" className="text-[9px] text-amber-600 border-amber-600 font-semibold px-1 py-0 h-4">
+                      Belum Disimpan
+                    </Badge>
+                  </AlertTitle>
+                  <AlertDescription className="text-[11px] mt-0.5">
+                    Menampilkan data yang Anda ketik sebelumnya secara lokal di browser ini. Data ini belum tersimpan di database. Klik <strong>Save</strong> untuk menyimpan permanen atau <strong>Reset</strong> untuk membuang draf ini.
+                  </AlertDescription>
+                </div>
+              </Alert>
+            )}
+
             {/* Sticky Navigator Container */}
             <div className="sticky top-0 z-20 bg-background/95 backdrop-blur-md pb-2.5 border-b pt-4 px-6 -mt-6 -mx-6">
               <ParticipantNavigator
                 programId={id}
                 onSave={handleSave}
+                onSaveDraft={saveDraftToLocalStorage}
                 onReset={handleReset}
                 hasChanges={hasChanges}
                 isSaving={isSaving}

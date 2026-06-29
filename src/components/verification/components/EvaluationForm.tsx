@@ -254,6 +254,15 @@ function PillsInput({ value, separator, onValueChange, placeholder, disabled }: 
     }
   };
 
+  const handleBlur = () => {
+    const trimmed = inputValue.trim().replace(/,/g, "");
+    if (trimmed && !items.includes(trimmed)) {
+      const newItems = [...items, trimmed];
+      onValueChange(newItems.join(separator));
+    }
+    setInputValue("");
+  };
+
   const removeItem = (itemToRemove: string) => {
     const newItems = items.filter(i => i !== itemToRemove);
     onValueChange(newItems.join(separator));
@@ -279,6 +288,7 @@ function PillsInput({ value, separator, onValueChange, placeholder, disabled }: 
         value={inputValue}
         onChange={(e) => setInputValue(e.target.value)}
         onKeyDown={handleKeyDown}
+        onBlur={handleBlur}
         onPaste={handlePaste}
         disabled={disabled}
         placeholder={items.length === 0 ? (placeholder || "Ketik dan tekan Spasi/Enter...") : ""}
