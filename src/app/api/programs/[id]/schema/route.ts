@@ -1,4 +1,6 @@
 import { db } from "@/lib/db";
+import { auth } from "@/lib/auth/auth";
+import { headers as getHeaders } from "next/headers";
 import { NextResponse } from "next/server";
 
 export async function GET(
@@ -6,7 +8,32 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const session = await auth.api.getSession({
+      headers: await getHeaders(),
+    });
+
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const { id } = await params;
+
+    // Check if the user is an APPROVED member of the program
+    const membership = await db.programMember.findUnique({
+      where: {
+        programId_userId: {
+          programId: id,
+          userId: session.user.id,
+        },
+      },
+    });
+
+    if (!membership || membership.status !== "APPROVED") {
+      return NextResponse.json(
+        { error: "Forbidden: Hanya anggota program yang disetujui." },
+        { status: 403 }
+      );
+    }
     
     const program = await db.program.findUnique({
       where: { id },
@@ -47,7 +74,30 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const session = await auth.api.getSession({
+      headers: await getHeaders(),
+    });
+
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const { id } = await params;
+
+    // Check if the user is an APPROVED ADMIN of the program
+    const membership = await db.programMember.findUnique({
+      where: {
+        programId_userId: {
+          programId: id,
+          userId: session.user.id,
+        },
+      },
+    });
+
+    if (!membership || membership.role !== "ADMIN" || membership.status !== "APPROVED") {
+      return NextResponse.json({ error: "Forbidden: Admin only" }, { status: 403 });
+    }
+
     const { sections } = await req.json();
 
     // Extract unique labels/headers from layout sections

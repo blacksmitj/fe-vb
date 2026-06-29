@@ -15,7 +15,33 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const session = await auth.api.getSession({
+      headers: await getHeaders(),
+    });
+
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const { id } = await params;
+
+    // Check if the user is an APPROVED member of the program
+    const membership = await db.programMember.findUnique({
+      where: {
+        programId_userId: {
+          programId: id,
+          userId: session.user.id,
+        },
+      },
+    });
+
+    if (!membership || membership.status !== "APPROVED") {
+      return NextResponse.json(
+        { error: "Forbidden: Hanya anggota program yang disetujui." },
+        { status: 403 }
+      );
+    }
+
     const { searchParams } = new URL(req.url);
     
     // Check if it's a search query

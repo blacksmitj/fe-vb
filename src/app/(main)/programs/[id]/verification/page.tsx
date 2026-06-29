@@ -250,21 +250,23 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
     }
   }, [originalParticipant, setEvaluationStatus, setApprovalDescription, clearDraftFromLocalStorage]);
 
-  const handleSave = async () => {
+  const handleSave = async (status: "VERIFIED" | "REJECTED") => {
     if (program?.status === "STOPPED") {
       toast.error("Tidak dapat menyimpan perubahan karena verifikasi program ini ditangguhkan.");
       return;
     }
 
-    // Validate required fields
+    // Validate required fields only if status is VERIFIED
     const errors: Record<string, string> = {};
-    for (const section of sections) {
-      for (const field of section.fields) {
-        if (field.isRequired) {
-          const val = participant?.[field.label];
-          const isEmpty = val === undefined || val === null || (typeof val === "string" && val.trim() === "");
-          if (isEmpty) {
-            errors[field.label] = "harus diisi";
+    if (status === "VERIFIED") {
+      for (const section of sections) {
+        for (const field of section.fields) {
+          if (field.isRequired) {
+            const val = participant?.[field.label];
+            const isEmpty = val === undefined || val === null || (typeof val === "string" && val.trim() === "");
+            if (isEmpty) {
+              errors[field.label] = "harus diisi";
+            }
           }
         }
       }
@@ -295,7 +297,7 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          status: "VERIFIED",
+          status: status,
           description: approvalDescription,
           participant,
         }),

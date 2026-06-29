@@ -21,7 +21,7 @@ import {
 
 interface ParticipantNavigatorProps {
   programId: string;
-  onSave?: () => Promise<void> | void;
+  onSave?: (status: "VERIFIED" | "REJECTED") => Promise<void> | void;
   onUnverify?: () => Promise<void> | void;
   onSaveDraft?: () => void;
   onReset?: () => void;
@@ -70,6 +70,7 @@ export function ParticipantNavigator({
   
   const [pendingIndex, setPendingIndex] = React.useState<number | null>(null);
   const [isNavSaving, setIsNavSaving] = React.useState(false);
+  const [showRejectConfirm, setShowRejectConfirm] = React.useState(false);
 
   const dropdownRef = React.useRef<HTMLDivElement>(null);
 
@@ -256,9 +257,22 @@ export function ParticipantNavigator({
             </AlertDialog>
           )}
 
+          {/* Reject Button */}
           <Button
             type="button"
-            onClick={onSave}
+            onClick={() => setShowRejectConfirm(true)}
+            disabled={isSaving || isPaused}
+            size="sm"
+            variant="destructive"
+            className="h-8 text-xs font-semibold px-4 shrink-0 bg-red-600 hover:bg-red-700 text-white"
+          >
+            Reject
+          </Button>
+
+          {/* Verify Button */}
+          <Button
+            type="button"
+            onClick={() => onSave?.("VERIFIED")}
             disabled={isSaving || isPaused}
             size="sm"
             className="h-8 text-xs font-semibold px-4 shrink-0 bg-emerald-600 hover:bg-emerald-700 text-white"
@@ -269,9 +283,34 @@ export function ParticipantNavigator({
                 Saving...
               </>
             ) : (
-              "Save"
+              "Verify"
             )}
           </Button>
+
+          {/* Reject Confirmation Dialog */}
+          <AlertDialog open={showRejectConfirm} onOpenChange={setShowRejectConfirm}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Konfirmasi Penolakan Data</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Apakah Anda yakin ingin menolak data peserta ini? Status evaluasi akan disimpan sebagai "REJECTED".
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Batal</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={async () => {
+                    if (onSave) {
+                      await onSave("REJECTED");
+                    }
+                  }}
+                  className="bg-red-600 text-white hover:bg-red-700"
+                >
+                  Tolak Data
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       </div>
 
@@ -406,7 +445,7 @@ export function ParticipantNavigator({
                 setIsNavSaving(true);
                 try {
                   if (onSave) {
-                    await onSave();
+                    await onSave("VERIFIED");
                   }
                   const target = pendingIndex;
                   setPendingIndex(null);
