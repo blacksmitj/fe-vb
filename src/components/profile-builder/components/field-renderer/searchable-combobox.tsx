@@ -29,8 +29,9 @@ export function SearchableCombobox({
   onValueChange,
   disabled,
 }: SearchableComboboxProps) {
-  const [searchValue, setSearchValue] = React.useState("");
+  const [searchValue, setSearchValue] = React.useState(value);
 
+  // Sync input display when the selected value changes from outside (e.g. participant navigation)
   React.useEffect(() => {
     setSearchValue(value);
   }, [value]);
@@ -51,16 +52,26 @@ export function SearchableCombobox({
       onValueChange={(val) => {
         if (val !== null) {
           onValueChange(val);
+          // Tampilkan nilai yang dipilih di input setelah seleksi
           setSearchValue(val);
         }
+      }}
+      // Kontrol teks input melalui Root sesuai API @base-ui/react
+      inputValue={searchValue}
+      onInputValueChange={(val, { reason }) => {
+        setSearchValue(val);
+        // Saat item dipilih, library sudah handle — jangan overwrite lagi
+        if (reason === "item-press") return;
+      }}
+      // Reset teks search ke nilai terpilih saat popup ditutup tanpa memilih
+      onOpenChange={(open) => {
+        if (!open) setSearchValue(value);
       }}
       disabled={disabled}
     >
       <ComboboxInput
         placeholder={placeholder || "Select option..."}
         className="w-full text-xs"
-        value={searchValue}
-        onChange={(e) => setSearchValue(e.target.value)}
         leftAddon={
           dotClass ? (
             <span className={cn("h-2.5 w-2.5 rounded-full shrink-0", dotClass)} />
