@@ -19,8 +19,6 @@ export function useFixDataCount() {
       const json = await res.json();
       return json.count as number;
     },
-    // Update every 2 minutes or when invalidated
-    staleTime: 1000 * 60 * 2,
   });
 }
 
@@ -33,6 +31,5 @@ export function useFixData() {
       const json = await res.json();
       return json.data as FixDataEntry[];
     },
-    staleTime: 1000 * 60 * 2,
   });
 }
