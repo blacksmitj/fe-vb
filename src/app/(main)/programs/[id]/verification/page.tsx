@@ -93,13 +93,17 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
       setCurrentRowIndex(initialIndex);
       // Clear ?page= from URL after consuming it so it doesn't block future navigations
       if (targetPageIndex !== null) {
-        router.replace(pathname, { scroll: false });
+        const fromParam = searchParams.get("from");
+        const nextUrl = fromParam ? `${pathname}?from=${fromParam}` : pathname;
+        router.replace(nextUrl, { scroll: false });
       }
     } else if (targetPageIndex !== null && !isNaN(targetPageIndex) && targetPageIndex !== currentRowIndex) {
       // Same program, but URL has a specific ?page= that differs from store — apply it
       setCurrentRowIndex(targetPageIndex);
       // Clear ?page= from URL after consuming it
-      router.replace(pathname, { scroll: false });
+      const fromParam = searchParams.get("from");
+      const nextUrl = fromParam ? `${pathname}?from=${fromParam}` : pathname;
+      router.replace(nextUrl, { scroll: false });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, prevProgramId, targetPageIndex]);
