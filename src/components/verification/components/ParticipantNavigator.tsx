@@ -4,9 +4,11 @@ import * as React from "react";
 import { useVerificationStore } from "@/stores";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, Search, Loader2, ArrowLeft, RotateCcw } from "lucide-react";
+import { ChevronLeft, ChevronRight, Search, Loader2, ArrowLeft, RotateCcw, Wrench } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
+import { useSearchParams, useRouter } from "next/navigation";
+import { useFixData } from "@/hooks/use-fix-data";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -63,12 +65,64 @@ export function ParticipantNavigator({
     totalRows,
   } = useVerificationStore();
 
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const from = searchParams.get("from");
+
+  const { data: fixDataList = [] } = useFixData();
+
+  const nextFixEntry = React.useMemo(() => {
+    if (fixDataList.length === 0) return null;
+    
+    // 1. Try to find by current index in the list
+    const currentIdx = fixDataList.findIndex(
+      (item) => item.programId === programId && item.rowIndex === currentRowIndex
+    );
+    if (currentIdx !== -1 && currentIdx < fixDataList.length - 1) {
+      return fixDataList[currentIdx + 1];
+    }
+    
+    // 2. If current item is not in the list (e.g. just got verified/removed),
+    // find the first item that has rowIndex > currentRowIndex in the same program
+    const nextInSameProgram = fixDataList.find(
+      (item) => item.programId === programId && item.rowIndex > currentRowIndex
+    );
+    if (nextInSameProgram) return nextInSameProgram;
+    
+    // 3. Fallback: just return the first item in the list
+    // but avoid returning the current item itself if it's still there
+    const firstRemaining = fixDataList.find(
+      (item) => !(item.programId === programId && item.rowIndex === currentRowIndex)
+    );
+    return firstRemaining || null;
+  }, [fixDataList, programId, currentRowIndex]);
+
+  const handleExit = () => {
+    if (from === "fix-data") {
+      router.push("/fix-data");
+    } else {
+      router.push("/programs");
+    }
+  };
+
+  const handleFixNext = () => {
+    if (!nextFixEntry) return;
+    const targetUrl = `/programs/${nextFixEntry.programId}/verification?page=${nextFixEntry.rowIndex}&from=fix-data`;
+    
+    if (hasChanges) {
+      setPendingRedirectUrl(targetUrl);
+    } else {
+      router.push(targetUrl);
+    }
+  };
+
   const [searchVal, setSearchVal] = React.useState("");
   const [isSearching, setIsSearching] = React.useState(false);
   const [results, setResults] = React.useState<SearchMatch[]>([]);
   const [showDropdown, setShowDropdown] = React.useState(false);
   
   const [pendingIndex, setPendingIndex] = React.useState<number | null>(null);
+  const [pendingRedirectUrl, setPendingRedirectUrl] = React.useState<string | null>(null);
   const [isNavSaving, setIsNavSaving] = React.useState(false);
   const [showRejectConfirm, setShowRejectConfirm] = React.useState(false);
 
@@ -174,11 +228,14 @@ export function ParticipantNavigator({
       <div className="flex items-center justify-between w-full gap-3">
         {/* Sisi Kiri: Exit & Statistik Progres */}
         <div className="flex items-center gap-3">
-          <Button variant="outline" size="sm" asChild className="gap-1.5 h-8 text-xs shrink-0">
-            <Link href="/programs">
-              <ArrowLeft className="h-3.5 w-3.5" />
-              Exit
-            </Link>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExit}
+            className="gap-1.5 h-8 text-xs shrink-0"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            Exit
           </Button>
 
           {/* Statistik Progres (Selalu tampil di semua ukuran layar) */}
@@ -311,6 +368,19 @@ export function ParticipantNavigator({
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
+          {from === "fix-data" && nextFixEntry && (
+            <Button
+              type="button"
+              onClick={handleFixNext}
+              disabled={isSaving || isPaused}
+              size="sm"
+              variant="outline"
+              className="h-8 text-xs font-semibold px-3 shrink-0 gap-1.5 border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-700 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-400"
+            >
+              <Wrench className="h-3.5 w-3.5" />
+              <span>Perbaiki Berikutnya</span>
+            </Button>
+          )}
         </div>
       </div>
 
@@ -402,7 +472,15 @@ export function ParticipantNavigator({
       </div>
 
       {/* Alert Dialog untuk konfirmasi perubahan belum disimpan saat navigasi */}
-      <AlertDialog open={pendingIndex !== null} onOpenChange={(open) => { if (!open) setPendingIndex(null); }}>
+      <AlertDialog
+        open={pendingIndex !== null || pendingRedirectUrl !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setPendingIndex(null);
+            setPendingRedirectUrl(null);
+          }
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="text-sm font-bold">Simpan Perubahan?</AlertDialogTitle>
@@ -414,7 +492,14 @@ export function ParticipantNavigator({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="flex flex-col sm:flex-row gap-2 mt-4">
-            <AlertDialogCancel disabled={isNavSaving} onClick={() => setPendingIndex(null)} className="h-8 text-xs font-semibold mt-0">
+            <AlertDialogCancel
+              disabled={isNavSaving}
+              onClick={() => {
+                setPendingIndex(null);
+                setPendingRedirectUrl(null);
+              }}
+              className="h-8 text-xs font-semibold mt-0"
+            >
               Batal
             </AlertDialogCancel>
             <Button
@@ -426,12 +511,16 @@ export function ParticipantNavigator({
                   onSaveDraft();
                 }
                 const target = pendingIndex;
+                const redirectUrl = pendingRedirectUrl;
                 setPendingIndex(null);
+                setPendingRedirectUrl(null);
                 if (target !== null) {
                   setCurrentRowIndex(target);
                   setSearchVal("");
                   setResults([]);
                   setShowDropdown(false);
+                } else if (redirectUrl !== null) {
+                  router.push(redirectUrl);
                 }
               }}
               className="h-8 text-xs font-semibold text-amber-600 hover:text-amber-700 hover:bg-amber-50"
@@ -453,12 +542,16 @@ export function ParticipantNavigator({
                   }
                   if (success) {
                     const target = pendingIndex;
+                    const redirectUrl = pendingRedirectUrl;
                     setPendingIndex(null);
+                    setPendingRedirectUrl(null);
                     if (target !== null) {
                       setCurrentRowIndex(target);
                       setSearchVal("");
                       setResults([]);
                       setShowDropdown(false);
+                    } else if (redirectUrl !== null) {
+                      router.push(redirectUrl);
                     }
                   }
                 } catch (err) {

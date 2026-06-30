@@ -155,7 +155,7 @@ export default function FixDataPage() {
         cell: ({ row }) => (
           <div className="text-right">
             <Button asChild size="sm" variant="outline">
-              <Link href={`/programs/${row.original.programId}/verification?page=${row.original.rowIndex}`}>
+              <Link href={`/programs/${row.original.programId}/verification?page=${row.original.rowIndex}&from=fix-data`}>
                 <span>Buka Verifikasi</span>
                 <ArrowRight className="ml-2 size-3" />
               </Link>
