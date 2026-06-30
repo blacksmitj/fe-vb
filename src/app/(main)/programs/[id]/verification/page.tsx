@@ -29,6 +29,7 @@ import { Badge } from "@/components/ui/badge";
 import { safeParseDate } from "@/lib/utils";
 import { useSession } from "@/lib/auth/auth-client";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 
 export default function VerificationPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = React.use(params);
@@ -36,6 +37,7 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
+  const queryClient = useQueryClient();
   
   const {
     currentRowIndex,
@@ -358,6 +360,7 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
         clearDraftFromLocalStorage(data.participant.id);
         setIsUsingLocalDraft(false);
         refetchProgram();
+        queryClient.invalidateQueries({ queryKey: ["fix-data"] });
         return true;
       } else {
         toast.error(data.error || "Gagal menyimpan data");
@@ -410,6 +413,7 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
         clearDraftFromLocalStorage(data.participant.id);
         setIsUsingLocalDraft(false);
         refetchProgram();
+        queryClient.invalidateQueries({ queryKey: ["fix-data"] });
       } else {
         toast.error(data.error || "Gagal membatalkan verifikasi");
       }
