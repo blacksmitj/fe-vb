@@ -353,6 +353,8 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
         toast.success(status === "VERIFIED" ? "Data berhasil diverifikasi" : "Data berhasil ditolak");
         setParticipant(data.participant);
         setOriginalParticipant(data.participant);
+        setEvaluationStatus(data.participant._evaluationStatus || null);
+        setApprovalDescription(data.participant._evaluationDescription || "");
         clearDraftFromLocalStorage(data.participant.id);
         setIsUsingLocalDraft(false);
         refetchProgram();
