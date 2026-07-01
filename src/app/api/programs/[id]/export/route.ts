@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth/auth";
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 import ExcelJS from "exceljs";
+import { safeParseDate } from "@/lib/utils";
 
 export async function GET(
   req: Request,
@@ -35,7 +36,10 @@ export async function GET(
 
     const program = await db.program.findUnique({
       where: { id },
-      select: { name: true, headers: true },
+      include: {
+        profileSchema: true,
+        profileTemplate: true,
+      },
     });
 
     if (!program) {
@@ -59,21 +63,52 @@ export async function GET(
       return NextResponse.json({ error: "No participant data available to export" }, { status: 400 });
     }
 
-    // Extract headers (headers are same across rows for a single import, use first row)
-    const headersList = program.headers || [];
+    const { searchParams } = new URL(req.url);
+    const mode = searchParams.get("mode"); // "profile" or "all"
+    const exportProfile = mode === "profile";
+
+    // Resolve active sections (prioritize profileTemplate, fallback to profileSchema)
+    let sections: any[] = [];
+    if (program.profileTemplate && program.profileTemplate.sections) {
+      sections = program.profileTemplate.sections as any[];
+    } else if (program.profileSchema && program.profileSchema.sections) {
+      sections = program.profileSchema.sections as any[];
+    }
+
+    // Extract fields from profile builder schema
+    const builderFields: any[] = [];
+    if (sections && Array.isArray(sections)) {
+      sections.forEach((sec: any) => {
+        if (sec.fields && Array.isArray(sec.fields)) {
+          sec.fields.forEach((f: any) => {
+            builderFields.push(f);
+          });
+        }
+      });
+    }
+
+    const hasProfileBuilder = exportProfile && builderFields.length > 0;
+
+    // Define column headers
+    const finalHeaders = hasProfileBuilder
+      ? [
+          ...builderFields.map((f: any) => f.label),
+          "Status Verifikasi",
+          "Diverifikasi Oleh",
+          "Waktu Verifikasi",
+          "Keterangan Verifikasi"
+        ]
+      : [
+          ...program.headers.filter((h: string) => !h.startsWith("__") && !h.startsWith("_")),
+          "Status Verifikasi",
+          "Diverifikasi Oleh",
+          "Waktu Verifikasi",
+          "Keterangan Verifikasi"
+        ];
 
     // Create workbook and sheet
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet("Participants Evaluation");
-
-    // We add verification status and details headers at the end
-    const finalHeaders = [
-      ...headersList.filter((h: string) => !h.startsWith("__") && !h.startsWith("_")),
-      "Status Verifikasi",
-      "Diverifikasi Oleh",
-      "Waktu Verifikasi",
-      "Keterangan Verifikasi"
-    ];
 
     // Define columns
     worksheet.columns = finalHeaders.map((h: string) => ({
@@ -87,22 +122,77 @@ export async function GET(
       const row = (p.data as Record<string, any>) || {};
       const rowData: Record<string, any> = {};
       
-      // Populate original fields
-      headersList.forEach((h: string) => {
-        if (!h.startsWith("__") && !h.startsWith("_")) {
-          rowData[h] = row[h] !== undefined && row[h] !== null ? row[h] : "";
-        }
-      });
+      if (hasProfileBuilder) {
+        builderFields.forEach((field: any) => {
+          const val = row[field.label];
+          if (field.type === "date") {
+            const dateObj = safeParseDate(val);
+            if (dateObj) {
+              const mode = field.dateMode === "date-time" ? "date-time" : "date-only";
+              const options: Intl.DateTimeFormatOptions = {
+                day: "numeric",
+                month: "long",
+                year: "numeric",
+                timeZone: "Asia/Jakarta"
+              };
+              if (mode === "date-time") {
+                options.hour = "2-digit";
+                options.minute = "2-digit";
+              }
+              
+              let formattedDate = dateObj.toLocaleDateString("id-ID", options);
+              if (mode === "date-time") {
+                formattedDate += " WIB";
+              }
+              rowData[field.label] = formattedDate;
+            } else {
+              rowData[field.label] = val !== undefined && val !== null ? String(val) : "";
+            }
+          } else {
+            rowData[field.label] = val !== undefined && val !== null ? String(val) : "";
+          }
+        });
+      } else {
+        // Populate original fields
+        program.headers.forEach((h: string) => {
+          if (!h.startsWith("__") && !h.startsWith("_")) {
+            const val = row[h];
+            rowData[h] = val !== undefined && val !== null ? String(val) : "";
+          }
+        });
+      }
 
       // Populate verification results
-      rowData["Status Verifikasi"] = p.evalStatus === "VERIFIED" ? "SUDAH DIVERIFIKASI" : "BELUM DIVERIFIKASI";
+      let statusVerifikasi = "BELUM DIVERIFIKASI";
+      if (p.evalStatus === "VERIFIED") {
+        statusVerifikasi = "SUDAH DIVERIFIKASI";
+      } else if (p.evalStatus === "REJECTED") {
+        statusVerifikasi = "DITOLAK";
+      }
+
+      rowData["Status Verifikasi"] = statusVerifikasi;
       rowData["Diverifikasi Oleh"] = p.evalByUserName || "";
       rowData["Waktu Verifikasi"] = p.evalAt 
-        ? new Date(p.evalAt).toLocaleString("id-ID")
+        ? p.evalAt.toLocaleDateString("id-ID", {
+            day: "numeric",
+            month: "long",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+            timeZone: "Asia/Jakarta"
+          }) + " WIB"
         : "";
       rowData["Keterangan Verifikasi"] = p.evalDescription || "";
 
-      worksheet.addRow(rowData);
+      const addedRow = worksheet.addRow(rowData);
+      
+      // CRITICAL: Format each cell in the added row as text to prevent scientific notation
+      addedRow.eachCell({ includeEmpty: true }, (cell) => {
+        cell.numFmt = "@";
+        if (cell.value !== null && cell.value !== undefined) {
+          cell.value = String(cell.value);
+        }
+      });
     });
 
     // Style the header row
@@ -120,8 +210,9 @@ export async function GET(
     const buffer = await workbook.xlsx.writeBuffer();
 
     // Format safe file name
+    const prefix = exportProfile ? "export_profile" : "export_all";
     const safeProgramName = program.name.replace(/[^a-z0-9]/gi, "_").toLowerCase();
-    const fileName = `export_${safeProgramName}_${new Date().toISOString().split("T")[0]}.xlsx`;
+    const fileName = `${prefix}_${safeProgramName}_${new Date().toISOString().split("T")[0]}.xlsx`;
 
     return new Response(buffer, {
       status: 200,

@@ -719,11 +719,11 @@ export default function ProgramSettingsPage({ params }: { params: Promise<{ id: 
     }
   }, [activeTab, userRole, fetchMembers, fetchLogs]);
 
-  const handleExport = async () => {
+  const handleExport = async (mode: "all" | "profile" = "all") => {
     setIsExporting(true);
     const toastId = toast.loading("Sedang menyiapkan file Excel...");
     try {
-      const response = await fetch(`/api/programs/${id}/export`);
+      const response = await fetch(`/api/programs/${id}/export?mode=${mode}`);
       if (!response.ok) {
         const errData = await response.json().catch(() => ({ error: "Gagal mengunduh file." }));
         throw new Error(errData.error || "Gagal mengunduh file.");
@@ -735,7 +735,7 @@ export default function ProgramSettingsPage({ params }: { params: Promise<{ id: 
       a.href = url;
       
       const contentDisposition = response.headers.get("Content-Disposition");
-      let fileName = `export_${program?.name?.replace(/[^a-z0-9]/gi, "_").toLowerCase() || id}.xlsx`;
+      let fileName = `export_${mode}_${program?.name?.replace(/[^a-z0-9]/gi, "_").toLowerCase() || id}.xlsx`;
       if (contentDisposition) {
         const match = contentDisposition.match(/filename="?([^"]+)"?/);
         if (match && match[1]) fileName = match[1];
@@ -1152,14 +1152,31 @@ export default function ProgramSettingsPage({ params }: { params: Promise<{ id: 
                           </div>
                         </div>
 
-                        <div className="flex justify-end">
-                          <Button onClick={handleExport} disabled={isExporting || !program?.totalRows} className="gap-2 w-full md:w-auto">
+                        <div className="flex flex-col sm:flex-row justify-end gap-3">
+                          <Button
+                            variant="outline"
+                            onClick={() => handleExport("all")}
+                            disabled={isExporting || !program?.totalRows}
+                            className="gap-2 w-full sm:w-auto"
+                          >
+                            {isExporting ? (
+                              <RefreshCwIcon className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <DatabaseIcon className="h-4 w-4 text-muted-foreground" />
+                            )}
+                            Export Semua Data Asli
+                          </Button>
+                          <Button
+                            onClick={() => handleExport("profile")}
+                            disabled={isExporting || !program?.totalRows}
+                            className="gap-2 w-full sm:w-auto"
+                          >
                             {isExporting ? (
                               <RefreshCwIcon className="h-4 w-4 animate-spin" />
                             ) : (
                               <DatabaseIcon className="h-4 w-4" />
                             )}
-                            Export Data ke Excel (.xlsx)
+                            Export Sesuai Layout Profile
                           </Button>
                         </div>
                       </CardContent>
