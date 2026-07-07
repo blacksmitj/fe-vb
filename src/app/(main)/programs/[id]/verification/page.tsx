@@ -128,16 +128,22 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
       participant,
       evaluationStatus,
       approvalDescription,
+      programId: id,
+      participantId: currentParticipantId,
+      rowIndex: currentRowIndex,
+      updatedAt: Date.now(),
     };
     localStorage.setItem(draftKey, JSON.stringify(draftData));
     setIsUsingLocalDraft(true);
-  }, [id, currentParticipantId, participant, evaluationStatus, approvalDescription]);
+    window.dispatchEvent(new Event("draft-updated"));
+  }, [id, currentParticipantId, participant, evaluationStatus, approvalDescription, currentRowIndex]);
 
   // Helper to clear draft from localStorage
   const clearDraftFromLocalStorage = React.useCallback((pId?: string) => {
     const targetId = pId || currentParticipantId;
     if (!targetId) return;
     localStorage.removeItem(`draft_${id}_${targetId}`);
+    window.dispatchEvent(new Event("draft-updated"));
   }, [id, currentParticipantId]);
 
   // Fetch Program Profile Builder Schema
@@ -265,6 +271,19 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
 
     return statusChanged || descChanged;
   }, [participant, originalParticipant, evaluationStatus, approvalDescription]);
+
+
+  // Autosave to localStorage when changes occur (5s delay)
+  React.useEffect(() => {
+    if (!hasChanges) return;
+
+    const delayDebounceFn = setTimeout(() => {
+      saveDraftToLocalStorage();
+    }, 5000);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [hasChanges, saveDraftToLocalStorage]);
+
 
   const handleReset = React.useCallback(() => {
     if (originalParticipant) {
