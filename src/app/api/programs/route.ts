@@ -76,8 +76,8 @@ export async function GET(request: Request) {
     evalStats.forEach(stat => {
       const progStats = statsMap[stat.programId];
       if (progStats) {
-        if (stat.evalStatus === "VERIFIED") {
-          progStats.verified = stat._count.id;
+        if (stat.evalStatus === "VERIFIED" || stat.evalStatus === "REVERIFICATION") {
+          progStats.verified += stat._count.id;
         } else if (stat.evalStatus === "REJECTED") {
           progStats.rejected = stat._count.id;
         }

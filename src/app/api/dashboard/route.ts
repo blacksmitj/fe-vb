@@ -65,8 +65,11 @@ export async function GET() {
     evalStats.forEach((stat) => {
       const s = statsMap[stat.programId];
       if (!s) return;
-      if (stat.evalStatus === "VERIFIED") s.verified = stat._count.id;
-      else if (stat.evalStatus === "REJECTED") s.rejected = stat._count.id;
+      if (stat.evalStatus === "VERIFIED" || stat.evalStatus === "REVERIFICATION") {
+        s.verified += stat._count.id;
+      } else if (stat.evalStatus === "REJECTED") {
+        s.rejected = stat._count.id;
+      }
     });
 
     // ─── 3. Format program list ───────────────────────────────────────────────

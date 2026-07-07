@@ -6,6 +6,7 @@ import {
   VerificationLayout,
   EvaluationForm,
   EvaluationControls,
+  ParticipantNavigator,
 } from "@/components/verification";
 import { Section, migrateSectionsSchema } from "@/components/profile-builder";
 import {
@@ -17,9 +18,6 @@ import {
   XCircle,
   ClockIcon,
   UserCircle2,
-  ChevronLeft,
-  ChevronRight,
-  RotateCcw,
 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -36,17 +34,6 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { safeParseDate } from "@/lib/utils";
 import { useVerificationStore } from "@/stores";
 import { useSession } from "@/lib/auth/auth-client";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 
 export default function ReVerificationDetailPage({
@@ -69,7 +56,6 @@ export default function ReVerificationDetailPage({
   const [isLoading, setIsLoading] = React.useState(true);
   const [isSaving, setIsSaving] = React.useState(false);
   const [validationErrors, setValidationErrors] = React.useState<Record<string, string>>({});
-  const [showRejectConfirm, setShowRejectConfirm] = React.useState(false);
 
   const {
     evaluationStatus,
@@ -433,190 +419,26 @@ export default function ReVerificationDetailPage({
             return null;
           })()}
 
-          {/* Sticky Navigator Container - structured precisely like original ParticipantNavigator */}
+          {/* Sticky Navigator Container */}
           {!isLoading && (
-            <div className="sticky top-0 z-20 bg-background/95 backdrop-blur-md pb-3 border-b pt-4 px-6 -mt-6 -mx-6 flex flex-col gap-3 w-full">
-              {/* Row 1: Exit, mode badge, and Reset/Unverif/Save Actions */}
-              <div className="flex items-center justify-between w-full gap-3">
-                <div className="flex items-center gap-3">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    asChild
-                    className="gap-1.5 h-8 text-xs shrink-0"
-                  >
-                    <Link href={backUrl}>
-                      <ArrowLeft className="h-3.5 w-3.5" />
-                      Exit
-                    </Link>
-                  </Button>
-
-                  <div className="flex items-center gap-1.5 text-xs bg-amber-500/10 border border-amber-500/20 px-3 py-1 rounded-lg select-none text-amber-700 dark:text-amber-400 font-semibold font-mono">
-                    VERIFIKASI ULANG
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2 shrink-0">
-                  {/* Reset Button */}
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        disabled={!hasChanges || isSaving}
-                        size="sm"
-                        className="h-8 text-xs font-semibold px-3 shrink-0 gap-1.5"
-                      >
-                        <RotateCcw className="h-3.5 w-3.5" />
-                        Reset
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Konfirmasi Reset Data</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          Apakah Anda yakin ingin membatalkan semua perubahan untuk data peserta ini?
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Batal</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleReset} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                          Reset Data
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-
-                  {/* Unverif Button */}
-                  {originalParticipant?._evaluationStatus && (
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button
-                          type="button"
-                          disabled={isSaving}
-                          size="sm"
-                          variant="outline"
-                          className="h-8 text-xs font-semibold px-3 shrink-0 gap-1.5 text-rose-600 hover:text-rose-700 hover:bg-rose-50 border-rose-200"
-                        >
-                          <RotateCcw className="h-3.5 w-3.5" />
-                          Unverif
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Konfirmasi Pembatalan Verifikasi</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            Apakah Anda yakin ingin membatalkan status verifikasi peserta ini?
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Batal</AlertDialogCancel>
-                          <AlertDialogAction onClick={handleUnverify} className="bg-rose-600 text-white hover:bg-rose-700">
-                            Batalkan Verifikasi
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  )}
-
-                  {/* Reject Button */}
-                  <Button
-                    type="button"
-                    onClick={() => setShowRejectConfirm(true)}
-                    disabled={isSaving}
-                    size="sm"
-                    variant="destructive"
-                    className="h-8 text-xs font-semibold px-4 shrink-0 bg-red-600 hover:bg-red-700 text-white"
-                  >
-                    Reject
-                  </Button>
-
-                  {/* Tombol Verifikasi Ulang */}
-                  {originalParticipant?._evaluationStatus !== "REVERIFICATION" &&
-                    session?.user &&
-                    originalParticipant?._verifiedByUserId === session.user.id && (
-                      <Button
-                        type="button"
-                        onClick={() => handleSave("REVERIFICATION")}
-                        disabled={isSaving}
-                        size="sm"
-                        className="h-8 text-xs font-semibold px-4 shrink-0 bg-amber-500 hover:bg-amber-600 text-white border-amber-600"
-                      >
-                        {isSaving ? (
-                          <>
-                            <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
-                            Saving...
-                          </>
-                        ) : (
-                          "Verifikasi Ulang"
-                        )}
-                      </Button>
-                    )}
-
-                  {/* Reject Confirmation Dialog */}
-                  <AlertDialog open={showRejectConfirm} onOpenChange={setShowRejectConfirm}>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Konfirmasi Penolakan Data</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          Apakah Anda yakin ingin menolak data peserta ini? Status evaluasi akan disimpan sebagai "REJECTED".
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Batal</AlertDialogCancel>
-                        <AlertDialogAction
-                          onClick={async () => {
-                            await handleSave("REJECTED");
-                          }}
-                          className="bg-red-600 text-white hover:bg-red-700"
-                        >
-                          Tolak Data
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                </div>
-              </div>
-
-              {/* Row 2: Participant info details and Prev/Next pagination */}
-              <div className="flex items-center justify-between w-full gap-3">
-                {/* Left Side: Participant Name & Unique Key */}
-                <div className="flex items-center gap-2 max-w-[65%] truncate">
-                  <span className="font-semibold text-xs text-foreground truncate">
-                    {participantName || "Peserta"}
-                  </span>
-                  <span className="text-[10px] text-muted-foreground/80 bg-muted px-2 py-0.5 rounded font-mono shrink-0">
-                    {participant?.uniqueKeyColumn}: {participant?.uniqueKey}
-                  </span>
-                </div>
-
-                {/* Right Side: Prev/Next Buttons */}
-                <div className="flex items-center gap-1.5 shrink-0">
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    disabled={!prevId}
-                    className="h-8 w-8"
-                    onClick={() => handleNavigate(prevId)}
-                    title="Sebelumnya"
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                  </Button>
-                  <span className="text-xs font-semibold min-w-[70px] text-center select-none text-muted-foreground">
-                    Verifikasi Ulang
-                  </span>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    disabled={!nextId}
-                    className="h-8 w-8"
-                    onClick={() => handleNavigate(nextId)}
-                    title="Berikutnya"
-                  >
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
+            <div className="sticky top-0 z-20 bg-background/95 backdrop-blur-md pb-2.5 border-b pt-4 px-6 -mt-6 -mx-6">
+              <ParticipantNavigator
+                programId={originalParticipant?.programId ?? ""}
+                mode="re-verification"
+                onSave={handleSave}
+                onUnverify={handleUnverify}
+                onReset={handleReset}
+                hasChanges={hasChanges}
+                isSaving={isSaving}
+                originalStatus={originalParticipant?._evaluationStatus}
+                verifiedByUserId={originalParticipant?._verifiedByUserId}
+                onPrev={() => handleNavigate(prevId)}
+                onNext={() => handleNavigate(nextId)}
+                prevDisabled={!prevId}
+                nextDisabled={!nextId}
+                backUrl={backUrl}
+                participantLabel={participantName || "Peserta"}
+              />
             </div>
           )}
 

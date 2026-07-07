@@ -76,8 +76,8 @@ export async function GET(
     let rejectedCount = 0;
 
     stats.forEach(stat => {
-      if (stat.evalStatus === "VERIFIED") {
-        verifiedCount = stat._count.id;
+      if (stat.evalStatus === "VERIFIED" || stat.evalStatus === "REVERIFICATION") {
+        verifiedCount += stat._count.id;
       } else if (stat.evalStatus === "REJECTED") {
         rejectedCount = stat._count.id;
       }

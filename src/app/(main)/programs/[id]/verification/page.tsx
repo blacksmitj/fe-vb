@@ -295,7 +295,7 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
     }
   }, [originalParticipant, setEvaluationStatus, setApprovalDescription, clearDraftFromLocalStorage]);
 
-  const handleSave = async (status: "VERIFIED" | "REJECTED"): Promise<boolean> => {
+  const handleSave = async (status: "VERIFIED" | "REJECTED" | "REVERIFICATION"): Promise<boolean> => {
     if (program?.status === "STOPPED") {
       toast.error("Tidak dapat menyimpan perubahan karena verifikasi program ini ditangguhkan.");
       return false;
@@ -375,7 +375,13 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
         data = { error: "An error occurred while saving the data" };
       }
       if (res.ok && data.success) {
-        toast.success(status === "VERIFIED" ? "Data berhasil diverifikasi" : "Data berhasil ditolak");
+        let successMsg = "Data berhasil diverifikasi";
+        if (status === "REJECTED") {
+          successMsg = "Data berhasil ditolak";
+        } else if (status === "REVERIFICATION") {
+          successMsg = "Permintaan Verifikasi Ulang berhasil diajukan";
+        }
+        toast.success(successMsg);
         setParticipant(data.participant);
         setOriginalParticipant(data.participant);
         setEvaluationStatus(data.participant._evaluationStatus || null);
@@ -662,6 +668,7 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
                 rejectedCount={program?.rejectedCount}
                 pendingCount={program?.pendingCount}
                 isPaused={program?.status === "STOPPED"}
+                verifiedByUserId={originalParticipant?._verifiedByUserId}
               />
             </div>
 

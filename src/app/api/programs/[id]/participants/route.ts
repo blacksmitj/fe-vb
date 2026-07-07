@@ -227,7 +227,18 @@ export async function PATCH(
 
     const isUnverif = status === null || status === "UNVERIFIED";
 
-    // Validate authorization for Unverif
+    // Validate authorization for REVERIFICATION
+    if (status === "REVERIFICATION") {
+      const isOriginalVerifier = targetParticipant.evalByUserId === session.user.id;
+      if (!isOriginalVerifier) {
+        return NextResponse.json(
+          { error: "Hanya Verifikator yang melakukan verifikasi awal yang dapat mengajukan verifikasi ulang." },
+          { status: 403 }
+        );
+      }
+    }
+
+    // Validate authorization for Unverify
     if (isUnverif) {
       const isAdmin = member.role === "ADMIN";
       const isOriginalVerifier = targetParticipant.evalByUserId === session.user.id;
@@ -337,15 +348,21 @@ export async function PATCH(
 
     // Create activity log
     try {
-      const details = isUnverif
+      let action = isUnverif ? "UNVERIFIED" : "VERIFIED";
+      let details = isUnverif
         ? `Membatalkan verifikasi data peserta (ID: ${updated.uniqueKey}).`
         : `Memverifikasi data peserta (ID: ${updated.uniqueKey}).${description ? ` Catatan: ${description}` : ""}`;
+
+      if (status === "REVERIFICATION") {
+        action = "REVERIFICATION";
+        details = `Mengajukan verifikasi ulang data peserta (ID: ${updated.uniqueKey}).${description ? ` Catatan: ${description}` : ""}`;
+      }
 
       await db.activityLog.create({
         data: {
           programId,
           userId: session.user.id,
-          action: isUnverif ? "UNVERIFIED" : "VERIFIED",
+          action,
           details,
         },
       });
