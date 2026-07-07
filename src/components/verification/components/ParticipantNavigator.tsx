@@ -327,22 +327,24 @@ export function ParticipantNavigator({
           </Button>
 
           {/* Verify Button */}
-          <Button
-            type="button"
-            onClick={() => onSave?.("VERIFIED")}
-            disabled={isSaving || isPaused}
-            size="sm"
-            className="h-8 text-xs font-semibold px-4 shrink-0 bg-emerald-600 hover:bg-emerald-700 text-white"
-          >
-            {isSaving ? (
-              <>
-                <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
-                Saving...
-              </>
-            ) : (
-              "Verify"
-            )}
-          </Button>
+          {(originalStatus === null || originalStatus === undefined || originalStatus === "") && (
+            <Button
+              type="button"
+              onClick={() => onSave?.("VERIFIED")}
+              disabled={isSaving || isPaused}
+              size="sm"
+              className="h-8 text-xs font-semibold px-4 shrink-0 bg-emerald-600 hover:bg-emerald-700 text-white"
+            >
+              {isSaving ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
+                  Saving...
+                </>
+              ) : (
+                "Verify"
+              )}
+            </Button>
+          )}
 
           {/* Reject Confirmation Dialog */}
           <AlertDialog open={showRejectConfirm} onOpenChange={setShowRejectConfirm}>

@@ -217,6 +217,7 @@ enum ProgramMemberStatus {
 enum ParticipantEvalStatus {
   VERIFIED
   REJECTED
+  REVERIFICATION
 }
 
 enum ProgramStatus {

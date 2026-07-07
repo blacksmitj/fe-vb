@@ -588,6 +588,37 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
                 );
               }
 
+              if (evalStatus === "REVERIFICATION") {
+                return (
+                  <div className="flex flex-col gap-3">
+                    <div className="flex items-center gap-3 rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30 px-4 py-3">
+                      <RefreshCw className="size-5 text-amber-600 dark:text-amber-400 shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">Menunggu Verifikasi Ulang</p>
+                        <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5 flex items-center gap-1.5 flex-wrap">
+                          {verifiedBy && (
+                            <>
+                              <UserCircle2 className="size-3.5 shrink-0" />
+                              <span>Oleh <strong>{verifiedBy}</strong></span>
+                            </>
+                          )}
+                          {formattedDate && (
+                            <>
+                              <span className="text-amber-500">·</span>
+                              <ClockIcon className="size-3.5 shrink-0" />
+                              <span>{formattedDate}</span>
+                            </>
+                          )}
+                        </p>
+                      </div>
+                      <Badge className="bg-amber-500 hover:bg-amber-600 text-white border-none text-[10px] font-bold h-5 px-2 shrink-0">
+                        Verifikasi Ulang
+                      </Badge>
+                    </div>
+                  </div>
+                );
+              }
+
               // Pending
               return (
                 <div className="flex items-center gap-3 rounded-lg border border-dashed px-4 py-3 text-muted-foreground">

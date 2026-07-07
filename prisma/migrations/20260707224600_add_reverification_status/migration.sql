@@ -1,0 +1,1 @@
+-- Empty migration (consolidated into 20260707230000_sync_relations_and_status)
