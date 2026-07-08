@@ -31,6 +31,9 @@ export async function GET(
     const participant = await db.participant.findUnique({
       where: { id: participantId },
       include: {
+        verificationHistories: {
+          orderBy: { evalAt: "asc" },
+        },
         program: {
           select: {
             name: true,
@@ -132,6 +135,19 @@ export async function GET(
       }
     }
 
+    const histories = [...(participant.verificationHistories || [])];
+    if (histories.length === 0 && participant.evalByUserId) {
+      histories.push({
+        id: "initial-legacy",
+        participantId: participant.id,
+        evalStatus: participant.evalStatus!,
+        evalDescription: participant.evalDescription,
+        evalByUserId: participant.evalByUserId,
+        evalByUserName: participant.evalByUserName || "Sistem",
+        evalAt: participant.evalAt || new Date(),
+      });
+    }
+
     const responseParticipant = {
       id: participant.id,
       programId: participant.programId,
@@ -144,6 +160,7 @@ export async function GET(
       _verifiedByName: participant.evalByUserName,
       _verifiedByUserId: participant.evalByUserId,
       _evaluatedAt: participant.evalAt ? participant.evalAt.toISOString() : null,
+      _verificationHistories: histories,
       ...(participant.data as Record<string, any>),
     };
 
@@ -223,17 +240,6 @@ export async function PATCH(
 
     const isUnverif = status === null || status === "UNVERIFIED";
 
-    // Validate authorization for REVERIFICATION
-    if (status === "REVERIFICATION") {
-      const isOriginalVerifier = targetParticipant.evalByUserId === session.user.id;
-      if (!isOriginalVerifier) {
-        return NextResponse.json(
-          { error: "Hanya Verifikator yang melakukan verifikasi awal yang dapat mengajukan verifikasi ulang." },
-          { status: 403 }
-        );
-      }
-    }
-
     // Validate authorization for Unverify
     if (isUnverif) {
       const isAdmin = member.role === "ADMIN";
@@ -256,6 +262,7 @@ export async function PATCH(
     delete cleanFields._verifiedByName;
     delete cleanFields._verifiedByUserId;
     delete cleanFields._evaluatedAt;
+    delete cleanFields._verificationHistories;
 
     const mergedData = {
       ...(targetParticipant.data as Record<string, any>),
@@ -267,13 +274,35 @@ export async function PATCH(
       where: { id: participantId },
       data: {
         data: mergedData,
-        evalStatus: isUnverif ? null : (status || "VERIFIED"),
+        evalStatus: isUnverif ? null : (status === "REVERIFICATION" ? "VERIFIED" : (status || "VERIFIED")),
         evalDescription: isUnverif ? null : (description || ""),
         evalByUserId: isUnverif ? null : session.user.id,
         evalByUserName: isUnverif ? null : (session.user.name || session.user.email),
         evalAt: isUnverif ? null : new Date(),
         searchText: buildSearchText(mergedData),
       },
+    });
+
+    if (isUnverif) {
+      await db.verificationHistory.deleteMany({
+        where: { participantId },
+      });
+    } else {
+      await db.verificationHistory.create({
+        data: {
+          participantId: updated.id,
+          evalStatus: updated.evalStatus!,
+          evalDescription: updated.evalDescription,
+          evalByUserId: session.user.id,
+          evalByUserName: session.user.name || session.user.email,
+          evalAt: updated.evalAt!,
+        },
+      });
+    }
+
+    const updatedHistories = await db.verificationHistory.findMany({
+      where: { participantId: updated.id },
+      orderBy: { evalAt: "asc" },
     });
 
     const responseParticipant = {
@@ -284,6 +313,7 @@ export async function PATCH(
       _verifiedByName: updated.evalByUserName,
       _verifiedByUserId: updated.evalByUserId,
       _evaluatedAt: updated.evalAt ? updated.evalAt.toISOString() : null,
+      _verificationHistories: updatedHistories,
       ...(updated.data as Record<string, any>),
     };
 
@@ -295,8 +325,8 @@ export async function PATCH(
         : `Memverifikasi ulang data peserta (ID: ${updated.uniqueKey}).${description ? ` Catatan: ${description}` : ""}`;
 
       if (status === "REVERIFICATION") {
-        action = "REVERIFICATION";
-        details = `Mengajukan verifikasi ulang data peserta (ID: ${updated.uniqueKey}).${description ? ` Catatan: ${description}` : ""}`;
+        action = "RE_VERIFIED";
+        details = `Memverifikasi ulang data peserta (ID: ${updated.uniqueKey}).${description ? ` Catatan: ${description}` : ""}`;
       }
 
       await db.activityLog.create({

@@ -394,10 +394,8 @@ export function ParticipantNavigator({
           )}
 
           {/* Tombol Verifikasi Ulang */}
-          {originalStatus !== "REVERIFICATION" &&
-            (originalStatus === "VERIFIED" || originalStatus === "REJECTED") &&
-            session?.user &&
-            verifiedByUserId === session.user.id && (
+          {(originalStatus === "VERIFIED" || originalStatus === "REJECTED" || originalStatus === "REVERIFICATION") &&
+            session?.user && (
               <Button
                 type="button"
                 onClick={() => onSave?.("REVERIFICATION")}
