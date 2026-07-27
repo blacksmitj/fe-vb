@@ -26,6 +26,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { safeParseDate } from "@/lib/utils";
+import { useProgramApiKey } from "@/hooks/use-programs";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -67,8 +69,10 @@ interface ApiKeyData {
 }
 
 export function ProgramApiSettings({ programId }: { programId: string }) {
-  const [apiKeyData, setApiKeyData] = React.useState<ApiKeyData | null>(null);
-  const [isLoading, setIsLoading] = React.useState(true);
+  const queryClient = useQueryClient();
+  const { data: rawApiKeyData, isLoading, refetch } = useProgramApiKey(programId);
+  const apiKeyData: ApiKeyData | null = rawApiKeyData?.hasKey ? rawApiKeyData.apiKey : null;
+
   const [isGenerating, setIsGenerating] = React.useState(false);
   const [isTogglingStatus, setIsTogglingStatus] = React.useState(false);
   const [isDeleting, setIsDeleting] = React.useState(false);
@@ -78,25 +82,11 @@ export function ProgramApiSettings({ programId }: { programId: string }) {
   const [copiedScript, setCopiedScript] = React.useState(false);
 
   const fetchApiKey = React.useCallback(async (showToast = false) => {
-    if (showToast) setIsLoading(true);
-    try {
-      const res = await fetch(`/api/programs/${programId}/api-key`);
-      if (res.ok) {
-        const data = await res.json();
-        setApiKeyData(data.hasKey ? data.apiKey : null);
-        if (showToast) toast.success("Data API & Audit Log berhasil diperbarui");
-      }
-    } catch (err) {
-      console.error("Gagal memuat API Key", err);
-      toast.error("Gagal memuat data API Key");
-    } finally {
-      setIsLoading(false);
+    const res = await refetch();
+    if (showToast && res.isSuccess) {
+      toast.success("Data API & Audit Log berhasil diperbarui");
     }
-  }, [programId]);
-
-  React.useEffect(() => {
-    fetchApiKey();
-  }, [fetchApiKey]);
+  }, [refetch]);
 
   const handleGenerateKey = async () => {
     setIsGenerating(true);
@@ -106,8 +96,7 @@ export function ProgramApiSettings({ programId }: { programId: string }) {
         method: "POST",
       });
       if (res.ok) {
-        const data = await res.json();
-        setApiKeyData(data.apiKey);
+        queryClient.invalidateQueries({ queryKey: ["program-api-key", programId] });
         toast.success("API Key berhasil dibuat!", { id: toastId });
       } else {
         toast.error("Gagal membuat API Key", { id: toastId });
@@ -134,7 +123,7 @@ export function ProgramApiSettings({ programId }: { programId: string }) {
         body: JSON.stringify({ status: nextStatus }),
       });
       if (res.ok) {
-        setApiKeyData((prev) => (prev ? { ...prev, status: nextStatus } : null));
+        queryClient.invalidateQueries({ queryKey: ["program-api-key", programId] });
         toast.success(
           `Integrasi API berhasil ${nextStatus === "ACTIVE" ? "diaktifkan" : "di-pause"}`,
           { id: toastId }
@@ -158,7 +147,7 @@ export function ProgramApiSettings({ programId }: { programId: string }) {
         method: "DELETE",
       });
       if (res.ok) {
-        setApiKeyData(null);
+        queryClient.invalidateQueries({ queryKey: ["program-api-key", programId] });
         setShowKey(false);
         toast.success("API Key berhasil dihapus", { id: toastId });
       } else {

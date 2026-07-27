@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { ShieldAlertIcon, ClockIcon, UserPlusIcon, RefreshCwIcon, ArrowLeftIcon, CheckCircle2Icon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { useProgram } from "@/hooks/use-programs";
+import { useProgram, useProgramMembership } from "@/hooks/use-programs";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 interface MembershipGateProps {
@@ -15,29 +16,12 @@ interface MembershipGateProps {
 
 export function MembershipGate({ programId, children }: MembershipGateProps) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { data: program, isLoading: isProgramLoading } = useProgram(programId);
-  const [membership, setMembership] = React.useState<{ role: string | null; status: string | null } | null>(null);
-  const [isChecking, setIsChecking] = React.useState(true);
+  const { data: membership, isLoading: isMembershipLoading, refetch: checkMembership } = useProgramMembership(programId);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
-  const checkMembership = React.useCallback(async () => {
-    setIsChecking(true);
-    try {
-      const res = await fetch(`/api/programs/${programId}/membership`);
-      if (res.ok) {
-        const data = await res.json();
-        setMembership(data);
-      }
-    } catch (err) {
-      console.error("Error checking membership:", err);
-    } finally {
-      setIsChecking(false);
-    }
-  }, [programId]);
-
-  React.useEffect(() => {
-    checkMembership();
-  }, [checkMembership]);
+  const isChecking = isProgramLoading || isMembershipLoading;
 
   const handleRegister = async () => {
     setIsSubmitting(true);
@@ -47,7 +31,7 @@ export function MembershipGate({ programId, children }: MembershipGateProps) {
       });
       if (res.ok) {
         toast.success("Pendaftaran berhasil diajukan");
-        checkMembership();
+        queryClient.invalidateQueries({ queryKey: ["program-membership", programId] });
       } else {
         const data = await res.json().catch(() => ({ error: "Gagal mengajukan pendaftaran" }));
         toast.error(data.error || "Gagal mengajukan pendaftaran");
@@ -202,7 +186,7 @@ export function MembershipGate({ programId, children }: MembershipGateProps) {
               <CardFooter className="flex flex-col gap-2">
                 <Button
                   variant="outline"
-                  onClick={checkMembership}
+                  onClick={() => checkMembership()}
                   className="w-full h-10 gap-2 border-border/60 hover:bg-muted"
                 >
                   <RefreshCwIcon className="h-4 w-4" />

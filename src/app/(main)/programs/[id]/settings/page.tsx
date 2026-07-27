@@ -54,7 +54,8 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
-import { useProgram, useDeleteProgram } from "@/hooks/use-programs";
+import { useProgram, useDeleteProgram, useProgramMembership, useProgramMembers, useProgramLogs } from "@/hooks/use-programs";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -651,75 +652,23 @@ export default function ProgramSettingsPage({ params }: { params: Promise<{ id: 
     }
   };
 
-  // Tabs state
+  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = React.useState("general"); // "general" | "export" | "members" | "logs"
-  const [userRole, setUserRole] = React.useState<string | null>(null);
-  const [members, setMembers] = React.useState<any[]>([]);
-  const [isMembersLoading, setIsMembersLoading] = React.useState(false);
-  const [logs, setLogs] = React.useState<any[]>([]);
-  const [isLogsLoading, setIsLogsLoading] = React.useState(false);
+  
+  const { data: membershipData } = useProgramMembership(id);
+  const userRole = membershipData?.role || null;
 
-  // Fetch current user's role
   React.useEffect(() => {
-    async function fetchRole() {
-      try {
-        const res = await fetch(`/api/programs/${id}/membership`);
-        if (res.ok) {
-          const data = await res.json();
-          setUserRole(data.role);
-          if (data.role !== "ADMIN") {
-            setActiveTab("logs");
-          }
-        }
-      } catch (err) {
-        console.error("Failed to fetch user role", err);
-      }
+    if (membershipData && membershipData.role !== "ADMIN" && activeTab === "general") {
+      setActiveTab("logs");
     }
-    fetchRole();
-  }, [id]);
+  }, [membershipData, activeTab]);
 
-  // Fetch program members
-  const fetchMembers = React.useCallback(async () => {
-    setIsMembersLoading(true);
-    try {
-      const res = await fetch(`/api/programs/${id}/members`);
-      if (res.ok) {
-        const data = await res.json();
-        setMembers(data);
-      }
-    } catch (err) {
-      console.error("Failed to fetch members", err);
-      toast.error("Gagal memuat daftar anggota");
-    } finally {
-      setIsMembersLoading(false);
-    }
-  }, [id]);
+  const { data: membersData, isLoading: isMembersLoading } = useProgramMembers(activeTab === "members" && userRole === "ADMIN" ? id : null);
+  const members = React.useMemo(() => (Array.isArray(membersData) ? membersData : []), [membersData]);
 
-  // Fetch activity logs
-  const fetchLogs = React.useCallback(async () => {
-    setIsLogsLoading(true);
-    try {
-      const res = await fetch(`/api/programs/${id}/logs`);
-      if (res.ok) {
-        const data = await res.json();
-        setLogs(data);
-      }
-    } catch (err) {
-      console.error("Failed to fetch logs", err);
-      toast.error("Gagal memuat log aktivitas");
-    } finally {
-      setIsLogsLoading(false);
-    }
-  }, [id]);
-
-  // Refetch when tab changes
-  React.useEffect(() => {
-    if (activeTab === "members" && userRole === "ADMIN") {
-      fetchMembers();
-    } else if (activeTab === "logs") {
-      fetchLogs();
-    }
-  }, [activeTab, userRole, fetchMembers, fetchLogs]);
+  const { data: logsData, isLoading: isLogsLoading } = useProgramLogs(activeTab === "logs" ? id : null);
+  const logs = React.useMemo(() => (Array.isArray(logsData) ? logsData : []), [logsData]);
 
   const handleExport = async (mode: "all" | "profile" = "all") => {
     setIsExporting(true);
@@ -767,7 +716,7 @@ export default function ProgramSettingsPage({ params }: { params: Promise<{ id: 
       });
       if (res.ok) {
         toast.success(`Pendaftaran verifikator berhasil di-${status === "APPROVED" ? "setujui" : "tolak"}`);
-        fetchMembers();
+        queryClient.invalidateQueries({ queryKey: ["program-members", id] });
       } else {
         const data = await res.json().catch(() => ({ error: "Gagal memperbarui status keanggotaan" }));
         toast.error(data.error || "Gagal memperbarui status keanggotaan");
@@ -1579,7 +1528,7 @@ export default function ProgramSettingsPage({ params }: { params: Promise<{ id: 
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={fetchMembers}
+                      onClick={() => queryClient.invalidateQueries({ queryKey: ["program-members", id] })}
                       disabled={isMembersLoading}
                       className="h-8 gap-1.5"
                     >

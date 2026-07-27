@@ -21,7 +21,7 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 import { PageLayout, PageHeader } from "@/components/dashboard";
-import { useProgram } from "@/hooks/use-programs";
+import { useProgram, useProgramMembership, useProgramSchema, useProgramParticipant } from "@/hooks/use-programs";
 import { toast } from "sonner";
 import { MembershipGate } from "@/components/programs/membership-gate";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
@@ -137,102 +137,80 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
     window.dispatchEvent(new Event("draft-updated"));
   }, [id, currentParticipantId]);
 
-  // Fetch user's membership & Program Profile Builder Schema in parallel
+  const { data: membershipData } = useProgramMembership(id);
+  const { data: schemaData, isLoading: isSchemaFetching } = useProgramSchema(id);
+
+  // Sync schema & membership when queries return data
   React.useEffect(() => {
-    async function loadInitialData() {
-      setIsSchemaLoading(true);
-      try {
-        const [membershipRes, schemaRes] = await Promise.all([
-          fetch(`/api/programs/${id}/membership`),
-          fetch(`/api/programs/${id}/schema`),
-        ]);
-
-        if (membershipRes.ok) {
-          const membershipData = await membershipRes.json();
-          setCurrentUserMember(membershipData);
-        }
-
-        if (schemaRes.ok) {
-          const schemaData = await schemaRes.json();
-          if (schemaData.sections) {
-            setSections(migrateSectionsSchema(schemaData.sections));
-          }
-        }
-      } catch (err) {
-        console.error("Failed to load initial verification data", err);
-      } finally {
-        setIsSchemaLoading(false);
-      }
+    if (membershipData) {
+      setCurrentUserMember(membershipData);
     }
-    loadInitialData();
-  }, [id]);
+  }, [membershipData]);
 
   React.useEffect(() => {
-    // Skip fetching until the program ID synchronization has settled
-    if (id !== prevProgramId) return;
-    // If a ?page= URL param is present, wait until currentRowIndex has caught up before fetching
-    if (targetPageIndex !== null && !isNaN(targetPageIndex) && currentRowIndex !== targetPageIndex) return;
+    if (schemaData?.sections) {
+      setSections(migrateSectionsSchema(schemaData.sections));
+    }
+    setIsSchemaLoading(isSchemaFetching);
+  }, [schemaData, isSchemaFetching]);
 
-    async function loadParticipant() {
+  // Determine if participant query should run
+  const isParticipantQueryReady = id === prevProgramId && (targetPageIndex === null || isNaN(targetPageIndex) || currentRowIndex === targetPageIndex);
+  const participantQuery = useProgramParticipant(isParticipantQueryReady ? id : null, currentRowIndex);
+
+  React.useEffect(() => {
+    if (!isParticipantQueryReady || participantQuery.isLoading) {
       setIsParticipantLoading(true);
       setValidationErrors({});
-      try {
-        const res = await fetch(`/api/programs/${id}/participants?page=${currentRowIndex}`);
-        if (!res.ok) throw new Error("Failed to load participant");
-        const data = await res.json();
-        
-        if (data.totalRows !== undefined) {
-          setTotalRows(data.totalRows);
-        }
+      return;
+    }
+    setIsParticipantLoading(false);
 
-        // Sync local store evaluation state with the fetched participant's evaluation
-        if (data.participant) {
-          setCurrentParticipantId(data.participant.id || null);
-          
-          // Check if local draft exists
-          const draftKey = `draft_${id}_${data.participant.id}`;
-          const localDraft = localStorage.getItem(draftKey);
-          if (localDraft) {
-            try {
-              const parsed = JSON.parse(localDraft);
-              setParticipant(parsed.participant);
-              setOriginalParticipant(data.participant);
-              setEvaluationStatus(parsed.evaluationStatus || null);
-              setApprovalDescription(parsed.approvalDescription || "");
-              setIsUsingLocalDraft(true);
-            } catch (e) {
-              console.error("Failed to parse local draft", e);
-              setParticipant(data.participant);
-              setOriginalParticipant(data.participant);
-              setEvaluationStatus(data.participant._evaluationStatus || null);
-              setApprovalDescription(data.participant._evaluationDescription || "");
-              setIsUsingLocalDraft(false);
-            }
-          } else {
-            setParticipant(data.participant);
-            setOriginalParticipant(data.participant);
-            setEvaluationStatus(data.participant._evaluationStatus || null);
-            setApprovalDescription(data.participant._evaluationDescription || "");
-            setIsUsingLocalDraft(false);
-          }
-        } else {
-          setParticipant(null);
-          setOriginalParticipant(null);
-          resetEvaluation();
+    if (!participantQuery.data) return;
+
+    const data = participantQuery.data;
+    if (data.totalRows !== undefined) {
+      setTotalRows(data.totalRows);
+    }
+
+    if (data.participant) {
+      setCurrentParticipantId(data.participant.id || null);
+      
+      // Check if local draft exists
+      const draftKey = `draft_${id}_${data.participant.id}`;
+      const localDraft = localStorage.getItem(draftKey);
+      if (localDraft) {
+        try {
+          const parsed = JSON.parse(localDraft);
+          setParticipant(parsed.participant);
+          setOriginalParticipant(data.participant);
+          setEvaluationStatus(parsed.evaluationStatus || null);
+          setApprovalDescription(parsed.approvalDescription || "");
+          setIsUsingLocalDraft(true);
+        } catch (e) {
+          console.error("Failed to parse local draft", e);
+          setParticipant(data.participant);
+          setOriginalParticipant(data.participant);
+          setEvaluationStatus(data.participant._evaluationStatus || null);
+          setApprovalDescription(data.participant._evaluationDescription || "");
           setIsUsingLocalDraft(false);
         }
-      } catch (err) {
-        console.error("Failed to load participant", err);
-        resetEvaluation();
-        setOriginalParticipant(null);
-        setParticipant(null);
+      } else {
+        setParticipant(data.participant);
+        setOriginalParticipant(data.participant);
+        setEvaluationStatus(data.participant._evaluationStatus || null);
+        setApprovalDescription(data.participant._evaluationDescription || "");
         setIsUsingLocalDraft(false);
-      } finally {
-        setIsParticipantLoading(false);
       }
+    } else {
+      setParticipant(null);
+      setOriginalParticipant(null);
+      setCurrentParticipantId(null);
+      setEvaluationStatus(null);
+      setApprovalDescription("");
+      setIsUsingLocalDraft(false);
     }
-    loadParticipant();
-  }, [currentRowIndex, id, prevProgramId, targetPageIndex, setTotalRows, setEvaluationStatus, setApprovalDescription, resetEvaluation, setCurrentParticipantId]);
+  }, [participantQuery.data, participantQuery.isLoading, isParticipantQueryReady, id]);
 
   // Auto-open first media attachment when participant data is loaded
   React.useEffect(() => {
@@ -443,6 +421,7 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
         clearDraftFromLocalStorage(data.participant.id);
         setIsUsingLocalDraft(false);
         refetchProgram();
+        queryClient.invalidateQueries({ queryKey: ["program-participant", id] });
         return true;
       } else {
         toast.error(data.error || "Gagal menyimpan data");

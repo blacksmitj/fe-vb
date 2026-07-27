@@ -95,5 +95,89 @@ export function useProgramsByTemplate(templateId: string | null) {
   });
 }
 
+export interface ProgramMembership {
+  role: string | null;
+  status: string | null;
+}
+
+export function useProgramMembership(programId: string | null) {
+  return useQuery<ProgramMembership>({
+    queryKey: ["program-membership", programId],
+    queryFn: async () => {
+      if (!programId) throw new Error("Program ID is required");
+      const res = await fetch(`${API_URL}/${programId}/membership`);
+      if (!res.ok) throw new Error("Failed to fetch membership status");
+      return res.json();
+    },
+    enabled: !!programId,
+  });
+}
+
+export function useProgramSchema(programId: string | null) {
+  return useQuery({
+    queryKey: ["program-schema", programId],
+    queryFn: async () => {
+      if (!programId) throw new Error("Program ID is required");
+      const res = await fetch(`${API_URL}/${programId}/schema`);
+      if (!res.ok) throw new Error("Failed to fetch program schema");
+      return res.json();
+    },
+    enabled: !!programId,
+  });
+}
+
+export function useProgramMembers(programId: string | null) {
+  return useQuery({
+    queryKey: ["program-members", programId],
+    queryFn: async () => {
+      if (!programId) throw new Error("Program ID is required");
+      const res = await fetch(`${API_URL}/${programId}/members`);
+      if (!res.ok) throw new Error("Failed to fetch program members");
+      return res.json();
+    },
+    enabled: !!programId,
+  });
+}
+
+export function useProgramLogs(programId: string | null) {
+  return useQuery({
+    queryKey: ["program-logs", programId],
+    queryFn: async () => {
+      if (!programId) throw new Error("Program ID is required");
+      const res = await fetch(`${API_URL}/${programId}/logs`);
+      if (!res.ok) throw new Error("Failed to fetch program logs");
+      return res.json();
+    },
+    enabled: !!programId,
+  });
+}
+
+export function useProgramApiKey(programId: string | null) {
+  return useQuery({
+    queryKey: ["program-api-key", programId],
+    queryFn: async () => {
+      if (!programId) throw new Error("Program ID is required");
+      const res = await fetch(`${API_URL}/${programId}/api-key`);
+      if (!res.ok) throw new Error("Failed to fetch API key");
+      return res.json();
+    },
+    enabled: !!programId,
+  });
+}
+
+export function useProgramParticipant(programId: string | null, pageIndex: number) {
+  return useQuery({
+    queryKey: ["program-participant", programId, pageIndex],
+    queryFn: async () => {
+      if (!programId) throw new Error("Program ID is required");
+      const res = await fetch(`${API_URL}/${programId}/participants?page=${pageIndex}`);
+      if (!res.ok) throw new Error("Failed to fetch participant");
+      return res.json();
+    },
+    enabled: !!programId && pageIndex >= 0,
+  });
+}
+
+
 
 
