@@ -28,7 +28,7 @@ import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { safeParseDate } from "@/lib/utils";
 import { useSession } from "@/lib/auth/auth-client";
-import { validateProfileFieldValue } from "@/lib/validators";
+import { validateProfileFieldValue } from "@/lib/validators/profile-validator";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -60,22 +60,6 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
   
   const { data: session } = useSession();
   const [currentUserMember, setCurrentUserMember] = React.useState<{ role: string | null; status: string | null } | null>(null);
-
-  // Fetch current user's membership in this program
-  React.useEffect(() => {
-    async function loadUserMembership() {
-      try {
-        const res = await fetch(`/api/programs/${id}/membership`);
-        if (res.ok) {
-          const data = await res.json();
-          setCurrentUserMember(data);
-        }
-      } catch (err) {
-        console.error("Failed to load user membership", err);
-      }
-    }
-    loadUserMembership();
-  }, [id]);
 
   // Synchronize program ID and page query parameter changes synchronously during render to avoid stale fetch cycles
   const pageParam = searchParams.get("page");
@@ -121,12 +105,18 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
   const [isUsingLocalDraft, setIsUsingLocalDraft] = React.useState(false);
   const [validationErrors, setValidationErrors] = React.useState<Record<string, string>>({});
 
+  const participantRef = React.useRef(participant);
+  React.useEffect(() => {
+    participantRef.current = participant;
+  }, [participant]);
+
   // Helper to save draft to localStorage
   const saveDraftToLocalStorage = React.useCallback(() => {
-    if (!participant || !currentParticipantId) return;
+    const currentParticipant = participantRef.current;
+    if (!currentParticipant || !currentParticipantId) return;
     const draftKey = `draft_${id}_${currentParticipantId}`;
     const draftData = {
-      participant,
+      participant: currentParticipant,
       evaluationStatus,
       approvalDescription,
       programId: id,
@@ -137,7 +127,7 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
     localStorage.setItem(draftKey, JSON.stringify(draftData));
     setIsUsingLocalDraft(true);
     window.dispatchEvent(new Event("draft-updated"));
-  }, [id, currentParticipantId, participant, evaluationStatus, approvalDescription, currentRowIndex]);
+  }, [id, currentParticipantId, evaluationStatus, approvalDescription, currentRowIndex]);
 
   // Helper to clear draft from localStorage
   const clearDraftFromLocalStorage = React.useCallback((pId?: string) => {
@@ -147,24 +137,34 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
     window.dispatchEvent(new Event("draft-updated"));
   }, [id, currentParticipantId]);
 
-  // Fetch Program Profile Builder Schema
+  // Fetch user's membership & Program Profile Builder Schema in parallel
   React.useEffect(() => {
-    async function loadSchema() {
+    async function loadInitialData() {
       setIsSchemaLoading(true);
       try {
-        const res = await fetch(`/api/programs/${id}/schema`);
-        if (!res.ok) throw new Error("Failed to load schema");
-        const data = await res.json();
-        if (data.sections) {
-          setSections(migrateSectionsSchema(data.sections));
+        const [membershipRes, schemaRes] = await Promise.all([
+          fetch(`/api/programs/${id}/membership`),
+          fetch(`/api/programs/${id}/schema`),
+        ]);
+
+        if (membershipRes.ok) {
+          const membershipData = await membershipRes.json();
+          setCurrentUserMember(membershipData);
+        }
+
+        if (schemaRes.ok) {
+          const schemaData = await schemaRes.json();
+          if (schemaData.sections) {
+            setSections(migrateSectionsSchema(schemaData.sections));
+          }
         }
       } catch (err) {
-        console.error("Failed to load program schema", err);
+        console.error("Failed to load initial verification data", err);
       } finally {
         setIsSchemaLoading(false);
       }
     }
-    loadSchema();
+    loadInitialData();
   }, [id]);
 
   React.useEffect(() => {
@@ -548,12 +548,12 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
           </PageHeader>
 
 
-          {program?.description && (
+          {program?.description ? (
             <div className="px-6 py-2.5 bg-muted/30 border-b text-xs text-muted-foreground flex items-center gap-2">
               <span className="font-semibold text-foreground/80 shrink-0">Deskripsi:</span>
               <span className="truncate" title={program.description}>{program.description}</span>
             </div>
-          )}
+          ) : null}
 
           <div className="p-6 flex flex-col gap-6">
             {program?.status === "STOPPED" && (

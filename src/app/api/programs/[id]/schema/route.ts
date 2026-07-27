@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import { auth } from "@/lib/auth/auth";
 import { headers as getHeaders } from "next/headers";
+import { verifyProgramAccess } from "@/lib/auth/program-auth";
 import { NextResponse } from "next/server";
 
 export async function GET(
@@ -8,27 +9,14 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await auth.api.getSession({
-      headers: await getHeaders(),
-    });
+    const { id } = await params;
+    const { session, isApproved } = await verifyProgramAccess(id);
 
     if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { id } = await params;
-
-    // Check if the user is an APPROVED member of the program
-    const membership = await db.programMember.findUnique({
-      where: {
-        programId_userId: {
-          programId: id,
-          userId: session.user.id,
-        },
-      },
-    });
-
-    if (!membership || membership.status !== "APPROVED") {
+    if (!isApproved) {
       return NextResponse.json(
         { error: "Forbidden: Hanya anggota program yang disetujui." },
         { status: 403 }
@@ -44,7 +32,13 @@ export async function GET(
             version: true,
           },
         },
-      }
+        profileSchema: {
+          select: {
+            sections: true,
+            version: true,
+          },
+        },
+      },
     });
 
     if (program?.profileTemplate) {
@@ -54,15 +48,14 @@ export async function GET(
       });
     }
 
-    const schema = await db.profileSchema.findUnique({
-      where: { programId: id },
-    });
-
-    if (!schema) {
-      return NextResponse.json({ sections: [], version: 0 });
+    if (program?.profileSchema) {
+      return NextResponse.json({
+        sections: program.profileSchema.sections,
+        version: program.profileSchema.version,
+      });
     }
 
-    return NextResponse.json(schema);
+    return NextResponse.json({ sections: [], version: 0 });
   } catch (error) {
     console.error("GET /api/programs/[id]/schema error:", error);
     return NextResponse.json({ error: "Failed to fetch schema" }, { status: 500 });

@@ -12,7 +12,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 
-import { useDraftsCount } from "@/hooks";
+import { useDraftsCount } from "@/hooks/use-drafts";
 import { Badge } from "@/components/ui/badge";
 
 import {

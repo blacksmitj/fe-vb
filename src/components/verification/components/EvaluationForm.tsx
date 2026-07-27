@@ -13,7 +13,7 @@ import { Field as ShadcnField, FieldLabel, FieldDescription, FieldError } from "
 import { Calendar, FileText, Image as ImageIcon, Video, Tag, Bookmark, Hash, ArrowUpRight, Eye, Play, Globe, X, Edit3, Link as LinkIcon, Clipboard, ExternalLink, AlertTriangle } from "lucide-react";
 import { safeParseDate } from "@/lib/utils/format-date";
 import { StreetAddressInput } from "@/components/ui/street-address-input";
-import { validateProfileFieldValue } from "@/lib/validators";
+import { validateProfileFieldValue } from "@/lib/validators/profile-validator";
 
 import {
   Dialog,
@@ -32,21 +32,25 @@ import {
   ComboboxEmpty,
 } from "@/components/ui/combobox";
 
+const DATE_ONLY_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+const DATE_TIME_REGEX = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/;
+const DMY_DATE_REGEX = /^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/;
+
 function formatDateForInput(valueStr: string, isDateTime: boolean = false): string {
   if (!valueStr) return "";
   
   const str = valueStr.trim();
   
   // 1. If it's already in the expected format, return as is
-  if (!isDateTime && /^\d{4}-\d{2}-\d{2}$/.test(str)) {
+  if (!isDateTime && DATE_ONLY_REGEX.test(str)) {
     return str;
   }
-  if (isDateTime && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(str)) {
+  if (isDateTime && DATE_TIME_REGEX.test(str)) {
     return str;
   }
   
   // 2. Handle DD/MM/YYYY or DD-MM-YYYY (with optional time)
-  const dmyMatch = str.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/);
+  const dmyMatch = str.match(DMY_DATE_REGEX);
   if (dmyMatch) {
     const [_, d, m, y, hr, min] = dmyMatch;
     const formattedDay = d.padStart(2, '0');
@@ -132,6 +136,8 @@ function formatDisplayDate(valueStr: string, isDateTime: boolean = false): strin
 }
 
 import { cn } from "@/lib/utils";
+
+const ADDRESS_LABEL_REGEX = /alamat|jalan/i;
 
 const dropdownColorMap: Record<string, string> = {
   gray: "bg-slate-400 dark:bg-slate-500",
@@ -320,6 +326,442 @@ function PillsInput({ value, separator, onValueChange, placeholder, disabled }: 
   );
 }
 
+interface FieldValueRendererProps {
+  field: Field;
+  value: any;
+  fieldError?: string;
+  fieldValidationStatus?: { error?: string | null; warning?: string | null };
+  onFieldChange?: (label: string, value: any) => void;
+  openMediaViewer: (type: "photo" | "video" | "pdf", url: string) => void;
+  handleOpenEditMediaModal: (field: Field, currentValue: string) => void;
+}
+
+const FieldValueRenderer = React.memo(function FieldValueRenderer({
+  field,
+  value,
+  fieldError,
+  fieldValidationStatus,
+  onFieldChange,
+  openMediaViewer,
+  handleOpenEditMediaModal,
+}: FieldValueRendererProps) {
+  const valueStr = value !== undefined && value !== null ? String(value) : "";
+
+  if (!field.isEditable && (value === undefined || value === null || value === "")) {
+    return <span className="text-muted-foreground italic text-xs">Empty</span>;
+  }
+
+  switch (field.type) {
+    case "media":
+      const detectedType = detectMediaType(valueStr);
+      const mediaSub = detectedType !== "link" ? detectedType : (field.mediaSubType || "link");
+      if (!valueStr && !field.isEditable) {
+        return <span className="text-muted-foreground italic text-xs">Empty</span>;
+      }
+      
+      return (
+        <div className="space-y-2 w-full max-w-md">
+          {mediaSub === "image" && (
+            <div 
+              onClick={() => openMediaViewer("photo", resolveMediaUrl(valueStr))}
+              className="group relative cursor-pointer overflow-hidden rounded-xl border border-border/80 bg-muted/40 hover:bg-muted/60 transition-all duration-300 shadow-sm hover:shadow-md hover:border-purple-500/50 dark:hover:border-purple-500/30 w-full max-w-md"
+            >
+              <div className="aspect-video w-full relative overflow-hidden bg-slate-950/5 dark:bg-slate-950/40 flex items-center justify-center">
+                <img 
+                  src={resolveMediaUrl(valueStr)} 
+                  alt="Image attachment"
+                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                  onError={(e) => {
+                    (e.target as HTMLElement).style.display = 'none';
+                    const fallback = document.getElementById(`fallback-img-${resolveMediaUrl(valueStr)}`);
+                    if (fallback) {
+                      fallback.classList.remove('hidden');
+                      fallback.classList.add('flex');
+                    }
+                  }}
+                />
+                <div 
+                  id={`fallback-img-${resolveMediaUrl(valueStr)}`} 
+                  className="hidden absolute inset-0 flex-col items-center justify-center gap-2 text-muted-foreground p-4 text-center"
+                >
+                  <ImageIcon className="h-8 w-8 text-purple-500/70" />
+                  <span className="text-[10px] font-medium max-w-[80%] truncate">Image Preview</span>
+                </div>
+                
+                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center backdrop-blur-xs">
+                  <span className="flex items-center gap-1.5 text-white bg-purple-600/90 px-3 py-1.5 rounded-full text-xs font-semibold shadow-lg transform translate-y-2 group-hover:translate-y-0 transition-transform duration-300">
+                    <Eye className="h-3.5 w-3.5" />
+                    Preview Image
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {mediaSub === "video" && (
+            <div 
+              onClick={() => openMediaViewer("video", valueStr)}
+              className="group relative cursor-pointer overflow-hidden rounded-xl border border-border/80 bg-muted/40 hover:bg-muted/60 transition-all duration-300 shadow-sm hover:shadow-md hover:border-teal-500/50 dark:hover:border-teal-500/30 w-full max-w-md"
+            >
+              <div className="aspect-video w-full relative overflow-hidden bg-slate-950/5 dark:bg-slate-950/40 flex items-center justify-center">
+                {(() => {
+                  const getYoutubeId = (videoUrl: string) => {
+                    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+                    const match = videoUrl.match(regExp);
+                    return match && match[2].length === 11 ? match[2] : null;
+                  };
+                  const ytId = getYoutubeId(valueStr);
+                  const ytThumbnailUrl = ytId ? `https://img.youtube.com/vi/${ytId}/mqdefault.jpg` : null;
+
+                  return ytThumbnailUrl ? (
+                    <img 
+                      src={ytThumbnailUrl} 
+                      alt="YouTube Video Thumbnail"
+                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                    />
+                  ) : (
+                    <video 
+                      src={valueStr} 
+                      preload="metadata"
+                      muted
+                      className="w-full h-full object-cover opacity-85 transition-transform duration-500 group-hover:scale-105"
+                      onError={(e) => {
+                        (e.target as HTMLElement).style.display = 'none';
+                        const fallback = document.getElementById(`fallback-vid-${valueStr}`);
+                        if (fallback) {
+                          fallback.classList.remove('hidden');
+                          fallback.classList.add('flex');
+                        }
+                      }}
+                    />
+                  );
+                })()}
+                <div 
+                  id={`fallback-vid-${valueStr}`} 
+                  className="hidden absolute inset-0 flex-col items-center justify-center gap-2 text-muted-foreground p-4 text-center"
+                >
+                  <Video className="h-8 w-8 text-teal-500/70" />
+                  <span className="text-[10px] font-medium max-w-[80%] truncate">Video Preview</span>
+                </div>
+
+                <div className="absolute inset-0 bg-black/35 group-hover:bg-black/50 transition-colors duration-300 flex items-center justify-center">
+                  <div className="h-10 w-10 rounded-full bg-teal-500/90 text-white flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300">
+                    <Play className="h-4.5 w-4.5 fill-current ml-0.5" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {mediaSub === "pdf" && (
+            <div className="flex items-center">
+              <Button 
+                onClick={() => openMediaViewer("pdf", valueStr)}
+                variant="outline"
+                size="sm"
+                className="flex items-center gap-2 border-red-200 dark:border-red-950/50 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/20"
+              >
+                <FileText className="h-4 w-4" />
+                <span>Open PDF Document</span>
+              </Button>
+            </div>
+          )}
+
+          {mediaSub === "link" && (
+            <div className="flex items-center">
+              <Button 
+                asChild
+                variant="outline"
+                size="sm"
+                className="flex items-center gap-2 border-indigo-200 dark:border-indigo-950/50 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 dark:hover:bg-indigo-950/20"
+              >
+                <a href={valueStr} target="_blank" rel="noopener noreferrer">
+                  <Globe className="h-4 w-4" />
+                  <span>Open Link</span>
+                </a>
+              </Button>
+            </div>
+          )}
+
+          {field.isEditable && (
+            <div className="pt-1 flex items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => handleOpenEditMediaModal(field, valueStr)}
+                className="h-8 gap-1.5 text-xs font-medium border-dashed border-primary/40 text-primary hover:bg-primary/5 hover:border-primary transition-all"
+              >
+                <Edit3 className="h-3.5 w-3.5" />
+                <span>{valueStr ? "Ganti File / Edit Link" : "Isi Link Media (Google Drive)"}</span>
+              </Button>
+              {valueStr && (
+                <span className="text-[11px] text-muted-foreground truncate max-w-[200px] bg-muted/30 px-2 py-0.5 rounded border border-border/50">
+                  {valueStr}
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+      );
+    case "badge-status":
+      if (field.isEditable) {
+        return (
+          <Input
+            value={valueStr}
+            onChange={(e) => onFieldChange?.(field.label, e.target.value)}
+            className="w-full text-sm"
+            placeholder="Enter status..."
+          />
+        );
+      }
+      const getBadgeStyle = (style?: string) => {
+        switch (style) {
+          case "success": return "bg-emerald-500/10 text-emerald-600 border-emerald-500/20";
+          case "warning": return "bg-amber-500/10 text-amber-600 border-amber-500/20";
+          case "danger": return "bg-red-500/10 text-red-600 border-red-500/20";
+          case "info": return "bg-sky-500/10 text-sky-600 border-sky-500/20";
+          default: return "bg-slate-500/10 text-slate-600 border-slate-500/20";
+        }
+      };
+      return (
+        <Badge variant="outline" className={`px-2.5 py-0.5 text-xs font-semibold rounded-full border ${getBadgeStyle(field.statusStyle)}`}>
+          {valueStr}
+        </Badge>
+      );
+    case "array-pills":
+      if (field.isEditable) {
+        return (
+          <PillsInput
+            value={valueStr}
+            separator={field.pillsSeparator || ","}
+            onValueChange={(val) => onFieldChange?.(field.label, val)}
+            placeholder={field.placeholder || `Ketik item...`}
+          />
+        );
+      }
+      const parseArrayPills = (val: any, sep: string = ",") => {
+        if (val === undefined || val === null || val === "") return [];
+        if (Array.isArray(val)) return val.map(i => String(i).trim()).filter(Boolean);
+        if (typeof val === "string") {
+          const trimmed = val.trim();
+          if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+            try {
+              const parsed = JSON.parse(trimmed);
+              if (Array.isArray(parsed)) return parsed.map(i => String(i).trim()).filter(Boolean);
+            } catch (e) {}
+          }
+          return trimmed.split(sep).map(i => i.trim()).filter(Boolean);
+        }
+        return [String(val).trim()].filter(Boolean);
+      };
+      const items = parseArrayPills(value, field.pillsSeparator || ",");
+      return (
+        <div className="flex flex-wrap gap-1.5">
+          {items.map((item, idx) => (
+            <Badge key={idx} variant="secondary" className="text-[10px] px-2 py-0.5 font-medium border">
+              {item}
+            </Badge>
+          ))}
+        </div>
+      );
+    case "date":
+      const formattedDateValue = formatDateForInput(valueStr, field.dateMode === "date-time");
+      if (field.isEditable) {
+        const hasDateErr = !!fieldValidationStatus?.error;
+        return (
+          <DatePicker
+            value={formattedDateValue}
+            dateMode={field.dateMode}
+            locale={field.dateLocale}
+            onChange={(val) => onFieldChange?.(field.label, val)}
+            error={hasDateErr}
+            className="w-full text-sm"
+          />
+        );
+      }
+      return (
+        <div className="flex items-center gap-1.5 text-sm font-medium bg-muted/40 border px-3 py-2 rounded-lg text-foreground/80">
+          <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
+          <span>{formatDisplayDate(valueStr, field.dateMode === "date-time") || valueStr}</span>
+        </div>
+      );
+    case "number":
+      if (field.isEditable) {
+        return (
+          <Input
+            type="number"
+            value={valueStr}
+            onChange={(e) => onFieldChange?.(field.label, e.target.value)}
+            className="w-full text-sm font-mono"
+          />
+        );
+      }
+      return (
+        <div className="flex items-center gap-1.5 text-sm font-mono font-medium bg-muted/40 border px-3 py-2 rounded-lg text-foreground/80">
+          <Hash className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+          <span>{valueStr}</span>
+        </div>
+      );
+    case "textarea":
+      const isTextareaMono = field.previewFontMode === "mono";
+      if (field.isEditable) {
+        return (
+          <Textarea
+            value={valueStr}
+            onChange={(e) => onFieldChange?.(field.label, e.target.value)}
+            className={cn("w-full text-sm min-h-[80px]", isTextareaMono && "font-mono")}
+          />
+        );
+      }
+      return (
+        <div className={cn("py-2.5 px-3 bg-muted/40 border border-border/50 rounded-lg text-sm select-all whitespace-pre-wrap text-foreground/80 font-medium", isTextareaMono && "font-mono")}>
+          {valueStr}
+        </div>
+      );
+    case "checkbox":
+      const isChecked = valueStr === "true";
+      if (field.isEditable) {
+        return (
+          <div className="flex items-center gap-2 py-1">
+            <Checkbox
+              id={`eval-checkbox-${field.id}`}
+              checked={isChecked}
+              onCheckedChange={(checked) => {
+                onFieldChange?.(field.label, checked ? "true" : "false");
+              }}
+            />
+            <label
+              htmlFor={`eval-checkbox-${field.id}`}
+              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer select-none text-foreground/80"
+            >
+              {field.placeholder || "Ceklis item ini"}
+            </label>
+          </div>
+        );
+      }
+      const isCheckedPreview = valueStr === "true";
+      return (
+        <div className="flex items-center gap-2 py-2 px-3 bg-muted/40 border border-border/50 rounded-lg text-sm w-full">
+          <Checkbox
+            checked={isCheckedPreview}
+            disabled
+            className="opacity-70"
+          />
+          <span className={`text-sm ${isCheckedPreview ? "text-foreground font-medium" : "text-muted-foreground/50 italic"}`}>
+            {isCheckedPreview ? (field.placeholder || "Terceklis") : (field.placeholder || "Tidak terceklis")}
+          </span>
+        </div>
+      );
+    case "dropdown":
+      const selectedColorKey = field.optionColors?.[valueStr];
+      const selectedDotClass = selectedColorKey ? dropdownColorMap[selectedColorKey] : undefined;
+      if (field.isEditable) {
+        const selectOptions = field.options || [];
+        return (
+          <SearchableCombobox
+            value={valueStr}
+            options={selectOptions}
+            optionColors={field.optionColors}
+            placeholder={field.placeholder}
+            onValueChange={(val) => onFieldChange?.(field.label, val)}
+          />
+        );
+      }
+      return (
+        <div className="py-2.5 px-3 bg-muted/40 border border-border/50 rounded-lg text-sm select-all whitespace-pre-wrap text-foreground/80 font-medium flex items-center gap-2">
+          {valueStr && selectedDotClass && (
+            <span className={cn("h-2.5 w-2.5 rounded-full shrink-0", selectedDotClass)} />
+          )}
+          <span>{valueStr || (field.placeholder || "Belum diisi")}</span>
+        </div>
+      );
+    case "street-address":
+      if (field.isEditable) {
+        return (
+          <StreetAddressInput
+            value={valueStr}
+            placeholder={field.placeholder || "Masukkan nama jalan, no, RT/RW..."}
+            onChange={(val) => onFieldChange?.(field.label, val)}
+            error={fieldError}
+            showError={false}
+          />
+        );
+      }
+      return (
+        <div className="py-2.5 px-3 bg-muted/40 border border-border/50 rounded-lg text-sm select-all whitespace-pre-wrap text-foreground/80 font-medium">
+          {valueStr || "Belum diisi"}
+        </div>
+      );
+    default:
+      const isMono = field.previewFontMode === "mono";
+      const isAddressLabel = ADDRESS_LABEL_REGEX.test(field.label);
+
+      if (field.isEditable) {
+        if (isAddressLabel) {
+          return (
+            <StreetAddressInput
+              value={valueStr}
+              placeholder={field.placeholder || "Masukkan nama jalan, no, RT/RW..."}
+              onChange={(val) => onFieldChange?.(field.label, val)}
+              error={fieldError}
+              showError={false}
+            />
+          );
+        }
+
+        const hasErr = !!fieldValidationStatus?.error;
+
+        return (
+          <Input
+            value={valueStr}
+            onChange={(e) => onFieldChange?.(field.label, e.target.value)}
+            aria-invalid={hasErr}
+            className={cn("w-full text-sm", isMono && "font-mono", hasErr && "border-destructive ring-destructive/20 ring-2")}
+          />
+        );
+      }
+      return (
+        <div className={cn("py-2.5 px-3 bg-muted/40 border border-border/50 rounded-lg text-sm select-all whitespace-pre-wrap text-foreground/80 font-medium", isMono && "font-mono")}>
+          {valueStr}
+        </div>
+      );
+  }
+});
+
+const FieldStatusMessage = React.memo(function FieldStatusMessage({
+  fieldValidationStatus,
+}: {
+  fieldValidationStatus?: { error?: string | null; warning?: string | null };
+}) {
+  const hasErr = !!fieldValidationStatus?.error;
+  const errMessage = fieldValidationStatus?.error;
+  const warnMessage = fieldValidationStatus?.warning;
+
+  if (hasErr && errMessage) {
+    return (
+      <FieldError className="mt-1 pl-0.5 font-semibold text-xs flex items-center gap-1.5 text-rose-500">
+        <span className="relative flex h-2 w-2 shrink-0">
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+          <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500"></span>
+        </span>
+        <span>{errMessage}</span>
+      </FieldError>
+    );
+  }
+
+  if (!hasErr && warnMessage) {
+    return (
+      <div className="mt-1.5 pl-0.5 font-medium text-xs flex items-center gap-1.5 text-amber-600 dark:text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2.5 py-1.5 rounded-lg">
+        <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-500" />
+        <span>{warnMessage}</span>
+      </div>
+    );
+  }
+
+  return null;
+});
+
 interface EvaluationFormProps {
   sections: Section[];
   participant: Record<string, any>;
@@ -376,427 +818,6 @@ export function EvaluationForm({ sections, participant, onFieldChange, errors }:
     return statuses;
   }, [sections, participant, errors, allFields]);
 
-  const renderFieldValue = (field: Field) => {
-    const value = participant[field.label];
-    const valueStr = value !== undefined && value !== null ? String(value) : "";
-    const fieldError = errors?.[field.label];
-
-    if (!field.isEditable && (value === undefined || value === null || value === "")) {
-      return <span className="text-muted-foreground italic text-xs">Empty</span>;
-    }
-
-    switch (field.type) {
-      case "media":
-        const detectedType = detectMediaType(valueStr);
-        const mediaSub = detectedType !== "link" ? detectedType : (field.mediaSubType || "link");
-        if (!valueStr && !field.isEditable) {
-          return <span className="text-muted-foreground italic text-xs">Empty</span>;
-        }
-        
-        return (
-          <div className="space-y-2 w-full max-w-md">
-            {mediaSub === "image" && (
-              <div 
-                onClick={() => openMediaViewer("photo", resolveMediaUrl(valueStr))}
-                className="group relative cursor-pointer overflow-hidden rounded-xl border border-border/80 bg-muted/40 hover:bg-muted/60 transition-all duration-300 shadow-sm hover:shadow-md hover:border-purple-500/50 dark:hover:border-purple-500/30 w-full max-w-md"
-              >
-                <div className="aspect-video w-full relative overflow-hidden bg-slate-950/5 dark:bg-slate-950/40 flex items-center justify-center">
-                  <img 
-                    src={resolveMediaUrl(valueStr)} 
-                    alt="Image attachment"
-                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                    onError={(e) => {
-                      (e.target as HTMLElement).style.display = 'none';
-                      const fallback = document.getElementById(`fallback-img-${resolveMediaUrl(valueStr)}`);
-                      if (fallback) {
-                        fallback.classList.remove('hidden');
-                        fallback.classList.add('flex');
-                      }
-                    }}
-                  />
-                  <div 
-                    id={`fallback-img-${resolveMediaUrl(valueStr)}`} 
-                    className="hidden absolute inset-0 flex-col items-center justify-center gap-2 text-muted-foreground p-4 text-center"
-                  >
-                    <ImageIcon className="h-8 w-8 text-purple-500/70" />
-                    <span className="text-[10px] font-medium max-w-[80%] truncate">Image Preview</span>
-                  </div>
-                  
-                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center backdrop-blur-xs">
-                    <span className="flex items-center gap-1.5 text-white bg-purple-600/90 px-3 py-1.5 rounded-full text-xs font-semibold shadow-lg transform translate-y-2 group-hover:translate-y-0 transition-transform duration-300">
-                      <Eye className="h-3.5 w-3.5" />
-                      Preview Image
-                    </span>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {mediaSub === "video" && (
-              <div 
-                onClick={() => openMediaViewer("video", valueStr)}
-                className="group relative cursor-pointer overflow-hidden rounded-xl border border-border/80 bg-muted/40 hover:bg-muted/60 transition-all duration-300 shadow-sm hover:shadow-md hover:border-teal-500/50 dark:hover:border-teal-500/30 w-full max-w-md"
-              >
-                <div className="aspect-video w-full relative overflow-hidden bg-slate-950/5 dark:bg-slate-950/40 flex items-center justify-center">
-                  {(() => {
-                    const getYoutubeId = (videoUrl: string) => {
-                      const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
-                      const match = videoUrl.match(regExp);
-                      return match && match[2].length === 11 ? match[2] : null;
-                    };
-                    const ytId = getYoutubeId(valueStr);
-                    const ytThumbnailUrl = ytId ? `https://img.youtube.com/vi/${ytId}/mqdefault.jpg` : null;
-
-                    return ytThumbnailUrl ? (
-                      <img 
-                        src={ytThumbnailUrl} 
-                        alt="YouTube Video Thumbnail"
-                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                      />
-                    ) : (
-                      <video 
-                        src={valueStr} 
-                        preload="metadata"
-                        muted
-                        className="w-full h-full object-cover opacity-85 transition-transform duration-500 group-hover:scale-105"
-                        onError={(e) => {
-                          (e.target as HTMLElement).style.display = 'none';
-                          const fallback = document.getElementById(`fallback-vid-${valueStr}`);
-                          if (fallback) {
-                            fallback.classList.remove('hidden');
-                            fallback.classList.add('flex');
-                          }
-                        }}
-                      />
-                    );
-                  })()}
-                  <div 
-                    id={`fallback-vid-${valueStr}`} 
-                    className="hidden absolute inset-0 flex-col items-center justify-center gap-2 text-muted-foreground p-4 text-center"
-                  >
-                    <Video className="h-8 w-8 text-teal-500/70" />
-                    <span className="text-[10px] font-medium max-w-[80%] truncate">Video Preview</span>
-                  </div>
-
-                  <div className="absolute inset-0 bg-black/35 group-hover:bg-black/50 transition-colors duration-300 flex items-center justify-center">
-                    <div className="h-10 w-10 rounded-full bg-teal-500/90 text-white flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300">
-                      <Play className="h-4.5 w-4.5 fill-current ml-0.5" />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {mediaSub === "pdf" && (
-              <div className="flex items-center">
-                <Button 
-                  onClick={() => openMediaViewer("pdf", valueStr)}
-                  variant="outline"
-                  size="sm"
-                  className="flex items-center gap-2 border-red-200 dark:border-red-950/50 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/20"
-                >
-                  <FileText className="h-4 w-4" />
-                  <span>Open PDF Document</span>
-                </Button>
-              </div>
-            )}
-
-            {mediaSub === "link" && (
-              <div className="flex items-center">
-                <Button 
-                  asChild
-                  variant="outline"
-                  size="sm"
-                  className="flex items-center gap-2 border-indigo-200 dark:border-indigo-950/50 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 dark:hover:bg-indigo-950/20"
-                >
-                  <a href={valueStr} target="_blank" rel="noopener noreferrer">
-                    <Globe className="h-4 w-4" />
-                    <span>Open Link</span>
-                  </a>
-                </Button>
-              </div>
-            )}
-
-            {field.isEditable && (
-              <div className="pt-1 flex items-center gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleOpenEditMediaModal(field, valueStr)}
-                  className="h-8 gap-1.5 text-xs font-medium border-dashed border-primary/40 text-primary hover:bg-primary/5 hover:border-primary transition-all"
-                >
-                  <Edit3 className="h-3.5 w-3.5" />
-                  <span>{valueStr ? "Ganti File / Edit Link" : "Isi Link Media (Google Drive)"}</span>
-                </Button>
-                {valueStr && (
-                  <span className="text-[11px] text-muted-foreground truncate max-w-[200px] bg-muted/30 px-2 py-0.5 rounded border border-border/50">
-                    {valueStr}
-                  </span>
-                )}
-              </div>
-            )}
-          </div>
-        );
-      case "badge-status":
-        if (field.isEditable) {
-          return (
-            <Input
-              value={valueStr}
-              onChange={(e) => onFieldChange?.(field.label, e.target.value)}
-              className="w-full text-sm"
-              placeholder="Enter status..."
-            />
-          );
-        }
-        const getBadgeStyle = (style?: string) => {
-          switch (style) {
-            case "success": return "bg-emerald-500/10 text-emerald-600 border-emerald-500/20";
-            case "warning": return "bg-amber-500/10 text-amber-600 border-amber-500/20";
-            case "danger": return "bg-red-500/10 text-red-600 border-red-500/20";
-            case "info": return "bg-sky-500/10 text-sky-600 border-sky-500/20";
-            default: return "bg-slate-500/10 text-slate-600 border-slate-500/20";
-          }
-        };
-        return (
-          <Badge variant="outline" className={`px-2.5 py-0.5 text-xs font-semibold rounded-full border ${getBadgeStyle(field.statusStyle)}`}>
-            {valueStr}
-          </Badge>
-        );
-      case "array-pills":
-        if (field.isEditable) {
-          return (
-            <PillsInput
-              value={valueStr}
-              separator={field.pillsSeparator || ","}
-              onValueChange={(val) => onFieldChange?.(field.label, val)}
-              placeholder={field.placeholder || `Ketik item...`}
-            />
-          );
-        }
-        const parseArrayPills = (val: any, sep: string = ",") => {
-          if (val === undefined || val === null || val === "") return [];
-          if (Array.isArray(val)) return val.map(i => String(i).trim()).filter(Boolean);
-          if (typeof val === "string") {
-            const trimmed = val.trim();
-            if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
-              try {
-                const parsed = JSON.parse(trimmed);
-                if (Array.isArray(parsed)) return parsed.map(i => String(i).trim()).filter(Boolean);
-              } catch (e) {}
-            }
-            return trimmed.split(sep).map(i => i.trim()).filter(Boolean);
-          }
-          return [String(val).trim()].filter(Boolean);
-        };
-        const items = parseArrayPills(value, field.pillsSeparator || ",");
-        return (
-          <div className="flex flex-wrap gap-1.5">
-            {items.map((item, idx) => (
-              <Badge key={idx} variant="secondary" className="text-[10px] px-2 py-0.5 font-medium border">
-                {item}
-              </Badge>
-            ))}
-          </div>
-        );
-      case "date":
-        const formattedDateValue = formatDateForInput(valueStr, field.dateMode === "date-time");
-        if (field.isEditable) {
-          const dateStatus = fieldValidationStatuses[field.id] || fieldValidationStatuses[field.label];
-          const hasDateErr = !!dateStatus?.error;
-          return (
-            <DatePicker
-              value={formattedDateValue}
-              dateMode={field.dateMode}
-              locale={field.dateLocale}
-              onChange={(val) => onFieldChange?.(field.label, val)}
-              error={hasDateErr}
-              className="w-full text-sm"
-            />
-          );
-        }
-        return (
-          <div className="flex items-center gap-1.5 text-sm font-medium bg-muted/40 border px-3 py-2 rounded-lg text-foreground/80">
-            <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
-            <span>{formatDisplayDate(valueStr, field.dateMode === "date-time") || valueStr}</span>
-          </div>
-        );
-      case "number":
-        if (field.isEditable) {
-          return (
-            <Input
-              type="number"
-              value={valueStr}
-              onChange={(e) => onFieldChange?.(field.label, e.target.value)}
-              className="w-full text-sm font-mono"
-            />
-          );
-        }
-        return (
-          <div className="flex items-center gap-1.5 text-sm font-mono font-medium bg-muted/40 border px-3 py-2 rounded-lg text-foreground/80">
-            <Hash className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-            <span>{valueStr}</span>
-          </div>
-        );
-      case "textarea":
-        const isTextareaMono = field.previewFontMode === "mono";
-        if (field.isEditable) {
-          return (
-            <Textarea
-              value={valueStr}
-              onChange={(e) => onFieldChange?.(field.label, e.target.value)}
-              className={cn("w-full text-sm min-h-[80px]", isTextareaMono && "font-mono")}
-            />
-          );
-        }
-        return (
-          <div className={cn("py-2.5 px-3 bg-muted/40 border border-border/50 rounded-lg text-sm select-all whitespace-pre-wrap text-foreground/80 font-medium", isTextareaMono && "font-mono")}>
-            {valueStr}
-          </div>
-        );
-      case "checkbox":
-        const isChecked = valueStr === "true";
-        if (field.isEditable) {
-          return (
-            <div className="flex items-center gap-2 py-1">
-              <Checkbox
-                id={`eval-checkbox-${field.id}`}
-                checked={isChecked}
-                onCheckedChange={(checked) => {
-                  onFieldChange?.(field.label, checked ? "true" : "false");
-                }}
-              />
-              <label
-                htmlFor={`eval-checkbox-${field.id}`}
-                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer select-none text-foreground/80"
-              >
-                {field.placeholder || "Ceklis item ini"}
-              </label>
-            </div>
-          );
-        }
-        const isCheckedPreview = valueStr === "true";
-        return (
-          <div className="flex items-center gap-2 py-2 px-3 bg-muted/40 border border-border/50 rounded-lg text-sm w-full">
-            <Checkbox
-              checked={isCheckedPreview}
-              disabled
-              className="opacity-70"
-            />
-            <span className={`text-sm ${isCheckedPreview ? "text-foreground font-medium" : "text-muted-foreground/50 italic"}`}>
-              {isCheckedPreview ? (field.placeholder || "Terceklis") : (field.placeholder || "Tidak terceklis")}
-            </span>
-          </div>
-        );
-      case "dropdown":
-        const selectedColorKey = field.optionColors?.[valueStr];
-        const selectedDotClass = selectedColorKey ? dropdownColorMap[selectedColorKey] : undefined;
-        if (field.isEditable) {
-          const selectOptions = field.options || [];
-          return (
-            <SearchableCombobox
-              value={valueStr}
-              options={selectOptions}
-              optionColors={field.optionColors}
-              placeholder={field.placeholder}
-              onValueChange={(val) => onFieldChange?.(field.label, val)}
-            />
-          );
-        }
-        return (
-          <div className="py-2.5 px-3 bg-muted/40 border border-border/50 rounded-lg text-sm select-all whitespace-pre-wrap text-foreground/80 font-medium flex items-center gap-2">
-            {valueStr && selectedDotClass && (
-              <span className={cn("h-2.5 w-2.5 rounded-full shrink-0", selectedDotClass)} />
-            )}
-            <span>{valueStr || (field.placeholder || "Belum diisi")}</span>
-          </div>
-        );
-      case "street-address":
-        if (field.isEditable) {
-          return (
-            <StreetAddressInput
-              value={valueStr}
-              placeholder={field.placeholder || "Masukkan nama jalan, no, RT/RW..."}
-              onChange={(val) => onFieldChange?.(field.label, val)}
-              error={fieldError}
-              showError={false}
-            />
-          );
-        }
-        return (
-          <div className="py-2.5 px-3 bg-muted/40 border border-border/50 rounded-lg text-sm select-all whitespace-pre-wrap text-foreground/80 font-medium">
-            {valueStr || "Belum diisi"}
-          </div>
-        );
-      default:
-        const isMono = field.previewFontMode === "mono";
-        const isAddressLabel = /alamat|jalan/i.test(field.label);
-
-        if (field.isEditable) {
-          if (isAddressLabel) {
-            return (
-              <StreetAddressInput
-                value={valueStr}
-                placeholder={field.placeholder || "Masukkan nama jalan, no, RT/RW..."}
-                onChange={(val) => onFieldChange?.(field.label, val)}
-                error={fieldError}
-                showError={false}
-              />
-            );
-          }
-
-          const status = fieldValidationStatuses[field.id] || fieldValidationStatuses[field.label];
-          const hasErr = !!status?.error;
-
-          return (
-            <Input
-              value={valueStr}
-              onChange={(e) => onFieldChange?.(field.label, e.target.value)}
-              aria-invalid={hasErr}
-              className={cn("w-full text-sm", isMono && "font-mono", hasErr && "border-destructive ring-destructive/20 ring-2")}
-            />
-          );
-        }
-        return (
-          <div className={cn("py-2.5 px-3 bg-muted/40 border border-border/50 rounded-lg text-sm select-all whitespace-pre-wrap text-foreground/80 font-medium", isMono && "font-mono")}>
-            {valueStr}
-          </div>
-        );
-    }
-  };
-
-
-
-  const renderFieldStatusMessage = (field: Field) => {
-    const status = fieldValidationStatuses[field.id] || fieldValidationStatuses[field.label];
-    const hasErr = !!status?.error;
-    const errMessage = status?.error;
-    const warnMessage = status?.warning;
-
-    if (hasErr && errMessage) {
-      return (
-        <FieldError className="mt-1 pl-0.5 font-semibold text-xs flex items-center gap-1.5 text-rose-500">
-          <span className="relative flex h-2 w-2 shrink-0">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500"></span>
-          </span>
-          <span>{errMessage}</span>
-        </FieldError>
-      );
-    }
-
-    if (!hasErr && warnMessage) {
-      return (
-        <div className="mt-1.5 pl-0.5 font-medium text-xs flex items-center gap-1.5 text-amber-600 dark:text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2.5 py-1.5 rounded-lg">
-          <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-500" />
-          <span>{warnMessage}</span>
-        </div>
-      );
-    }
-
-    return null;
-  };
-
   return (
     <div className="space-y-6 w-full">
       {sections.map((section) => (
@@ -817,8 +838,16 @@ export function EvaluationForm({ sections, participant, onFieldChange, errors }:
                         <FieldLabel className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block">
                           {field.label} {field.isRequired && <span className="text-rose-500 font-bold ml-0.5">*</span>}
                         </FieldLabel>
-                        {renderFieldValue(field)}
-                        {renderFieldStatusMessage(field)}
+                        <FieldValueRenderer
+                          field={field}
+                          value={participant[field.label]}
+                          fieldError={errors?.[field.label]}
+                          fieldValidationStatus={status}
+                          onFieldChange={onFieldChange}
+                          openMediaViewer={openMediaViewer}
+                          handleOpenEditMediaModal={handleOpenEditMediaModal}
+                        />
+                        <FieldStatusMessage fieldValidationStatus={status} />
                         {field.description && (
                           <FieldDescription className="text-xs italic text-muted-foreground/80 mt-1 pl-0.5 leading-relaxed">
                             {field.description}
@@ -839,8 +868,16 @@ export function EvaluationForm({ sections, participant, onFieldChange, errors }:
                         <FieldLabel className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block">
                           {field.label} {field.isRequired && <span className="text-rose-500 font-bold ml-0.5">*</span>}
                         </FieldLabel>
-                        {renderFieldValue(field)}
-                        {renderFieldStatusMessage(field)}
+                        <FieldValueRenderer
+                          field={field}
+                          value={participant[field.label]}
+                          fieldError={errors?.[field.label]}
+                          fieldValidationStatus={status}
+                          onFieldChange={onFieldChange}
+                          openMediaViewer={openMediaViewer}
+                          handleOpenEditMediaModal={handleOpenEditMediaModal}
+                        />
+                        <FieldStatusMessage fieldValidationStatus={status} />
                         {field.description && (
                           <FieldDescription className="text-xs italic text-muted-foreground/80 mt-1 pl-0.5 leading-relaxed">
                             {field.description}
@@ -860,8 +897,16 @@ export function EvaluationForm({ sections, participant, onFieldChange, errors }:
                     <FieldLabel className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block">
                       {field.label} {field.isRequired && <span className="text-rose-500 font-bold ml-0.5">*</span>}
                     </FieldLabel>
-                    {renderFieldValue(field)}
-                    {renderFieldStatusMessage(field)}
+                    <FieldValueRenderer
+                      field={field}
+                      value={participant[field.label]}
+                      fieldError={errors?.[field.label]}
+                      fieldValidationStatus={status}
+                      onFieldChange={onFieldChange}
+                      openMediaViewer={openMediaViewer}
+                      handleOpenEditMediaModal={handleOpenEditMediaModal}
+                    />
+                    <FieldStatusMessage fieldValidationStatus={status} />
                     {field.description && (
                       <FieldDescription className="text-xs italic text-muted-foreground/80 mt-1 pl-0.5 leading-relaxed">
                         {field.description}

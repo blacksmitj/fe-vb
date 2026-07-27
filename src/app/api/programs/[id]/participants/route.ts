@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import { auth } from "@/lib/auth/auth";
 import { headers as getHeaders } from "next/headers";
+import { verifyProgramAccess } from "@/lib/auth/program-auth";
 import { NextResponse } from "next/server";
 
 function buildSearchText(data: Record<string, any>): string {
@@ -15,27 +16,14 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await auth.api.getSession({
-      headers: await getHeaders(),
-    });
+    const { id } = await params;
+    const { session, isApproved } = await verifyProgramAccess(id);
 
     if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { id } = await params;
-
-    // Check if the user is an APPROVED member of the program
-    const membership = await db.programMember.findUnique({
-      where: {
-        programId_userId: {
-          programId: id,
-          userId: session.user.id,
-        },
-      },
-    });
-
-    if (!membership || membership.status !== "APPROVED") {
+    if (!isApproved) {
       return NextResponse.json(
         { error: "Forbidden: Hanya anggota program yang disetujui." },
         { status: 403 }
@@ -95,27 +83,34 @@ export async function GET(
       return NextResponse.json({ error: "Invalid page parameter" }, { status: 400 });
     }
 
-    // Get 1 participant by rowIndex (0-based)
-    const participantRecord = await db.participant.findFirst({
-      where: {
-        programId: id,
-        rowIndex: page,
-      },
-      select: {
-        id: true,
-        rowIndex: true,
-        uniqueKey: true,
-        data: true,
-        evalStatus: true,
-        evalDescription: true,
-        evalByUserId: true,
-        evalByUserName: true,
-        evalAt: true,
-        verificationHistories: {
-          orderBy: { evalAt: "asc" },
+    // Get 1 participant by rowIndex and total rows count concurrently
+    const [participantRecord, program] = await Promise.all([
+      db.participant.findFirst({
+        where: {
+          programId: id,
+          rowIndex: page,
         },
-      },
-    });
+        select: {
+          id: true,
+          rowIndex: true,
+          uniqueKey: true,
+          data: true,
+          evalStatus: true,
+          evalDescription: true,
+          evalByUserId: true,
+          evalByUserName: true,
+          evalAt: true,
+          verificationHistories: {
+            orderBy: { evalAt: "asc" },
+            take: 20,
+          },
+        },
+      }),
+      db.program.findUnique({
+        where: { id },
+        select: { totalRows: true },
+      }),
+    ]);
 
     const histories = participantRecord ? [...(participantRecord.verificationHistories || [])] : [];
     if (participantRecord && histories.length === 0 && participantRecord.evalByUserId) {
@@ -143,12 +138,6 @@ export async function GET(
           ...(participantRecord.data as Record<string, any>),
         }
       : null;
-
-    // Get total rows count from the program
-    const program = await db.program.findUnique({
-      where: { id },
-      select: { totalRows: true },
-    });
 
     return NextResponse.json({ 
       participant,

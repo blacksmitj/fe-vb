@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Section, Field, FieldType, migrateSectionsSchema } from "@/components/profile-builder";
 import { useProfileBuilder, useUpdateProfileBuilder } from "@/hooks/use-profile-builders";
 import { toast } from "sonner";
@@ -63,10 +63,14 @@ export function useBuilderState(builderId: string | null) {
     }
   }, [builder, builderId]);
 
+  // Cache serialized dbSchemaStr to avoid re-stringifying builder.sections on every render
+  const dbSchemaStr = useMemo(() => {
+    return JSON.stringify(builder?.sections || []);
+  }, [builder?.sections]);
+
   // Sync modifications to localStorage draft
   useEffect(() => {
     if (isLoaded && builderId && builder) {
-      const dbSchemaStr = JSON.stringify(builder.sections || []);
       const currentSchemaStr = JSON.stringify(sections);
       const draftKey = `profile-builder-draft-${builderId}`;
 
@@ -78,7 +82,7 @@ export function useBuilderState(builderId: string | null) {
         setHasDraft(true);
       }
     }
-  }, [sections, isLoaded, builderId, builder]);
+  }, [sections, isLoaded, builderId, builder, dbSchemaStr]);
 
   // Open settings sheet automatically if no program is selected yet
   useEffect(() => {

@@ -24,7 +24,7 @@ export function validateProfileFieldValue(
   allFormValues?: Record<string, any>,
   allFields?: Field[]
 ): FieldValidationStatus {
-  const val = (value || "").trim();
+  const val = value !== undefined && value !== null ? String(value).trim() : "";
 
   // 1. Cek Required
   if (field.isRequired && !val) {
