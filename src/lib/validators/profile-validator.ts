@@ -112,8 +112,9 @@ export function validateProfileFieldValue(
     case "tanggal-lahir": {
       const res = validateTanggalLahir(val);
       let err = res.error;
+      let warning = res.warning;
 
-      // Cross-check dengan NIK: jika Tanggal Lahir diisi tapi tidak cocok dengan NIK, tampilkan error di Tanggal Lahir
+      // Cross-check dengan NIK: jika Tanggal Lahir diisi tapi tidak cocok dengan NIK, tampilkan warning/atensi (bukan error pembatas submit)
       if (!err && val && allFormValues) {
         let nikVal: string | undefined = undefined;
 
@@ -149,7 +150,7 @@ export function validateProfileFieldValue(
           if (cleanNik.length === 16) {
             const nikRes = validateNik(cleanNik, { dob: val });
             if (!nikRes.isValid && nikRes.error) {
-              err = nikRes.error;
+              warning = nikRes.error;
             }
           }
         }
@@ -158,7 +159,7 @@ export function validateProfileFieldValue(
       return {
         isValid: !err,
         error: err,
-        warning: res.warning,
+        warning: warning,
       };
     }
 

@@ -172,61 +172,73 @@ function SearchableCombobox({ value, options, optionColors, placeholder, onValue
     );
   }, [options, searchValue, value]);
 
+  const isInvalid = React.useMemo(() => {
+    if (!searchValue || searchValue.trim() === "") return false;
+    return !options.some((opt) => opt.toLowerCase() === searchValue.trim().toLowerCase());
+  }, [options, searchValue]);
+
   const colorKey = optionColors?.[value];
   const dotClass = colorKey ? dropdownColorMap[colorKey] : undefined;
 
   return (
-    <Combobox
-      value={value}
-      onValueChange={(val) => {
-        if (val !== null) {
-          onValueChange(val);
-          // Tampilkan nilai yang dipilih di input setelah seleksi
+    <div className="w-full">
+      <Combobox
+        value={value}
+        onValueChange={(val) => {
+          if (val !== null) {
+            onValueChange(val);
+            // Tampilkan nilai yang dipilih di input setelah seleksi
+            setSearchValue(val);
+          }
+        }}
+        // Kontrol teks input melalui Root sesuai API @base-ui/react
+        inputValue={searchValue}
+        onInputValueChange={(val, { reason }) => {
           setSearchValue(val);
-        }
-      }}
-      // Kontrol teks input melalui Root sesuai API @base-ui/react
-      inputValue={searchValue}
-      onInputValueChange={(val, { reason }) => {
-        setSearchValue(val);
-        // Saat item dipilih, library sudah handle — jangan overwrite lagi
-        if (reason === "item-press") return;
-      }}
-      // Reset teks search ke nilai terpilih saat popup ditutup tanpa memilih
-      onOpenChange={(open) => {
-        if (!open) setSearchValue(value);
-      }}
-      disabled={disabled}
-    >
-      <ComboboxInput
-        placeholder={placeholder || "Select option..."}
-        className="w-full text-sm"
-        leftAddon={
-          dotClass ? (
-            <span className={cn("h-2.5 w-2.5 rounded-full shrink-0", dotClass)} />
-          ) : null
-        }
-      />
-      <ComboboxContent>
-        <ComboboxList>
-          {filteredOptions.map((opt) => {
-            const colorKey = optionColors?.[opt];
-            const dotClass = colorKey ? dropdownColorMap[colorKey] : undefined;
-            return (
-              <ComboboxItem key={opt} value={opt} className="flex items-center gap-2 text-sm">
-                {dotClass && <span className={cn("h-2 w-2 rounded-full shrink-0", dotClass)} />}
-                <span>{opt}</span>
-              </ComboboxItem>
-            );
-          })}
-          {filteredOptions.length === 0 && (
-            <ComboboxEmpty className="text-[10px] text-muted-foreground p-2 text-center">
-              Tidak ditemukan
-            </ComboboxEmpty>
-          )}
-        </ComboboxList>
-      </ComboboxContent>
-    </Combobox>
+          // Saat item dipilih, library sudah handle — jangan overwrite lagi
+          if (reason === "item-press") return;
+        }}
+        // Reset teks search ke nilai terpilih saat popup ditutup tanpa memilih
+        onOpenChange={(open) => {
+          if (!open) setSearchValue(value);
+        }}
+        disabled={disabled}
+      >
+        <ComboboxInput
+          placeholder={placeholder || "Select option..."}
+          className={cn("w-full text-sm", isInvalid && "border-destructive focus-within:border-destructive text-destructive ring-destructive")}
+          leftAddon={
+            dotClass ? (
+              <span className={cn("h-2.5 w-2.5 rounded-full shrink-0", dotClass)} />
+            ) : null
+          }
+        />
+        <ComboboxContent>
+          <ComboboxList>
+            {filteredOptions.map((opt) => {
+              const colorKey = optionColors?.[opt];
+              const dotClass = colorKey ? dropdownColorMap[colorKey] : undefined;
+              return (
+                <ComboboxItem key={opt} value={opt} className="flex items-center gap-2 text-sm">
+                  {dotClass && <span className={cn("h-2 w-2 rounded-full shrink-0", dotClass)} />}
+                  <span>{opt}</span>
+                </ComboboxItem>
+              );
+            })}
+            {filteredOptions.length === 0 && (
+              <ComboboxEmpty className="text-[10px] text-muted-foreground p-2 text-center">
+                Tidak ditemukan
+              </ComboboxEmpty>
+            )}
+          </ComboboxList>
+        </ComboboxContent>
+      </Combobox>
+      {isInvalid && (
+        <p className="text-xs font-medium text-destructive mt-1.5 flex items-center gap-1">
+          <span>Nilai tidak valid / tidak ada dalam pilihan</span>
+        </p>
+      )}
+    </div>
   );
 }
 
