@@ -5,5 +5,4 @@ export * from "./use-programs";
 export * from "./use-dashboard";
 export * from "./use-profile-builders";
 export * from "./use-drafts";
-export * from "./use-reverification";
 

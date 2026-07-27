@@ -1,4 +1,5 @@
 export { TextPreview } from "./text-preview";
+export { StreetAddressPreview } from "./street-address-preview";
 export { NumberPreview } from "./number-preview";
 export { DatePreview } from "./date-preview";
 export { BadgeStatusPreview } from "./badge-status-preview";

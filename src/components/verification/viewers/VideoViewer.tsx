@@ -17,6 +17,30 @@ export function VideoViewer({ url }: VideoViewerProps) {
 
   const youtubeId = getYoutubeId(url);
 
+  // Check if it's a Google Drive URL
+  const getGoogleDriveEmbed = (driveUrl: string) => {
+    const match = driveUrl.match(/(?:drive|docs)\.google\.com\/(?:[^\/]+\/)*?(?:file\/d\/|open\?id=|uc\?(?:[^\&]*\&)*?id=)([^/\?&#]+)/i);
+    return match && match[1] ? `https://drive.google.com/file/d/${match[1]}/preview` : null;
+  };
+
+  const gdriveEmbed = getGoogleDriveEmbed(url);
+
+  if (gdriveEmbed) {
+    return (
+      <div className="flex-1 w-full h-full border rounded-lg bg-black overflow-hidden flex items-center justify-center min-h-[300px]">
+        <iframe
+          src={gdriveEmbed}
+          title="Google Drive Video Viewer"
+          width="100%"
+          height="100%"
+          allow="autoplay"
+          allowFullScreen
+          className="w-full h-full aspect-video border-0"
+        />
+      </div>
+    );
+  }
+
   if (youtubeId) {
     return (
       <div className="flex-1 w-full h-full border rounded-lg bg-black overflow-hidden flex items-center justify-center min-h-[300px]">

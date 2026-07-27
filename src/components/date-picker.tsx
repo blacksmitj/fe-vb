@@ -20,6 +20,7 @@ interface DatePickerProps {
   disabled?: boolean;
   placeholder?: string;
   className?: string;
+  error?: boolean;
 }
 
 export default function DatePicker({
@@ -30,6 +31,7 @@ export default function DatePicker({
   disabled = false,
   placeholder = "Pilih tanggal...",
   className,
+  error = false,
 }: DatePickerProps) {
   // Parse string value into Date object
   const dateValue = React.useMemo(() => {
@@ -94,6 +96,7 @@ export default function DatePicker({
           className={cn(
             "w-full justify-start text-left font-normal h-9 px-3 text-sm rounded-lg border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground disabled:opacity-50",
             !value && "text-muted-foreground",
+            error && "border-destructive ring-destructive/20 ring-2",
             className
           )}
         >

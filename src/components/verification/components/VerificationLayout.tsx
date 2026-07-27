@@ -72,7 +72,7 @@ export function VerificationLayout({ children }: VerificationLayoutProps) {
               <div className="flex flex-col h-full w-full min-w-[300px]">
                 <div className="flex items-center justify-between p-4 border-b bg-background">
                   <h3 className="font-semibold text-sm">
-                    Media Viewer: <span className="capitalize font-medium text-muted-foreground">{mediaType}</span>
+                    Media Viewer{mediaType ? `: ` : ""}<span className="capitalize font-medium text-muted-foreground">{mediaType || ""}</span>
                   </h3>
                   <Button
                     variant="ghost"

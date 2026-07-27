@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Field, FieldType } from "../../../types";
+import { Field, FieldType, ValidationRule } from "../../../types";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -35,6 +35,7 @@ interface FieldEditSheetProps {
 /** Sheet panel for editing all settings of a single field */
 export function FieldEditSheet({ field, isOpen, onOpenChange, onUpdateField }: FieldEditSheetProps) {
   const [editType, setEditType] = useState<FieldType>(field.type);
+  const [editValidationRule, setEditValidationRule] = useState<ValidationRule>(field.validationRule || "none");
   const [editLabel, setEditLabel] = useState(field.label);
   const [editIsEditable, setEditIsEditable] = useState(field.isEditable ?? false);
   const [editIsRequired, setEditIsRequired] = useState(field.isRequired ?? false);
@@ -55,6 +56,7 @@ export function FieldEditSheet({ field, isOpen, onOpenChange, onUpdateField }: F
   React.useEffect(() => {
     if (isOpen) {
       setEditType(field.type);
+      setEditValidationRule(field.validationRule || "none");
       setEditLabel(field.label);
       setEditIsEditable(field.isEditable ?? false);
       setEditIsRequired(field.isRequired ?? false);
@@ -112,8 +114,9 @@ export function FieldEditSheet({ field, isOpen, onOpenChange, onUpdateField }: F
     onUpdateField({
       ...field,
       type: editType,
+      validationRule: editValidationRule !== "none" ? editValidationRule : undefined,
       label: editLabel,
-      isEditable: editType !== "media" ? editIsEditable : false,
+      isEditable: editIsEditable,
       isRequired: editIsRequired,
       placeholder: editPlaceholder,
       description: editDescription.trim() || undefined,
@@ -153,6 +156,7 @@ export function FieldEditSheet({ field, isOpen, onOpenChange, onUpdateField }: F
                   <SelectContent>
                     <SelectItem value="text">Text Input</SelectItem>
                     <SelectItem value="textarea">Text Area</SelectItem>
+                    <SelectItem value="street-address">Alamat Jalan (Magic Wand)</SelectItem>
                     <SelectItem value="number">Number Input</SelectItem>
                     <SelectItem value="date">Date picker</SelectItem>
                     <SelectItem value="badge-status">Badge Status</SelectItem>
@@ -160,6 +164,26 @@ export function FieldEditSheet({ field, isOpen, onOpenChange, onUpdateField }: F
                     <SelectItem value="media">Media / Dokumen (Auto-detect)</SelectItem>
                     <SelectItem value="dropdown">Dropdown Input</SelectItem>
                     <SelectItem value="checkbox">Ceklis / Checkbox</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Aturan Validasi Khusus */}
+              <div className="grid gap-2">
+                <Label htmlFor="editValidationRule">Aturan Validasi Data</Label>
+                <Select value={editValidationRule} onValueChange={(val) => setEditValidationRule(val as ValidationRule)}>
+                  <SelectTrigger id="editValidationRule">
+                    <SelectValue placeholder="Pilih aturan validasi" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Tanpa Validasi Khusus</SelectItem>
+                    <SelectItem value="nik">NIK (16 Digit Indonesia)</SelectItem>
+                    <SelectItem value="whatsapp">Nomor WhatsApp (08 / +62)</SelectItem>
+                    <SelectItem value="npwp">NPWP (15 Digit Lama / 16 Digit NIK)</SelectItem>
+                    <SelectItem value="nib">NIB (13 Digit OSS RBA)</SelectItem>
+                    <SelectItem value="kode-pos">Kode Pos (5 Digit Indonesia)</SelectItem>
+                    <SelectItem value="tanggal-lahir">Tanggal Lahir (Validasi Keabsahan & Masa Depan)</SelectItem>
+                    <SelectItem value="street-address">Alamat Jalan (Magic Wand & Standarisasi)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -181,6 +205,7 @@ export function FieldEditSheet({ field, isOpen, onOpenChange, onUpdateField }: F
                 onMediaSubTypeChange={setEditMediaSubType}
               />
 
+
               {/* Field Label */}
               <div className="grid gap-2">
                 <Label htmlFor="editLabel">Field Label</Label>
@@ -193,19 +218,17 @@ export function FieldEditSheet({ field, isOpen, onOpenChange, onUpdateField }: F
               </div>
 
               {/* Editable toggle */}
-              {editType !== "media" && (
-                <div className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
-                  <div className="space-y-0.5">
-                    <Label htmlFor="editIsEditable" className="text-sm font-medium">
-                      Editable Field
-                    </Label>
-                    <p className="text-[11px] text-muted-foreground">
-                      Allow users/verifiers to edit the value of this field during validation.
-                    </p>
-                  </div>
-                  <Switch id="editIsEditable" checked={editIsEditable} onCheckedChange={setEditIsEditable} />
+              <div className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
+                <div className="space-y-0.5">
+                  <Label htmlFor="editIsEditable" className="text-sm font-medium">
+                    Editable Field
+                  </Label>
+                  <p className="text-[11px] text-muted-foreground">
+                    Allow users/verifiers to edit the value of this field during validation.
+                  </p>
                 </div>
-              )}
+                <Switch id="editIsEditable" checked={editIsEditable} onCheckedChange={setEditIsEditable} />
+              </div>
 
               {/* Required toggle */}
               <div className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
@@ -236,8 +259,8 @@ export function FieldEditSheet({ field, isOpen, onOpenChange, onUpdateField }: F
                 />
               </div>
 
-              {/* Placeholder (text/textarea/number/checkbox) */}
-              {(editType === "text" || editType === "textarea" || editType === "number" || editType === "checkbox") && (
+              {/* Placeholder (text/textarea/street-address/number/checkbox) */}
+              {(editType === "text" || editType === "textarea" || editType === "street-address" || editType === "number" || editType === "checkbox") && (
                 <div className="grid gap-2">
                   <Label htmlFor="editPlaceholder">
                     {editType === "checkbox" ? "Label Samping Ceklis" : "Placeholder Text"}

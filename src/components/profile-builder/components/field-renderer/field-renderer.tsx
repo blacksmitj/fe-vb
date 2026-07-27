@@ -4,11 +4,12 @@ import React, { useState } from "react";
 import { Field } from "../../types";
 import { Button } from "@/components/ui/button";
 import { Lock, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Trash2 } from "lucide-react";
-import { Type, AlignLeft, Link2, Hash, Calendar, Tag, Bookmark, List, CheckSquare } from "lucide-react";
+import { Type, AlignLeft, Link2, Hash, Calendar, Tag, Bookmark, List, CheckSquare, MapPin } from "lucide-react";
 import { FieldRendererProps } from "./shared";
 import { FieldEditSheet } from "./edit-sheet";
 import {
   TextPreview,
+  StreetAddressPreview,
   NumberPreview,
   DatePreview,
   BadgeStatusPreview,
@@ -20,15 +21,16 @@ import {
 
 function getFieldIcon(field: Field) {
   switch (field.type) {
-    case "text":         return <Type className="h-4.5 w-4.5 text-primary" />;
-    case "textarea":     return <AlignLeft className="h-4.5 w-4.5 text-primary" />;
-    case "media":        return <Link2 className="h-4.5 w-4.5 text-indigo-500" />;
-    case "number":       return <Hash className="h-4.5 w-4.5 text-orange-500" />;
-    case "date":         return <Calendar className="h-4.5 w-4.5 text-blue-500" />;
-    case "badge-status": return <Tag className="h-4.5 w-4.5 text-amber-500" />;
-    case "array-pills":  return <Bookmark className="h-4.5 w-4.5 text-emerald-500" />;
-    case "dropdown":     return <List className="h-4.5 w-4.5 text-indigo-500" />;
-    case "checkbox":     return <CheckSquare className="h-4.5 w-4.5 text-emerald-500" />;
+    case "text":           return <Type className="h-4.5 w-4.5 text-primary" />;
+    case "textarea":       return <AlignLeft className="h-4.5 w-4.5 text-primary" />;
+    case "street-address": return <MapPin className="h-4.5 w-4.5 text-amber-500" />;
+    case "media":          return <Link2 className="h-4.5 w-4.5 text-indigo-500" />;
+    case "number":         return <Hash className="h-4.5 w-4.5 text-orange-500" />;
+    case "date":           return <Calendar className="h-4.5 w-4.5 text-blue-500" />;
+    case "badge-status":   return <Tag className="h-4.5 w-4.5 text-amber-500" />;
+    case "array-pills":    return <Bookmark className="h-4.5 w-4.5 text-emerald-500" />;
+    case "dropdown":       return <List className="h-4.5 w-4.5 text-indigo-500" />;
+    case "checkbox":       return <CheckSquare className="h-4.5 w-4.5 text-emerald-500" />;
   }
 }
 
@@ -36,15 +38,16 @@ function renderInput(field: Field, sampleRow: Record<string, any> | undefined, o
   const props = { field, sampleRow, onUpdateField };
   switch (field.type) {
     case "text":
-    case "textarea":     return <TextPreview {...props} />;
-    case "number":       return <NumberPreview {...props} />;
-    case "date":         return <DatePreview {...props} />;
-    case "badge-status": return <BadgeStatusPreview {...props} />;
-    case "array-pills":  return <ArrayPillsPreview {...props} />;
-    case "checkbox":     return <CheckboxPreview {...props} />;
-    case "dropdown":     return <DropdownPreview {...props} />;
-    case "media":        return <MediaPreview field={field} sampleRow={sampleRow} />;
-    default:             return null;
+    case "textarea":       return <TextPreview {...props} />;
+    case "street-address": return <StreetAddressPreview {...props} />;
+    case "number":         return <NumberPreview {...props} />;
+    case "date":           return <DatePreview {...props} />;
+    case "badge-status":   return <BadgeStatusPreview {...props} />;
+    case "array-pills":    return <ArrayPillsPreview {...props} />;
+    case "checkbox":       return <CheckboxPreview {...props} />;
+    case "dropdown":       return <DropdownPreview {...props} />;
+    case "media":          return <MediaPreview field={field} sampleRow={sampleRow} />;
+    default:               return null;
   }
 }
 

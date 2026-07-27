@@ -20,11 +20,11 @@ export function migrateSectionsSchema(sections: Section[]): Section[] {
           isEditable: false, // Ensure media is always read-only
         };
       }
-      // If it is already media, make sure it is read-only
+      // If it is already media, preserve its settings
       if (field.type === "media") {
         return {
           ...field,
-          isEditable: false,
+          isEditable: field.isEditable ?? false,
         };
       }
       return field;

@@ -46,7 +46,7 @@ export const useVerificationStore = create<VerificationState>()((set) => ({
   totalRows: 0,
   setTotalRows: (total) => set({ totalRows: total }),
 
-  isMediaViewerOpen: false,
+  isMediaViewerOpen: true,
   mediaType: null,
   mediaUrl: null,
   openMediaViewer: (type, url) => set({ isMediaViewerOpen: true, mediaType: type, mediaUrl: url }),

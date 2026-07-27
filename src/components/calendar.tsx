@@ -68,20 +68,33 @@ function Calendar({
   ...props
 }: CalendarProps) {
   const [navView, setNavView] = React.useState<NavView>("days")
+  const { onNextClick, onPrevClick, startMonth, endMonth } = props
+  const { month: monthProp, selected } = props as any
+
+  const selectedOrMonthYear = React.useMemo(() => {
+    if (monthProp instanceof Date && !isNaN(monthProp.getTime())) {
+      return monthProp.getFullYear()
+    }
+    if (selected instanceof Date && !isNaN(selected.getTime())) {
+      return selected.getFullYear()
+    }
+    return new Date().getFullYear()
+  }, [monthProp, selected])
+
   const [displayYears, setDisplayYears] = React.useState<{
     from: number
     to: number
-  }>(
-    React.useMemo(() => {
-      const currentYear = new Date().getFullYear()
-      return {
-        from: currentYear - Math.floor(yearRange / 2 - 1),
-        to: currentYear + Math.ceil(yearRange / 2),
-      }
-    }, [yearRange])
-  )
+  }>(() => ({
+    from: selectedOrMonthYear - Math.floor(yearRange / 2 - 1),
+    to: selectedOrMonthYear + Math.ceil(yearRange / 2),
+  }))
 
-  const { onNextClick, onPrevClick, startMonth, endMonth } = props
+  React.useEffect(() => {
+    setDisplayYears({
+      from: selectedOrMonthYear - Math.floor(yearRange / 2 - 1),
+      to: selectedOrMonthYear + Math.ceil(yearRange / 2),
+    })
+  }, [selectedOrMonthYear, yearRange])
 
   const columnsDisplayed = navView === "years" ? 1 : numberOfMonths
 

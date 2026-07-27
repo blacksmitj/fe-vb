@@ -1,6 +1,7 @@
 export type FieldType = 
   | 'text' 
   | 'textarea' 
+  | 'street-address'
   | 'media' 
   | 'number' 
   | 'date' 
@@ -8,6 +9,16 @@ export type FieldType =
   | 'array-pills'
   | 'dropdown'
   | 'checkbox';
+
+export type ValidationRule = 
+  | 'none'
+  | 'nik'
+  | 'whatsapp'
+  | 'npwp'
+  | 'nib'
+  | 'kode-pos'
+  | 'tanggal-lahir'
+  | 'street-address';
 
 export type MediaSubType = 'image' | 'video' | 'pdf' | 'link';
 
@@ -22,6 +33,7 @@ export interface Field {
   column?: 'left' | 'right';
   isEditable?: boolean; // Toggle between editable and preview mode
   isRequired?: boolean; // Make this field mandatory during verification save
+  validationRule?: ValidationRule; // Custom validation rule for NIK, WA, NPWP, NIB, Kode Pos, Tanggal Lahir
   // New customizable properties
   dateMode?: 'date-only' | 'date-time';
   dateLocale?: 'id' | 'en';
@@ -32,6 +44,7 @@ export interface Field {
   options?: string[];
   optionColors?: Record<string, string>;
 }
+
 
 export interface Section {
   id: string;

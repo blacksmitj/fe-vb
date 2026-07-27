@@ -23,7 +23,9 @@ import {
   InfoIcon,
   LayoutTemplateIcon,
   Trash2Icon,
+  KeyIcon,
 } from "lucide-react";
+import { ProgramApiSettings } from "@/components/program/program-api-settings";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -874,6 +876,13 @@ export default function ProgramSettingsPage({ params }: { params: Promise<{ id: 
               )}
 
               {userRole === "ADMIN" && (
+                <TabsTrigger value="api">
+                  <KeyIcon className="h-4 w-4 mr-2" />
+                  API Integrasi
+                </TabsTrigger>
+              )}
+
+              {userRole === "ADMIN" && (
                 <TabsTrigger value="members">
                   <UsersIcon className="h-4 w-4 mr-2" />
                   Anggota
@@ -885,6 +894,13 @@ export default function ProgramSettingsPage({ params }: { params: Promise<{ id: 
                 Log Aktivitas
               </TabsTrigger>
             </TabsList>
+
+            {/* TAB: API INTEGRATION */}
+            {userRole === "ADMIN" && (
+              <TabsContent value="api" className="space-y-6 outline-none mt-0">
+                <ProgramApiSettings programId={id} />
+              </TabsContent>
+            )}
 
             {/* TAB: GENERAL SETTINGS */}
             {userRole === "ADMIN" && (

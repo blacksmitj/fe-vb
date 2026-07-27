@@ -28,7 +28,9 @@ export function detectMediaType(url: string | undefined | null): MediaSubType {
   if (IMAGE_EXT.test(trimmed)) return 'image';
   if (VIDEO_EXT.test(trimmed)) return 'video';
   if (PDF_EXT.test(trimmed)) return 'pdf';
-  if (isGoogleDriveUrl(trimmed)) return 'image';
+  // Google Drive URLs use random IDs (e.g. /file/d/1ABC...), so extension detection fails.
+  // Returning 'link' allows field.mediaSubType (PDF, Video, Image setting) to dictate the rendering type.
+  if (isGoogleDriveUrl(trimmed)) return 'link';
   return 'link';
 }
 

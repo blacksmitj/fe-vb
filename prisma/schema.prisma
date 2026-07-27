@@ -27,6 +27,7 @@ model Program {
   programMembers  ProgramMember[]
   activityLogs    ActivityLog[]
   profileTemplate ProfileTemplate?
+  apiKey          ProgramApiKey?
 
   @@index([createdAt(sort: Desc)])
 }
@@ -259,6 +260,50 @@ model VerificationHistory {
   @@index([participantId])
   @@index([evalAt(sort: Asc)])
 }
+
+// ─────────────────────────────────────────────
+// Model: ProgramApiKey
+// ─────────────────────────────────────────────
+model ProgramApiKey {
+  id         String       @id @default(uuid())
+  programId  String       @unique
+  program    Program      @relation(fields: [programId], references: [id], onDelete: Cascade)
+
+  key        String       @unique
+  name       String       @default("Google Apps Script Key")
+  status     ApiKeyStatus @default(ACTIVE)
+
+  usageCount Int          @default(0)
+  lastUsedAt DateTime?
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+
+  logs       ProgramApiKeyLog[]
+
+  @@index([key])
+  @@index([programId])
+}
+
+model ProgramApiKeyLog {
+  id         String        @id @default(uuid())
+  apiKeyId   String
+  apiKey     ProgramApiKey @relation(fields: [apiKeyId], references: [id], onDelete: Cascade)
+
+  ipAddress  String?
+  userAgent  String?
+  status     Int           // e.g. 200, 401, 403, 500
+  message    String?
+  createdAt  DateTime      @default(now())
+
+  @@index([apiKeyId])
+  @@index([createdAt(sort: Desc)])
+}
+
+enum ApiKeyStatus {
+  ACTIVE
+  PAUSED
+}
+
 
 
 

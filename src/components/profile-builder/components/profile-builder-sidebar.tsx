@@ -39,7 +39,8 @@ function HeaderItem({
       variant="ghost"
       className="justify-start gap-1 h-auto py-1.5 w-full hover:bg-muted font-medium text-xs text-foreground/80 px-2 flex flex-col items-start align-top select-none cursor-pointer"
       onClick={() => {
-        onAddField("text", header, `Enter ${header}...`);
+        const initialType: FieldType = /alamat|jalan/i.test(header) ? "street-address" : "text";
+        onAddField(initialType, header, `Enter ${header}...`);
       }}
     >
       <div className="flex items-center gap-2 w-full">

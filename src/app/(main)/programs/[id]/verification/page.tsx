@@ -8,7 +8,7 @@ import {
   EvaluationControls,
 } from "@/components/verification";
 import { useVerificationStore } from "@/stores";
-import { Section, migrateSectionsSchema } from "@/components/profile-builder";
+import { Section, migrateSectionsSchema, detectMediaType, resolveMediaUrl } from "@/components/profile-builder";
 import { Loader2, ArrowLeft, RefreshCw, AlertCircle, CheckCircle2, XCircle, ClockIcon, UserCircle2 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -28,6 +28,7 @@ import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { safeParseDate } from "@/lib/utils";
 import { useSession } from "@/lib/auth/auth-client";
+import { validateProfileFieldValue } from "@/lib/validators";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -50,7 +51,7 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
     resetEvaluation,
     evaluationStatus,
     approvalDescription,
-    closeMediaViewer,
+    openMediaViewer,
   } = useVerificationStore();
   
   const [participant, setParticipant] = React.useState<Record<string, any> | null>(null);
@@ -176,7 +177,6 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
       setIsParticipantLoading(true);
       setValidationErrors({});
       try {
-        closeMediaViewer();
         const res = await fetch(`/api/programs/${id}/participants?page=${currentRowIndex}`);
         if (!res.ok) throw new Error("Failed to load participant");
         const data = await res.json();
@@ -232,7 +232,35 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
       }
     }
     loadParticipant();
-  }, [currentRowIndex, id, prevProgramId, targetPageIndex, setTotalRows, setEvaluationStatus, setApprovalDescription, resetEvaluation, setCurrentParticipantId, closeMediaViewer]);
+  }, [currentRowIndex, id, prevProgramId, targetPageIndex, setTotalRows, setEvaluationStatus, setApprovalDescription, resetEvaluation, setCurrentParticipantId]);
+
+  // Auto-open first media attachment when participant data is loaded
+  React.useEffect(() => {
+    if (!participant || sections.length === 0) return;
+
+    for (const section of sections) {
+      for (const field of section.fields) {
+        if (field.type === "media") {
+          const val = participant[field.label];
+          const valueStr = val !== undefined && val !== null ? String(val).trim() : "";
+          if (valueStr) {
+            const detected = detectMediaType(valueStr);
+            const mediaSub = detected !== "link" ? detected : (field.mediaSubType || "link");
+            if (mediaSub === "image") {
+              openMediaViewer("photo", resolveMediaUrl(valueStr));
+              return;
+            } else if (mediaSub === "video") {
+              openMediaViewer("video", valueStr);
+              return;
+            } else if (mediaSub === "pdf") {
+              openMediaViewer("pdf", valueStr);
+              return;
+            }
+          }
+        }
+      }
+    }
+  }, [participant, sections, openMediaViewer]);
 
   // Callback to update participant row locally after saving evaluation
   const handleParticipantUpdated = (updatedParticipant: Record<string, any>) => {
@@ -246,9 +274,19 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
   const handleFieldChange = (label: string, value: any) => {
     setParticipant((prev) => (prev ? { ...prev, [label]: value } : null));
     setValidationErrors((prev) => {
-      if (!prev[label]) return prev;
+      if (Object.keys(prev).length === 0) return prev;
       const updated = { ...prev };
       delete updated[label];
+      // Jika Tanggal Lahir atau NIK diubah, bersihkan juga error validasi silang pada NIK/Tanggal Lahir
+      if (/lahir|dob/i.test(label)) {
+        Object.keys(updated).forEach((k) => {
+          if (/nik|ktp/i.test(k)) delete updated[k];
+        });
+      } else if (/nik|ktp/i.test(label)) {
+        Object.keys(updated).forEach((k) => {
+          if (/lahir|dob/i.test(k)) delete updated[k];
+        });
+      }
       return updated;
     });
   };
@@ -273,12 +311,20 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
   }, [participant, originalParticipant, evaluationStatus, approvalDescription]);
 
 
-  // Autosave to localStorage when changes occur (5s delay)
+  const [draftStatus, setDraftStatus] = React.useState<"idle" | "saving" | "saved">("idle");
+
+  // Autosave to localStorage when changes occur with live status UI feedback
   React.useEffect(() => {
-    if (!hasChanges) return;
+    if (!hasChanges) {
+      setDraftStatus("idle");
+      return;
+    }
+
+    setDraftStatus("saving");
 
     const delayDebounceFn = setTimeout(() => {
       saveDraftToLocalStorage();
+      setDraftStatus("saved");
     }, 5000);
 
     return () => clearTimeout(delayDebounceFn);
@@ -301,37 +347,45 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
       return false;
     }
 
-    // Validate required fields only if status is VERIFIED
+    // Validate required fields & format rules if status is VERIFIED or REVERIFICATION
     const errors: Record<string, string> = {};
-    if (status === "VERIFIED") {
+    const allFields = sections.flatMap((s) => s.fields);
+    if (status === "VERIFIED" || status === "REVERIFICATION") {
       for (const section of sections) {
         for (const field of section.fields) {
-          if (field.isRequired) {
-            const val = participant?.[field.label];
-            let isEmpty = val === undefined || val === null || (typeof val === "string" && val.trim() === "");
-            
-            // Required checkbox must be checked ("true")
-            if (field.type === "checkbox" && val !== "true" && val !== true) {
+          const val = participant?.[field.label];
+          let isEmpty = val === undefined || val === null || (typeof val === "string" && val.trim() === "");
+          
+          // Required checkbox must be checked ("true")
+          if (field.type === "checkbox" && val !== "true" && val !== true) {
+            isEmpty = true;
+          }
+
+          // Required array-pills must not be empty or "[]"
+          if (field.type === "array-pills") {
+            const strVal = val !== undefined && val !== null ? String(val).trim() : "";
+            if (strVal === "" || strVal === "[]") {
               isEmpty = true;
+            } else if (strVal.startsWith("[") && strVal.endsWith("]")) {
+              try {
+                const parsed = JSON.parse(strVal);
+                if (Array.isArray(parsed) && parsed.length === 0) {
+                  isEmpty = true;
+                }
+              } catch (e) {}
             }
+          }
 
-            // Required array-pills must not be empty or "[]"
-            if (field.type === "array-pills") {
-              const strVal = val !== undefined && val !== null ? String(val).trim() : "";
-              if (strVal === "" || strVal === "[]") {
-                isEmpty = true;
-              } else if (strVal.startsWith("[") && strVal.endsWith("]")) {
-                try {
-                  const parsed = JSON.parse(strVal);
-                  if (Array.isArray(parsed) && parsed.length === 0) {
-                    isEmpty = true;
-                  }
-                } catch (e) {}
-              }
-            }
+          if (field.isRequired && isEmpty) {
+            errors[field.label] = "harus diisi";
+            continue;
+          }
 
-            if (isEmpty) {
-              errors[field.label] = "harus diisi";
+          // Check format validation rule (e.g. street-address Magic Wand, NIK, NPWP, etc.)
+          if (!isEmpty) {
+            const validationRes = validateProfileFieldValue(field, String(val), participant || undefined, allFields);
+            if (!validationRes.isValid && validationRes.error) {
+              errors[field.label] = validationRes.error;
             }
           }
         }
@@ -340,7 +394,7 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
 
     if (Object.keys(errors).length > 0) {
       setValidationErrors(errors);
-      toast.error("Mohon lengkapi semua field yang wajib diisi.");
+      toast.error("Mohon perbaiki data yang belum sesuai format standar sebelum menyimpan.");
       
       // Auto-scroll to the first field that fails validation
       setTimeout(() => {
@@ -389,7 +443,6 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
         clearDraftFromLocalStorage(data.participant.id);
         setIsUsingLocalDraft(false);
         refetchProgram();
-        queryClient.invalidateQueries({ queryKey: ["fix-data"] });
         return true;
       } else {
         toast.error(data.error || "Gagal menyimpan data");
@@ -442,7 +495,6 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
         clearDraftFromLocalStorage(data.participant.id);
         setIsUsingLocalDraft(false);
         refetchProgram();
-        queryClient.invalidateQueries({ queryKey: ["fix-data"] });
       } else {
         toast.error(data.error || "Gagal membatalkan verifikasi");
       }
@@ -634,23 +686,6 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
               );
             })()}
 
-            {isUsingLocalDraft && (
-              <Alert className="border-amber-500 bg-amber-500/5 text-amber-600 dark:border-amber-800 dark:bg-amber-950/20 dark:text-amber-400">
-                <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-                <div className="flex-1">
-                  <AlertTitle className="font-bold flex items-center gap-2 text-xs">
-                    Draft Lokal Aktif
-                    <Badge variant="outline" className="text-[9px] text-amber-600 border-amber-600 font-semibold px-1 py-0 h-4">
-                      Belum Disimpan
-                    </Badge>
-                  </AlertTitle>
-                  <AlertDescription className="text-[11px] mt-0.5">
-                    Menampilkan data yang Anda ketik sebelumnya secara lokal di browser ini. Data ini belum tersimpan di database. Klik <strong>Save</strong> untuk menyimpan permanen atau <strong>Reset</strong> untuk membuang draf ini.
-                  </AlertDescription>
-                </div>
-              </Alert>
-            )}
-
             {/* Sticky Navigator Container */}
             <div className="sticky top-0 z-20 bg-background/95 backdrop-blur-md pb-2.5 border-b pt-4 px-6 -mt-6 -mx-6">
               <ParticipantNavigator
@@ -669,6 +704,7 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
                 pendingCount={program?.pendingCount}
                 isPaused={program?.status === "STOPPED"}
                 verifiedByUserId={originalParticipant?._verifiedByUserId}
+                draftStatus={draftStatus}
               />
             </div>
 

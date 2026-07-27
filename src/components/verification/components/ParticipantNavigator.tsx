@@ -4,11 +4,11 @@ import * as React from "react";
 import { useVerificationStore } from "@/stores";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, Search, Loader2, ArrowLeft, RotateCcw, Wrench } from "lucide-react";
+import { ChevronLeft, ChevronRight, Search, Loader2, ArrowLeft, RotateCcw, Wrench, CheckCircle2 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
-import { useFixData } from "@/hooks/use-fix-data";
 import { useSession } from "@/lib/auth/auth-client";
 import {
   AlertDialog,
@@ -24,7 +24,6 @@ import {
 
 interface ParticipantNavigatorProps {
   programId: string;
-  mode?: "verification" | "re-verification";
   onSave?: (status: "VERIFIED" | "REJECTED" | "REVERIFICATION") => Promise<boolean | void> | boolean | void;
   onUnverify?: () => Promise<void> | void;
   onSaveDraft?: () => void;
@@ -39,13 +38,7 @@ interface ParticipantNavigatorProps {
   pendingCount?: number;
   isPaused?: boolean;
   verifiedByUserId?: string | null;
-  // Re-verification mode specific props
-  onPrev?: () => void;
-  onNext?: () => void;
-  prevDisabled?: boolean;
-  nextDisabled?: boolean;
-  backUrl?: string;
-  participantLabel?: string;
+  draftStatus?: "idle" | "saving" | "saved";
 }
 
 interface SearchMatch {
@@ -55,7 +48,6 @@ interface SearchMatch {
 
 export function ParticipantNavigator({
   programId,
-  mode = "verification",
   onSave,
   onUnverify,
   onSaveDraft,
@@ -70,14 +62,8 @@ export function ParticipantNavigator({
   pendingCount = 0,
   isPaused = false,
   verifiedByUserId = null,
-  onPrev,
-  onNext,
-  prevDisabled = false,
-  nextDisabled = false,
-  backUrl,
-  participantLabel,
+  draftStatus = "idle",
 }: ParticipantNavigatorProps) {
-  const isReVerification = mode === "re-verification";
   const { data: session } = useSession();
   const {
     currentRowIndex,
@@ -89,51 +75,8 @@ export function ParticipantNavigator({
   const router = useRouter();
   const from = searchParams.get("from");
 
-  const { data: fixDataList = [] } = useFixData();
-
-  const nextFixEntry = React.useMemo(() => {
-    if (fixDataList.length === 0) return null;
-    
-    // 1. Try to find by current index in the list
-    const currentIdx = fixDataList.findIndex(
-      (item) => item.programId === programId && item.rowIndex === currentRowIndex
-    );
-    if (currentIdx !== -1 && currentIdx < fixDataList.length - 1) {
-      return fixDataList[currentIdx + 1];
-    }
-    
-    // 2. If current item is not in the list (e.g. just got verified/removed),
-    // find the first item that has rowIndex > currentRowIndex in the same program
-    const nextInSameProgram = fixDataList.find(
-      (item) => item.programId === programId && item.rowIndex > currentRowIndex
-    );
-    if (nextInSameProgram) return nextInSameProgram;
-    
-    // 3. Fallback: just return the first item in the list
-    // but avoid returning the current item itself if it's still there
-    const firstRemaining = fixDataList.find(
-      (item) => !(item.programId === programId && item.rowIndex === currentRowIndex)
-    );
-    return firstRemaining || null;
-  }, [fixDataList, programId, currentRowIndex]);
-
   const handleExit = () => {
-    if (from === "fix-data") {
-      router.push("/fix-data");
-    } else {
-      router.push("/programs");
-    }
-  };
-
-  const handleFixNext = () => {
-    if (!nextFixEntry) return;
-    const targetUrl = `/programs/${nextFixEntry.programId}/verification?page=${nextFixEntry.rowIndex}&from=fix-data`;
-    
-    if (hasChanges) {
-      setPendingRedirectUrl(targetUrl);
-    } else {
-      router.push(targetUrl);
-    }
+    router.push("/programs");
   };
 
   const [searchVal, setSearchVal] = React.useState("");
@@ -246,47 +189,41 @@ export function ParticipantNavigator({
     <div className="flex flex-col gap-3 w-full">
       {/* Baris Atas: Exit, Info Progres, Reset & Save */}
       <div className="flex items-center justify-between w-full gap-3">
-        {/* Sisi Kiri: Exit & Statistik Progres / Mode Badge */}
+        {/* Sisi Kiri: Exit & Statistik Progres */}
         <div className="flex items-center gap-3">
-          {isReVerification ? (
-            <Button
-              variant="outline"
-              size="sm"
-              asChild
-              className="gap-1.5 h-8 text-xs shrink-0"
-            >
-              <Link href={backUrl ?? "/re-verification"}>
-                <ArrowLeft className="h-3.5 w-3.5" />
-                Exit
-              </Link>
-            </Button>
-          ) : (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleExit}
-              className="gap-1.5 h-8 text-xs shrink-0"
-            >
-              <ArrowLeft className="h-3.5 w-3.5" />
-              Exit
-            </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExit}
+            className="gap-1.5 h-8 text-xs shrink-0"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            Exit
+          </Button>
+
+          {/* Statistik Progres (Verification mode) */}
+          <div className="flex items-center gap-3 text-xs bg-muted/45 border px-3 py-1 rounded-lg font-mono select-none">
+            <span className="font-semibold text-muted-foreground font-sans text-[10px] uppercase tracking-wider mr-1">Progres:</span>
+            <span className="text-emerald-600 font-semibold">{verifiedCount} Verif</span>
+            <span className="text-muted-foreground/30">|</span>
+            <span className="text-red-600 font-semibold">{rejectedCount} Tolak</span>
+            <span className="text-muted-foreground/30">|</span>
+            <span className="text-amber-600 font-semibold">{pendingCount} Belum</span>
+          </div>
+
+          {/* Indikator Status Save Draft */}
+          {hasChanges && draftStatus === "saving" && (
+            <Badge variant="outline" className="bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30 gap-1.5 text-xs font-semibold py-1 px-2.5 animate-pulse">
+              <Loader2 className="size-3 animate-spin text-amber-500 shrink-0" />
+              Menyimpan Draft...
+            </Badge>
           )}
 
-          {isReVerification ? (
-            /* Mode Badge for Re-Verification */
-            <div className="flex items-center gap-1.5 text-xs bg-amber-500/10 border border-amber-500/20 px-3 py-1 rounded-lg select-none text-amber-700 dark:text-amber-400 font-semibold font-mono">
-              VERIFIKASI ULANG
-            </div>
-          ) : (
-            /* Statistik Progres (Verification mode) */
-            <div className="flex items-center gap-3 text-xs bg-muted/45 border px-3 py-1 rounded-lg font-mono select-none">
-              <span className="font-semibold text-muted-foreground font-sans text-[10px] uppercase tracking-wider mr-1">Progres:</span>
-              <span className="text-emerald-600 font-semibold">{verifiedCount} Verif</span>
-              <span className="text-muted-foreground/30">|</span>
-              <span className="text-red-600 font-semibold">{rejectedCount} Tolak</span>
-              <span className="text-muted-foreground/30">|</span>
-              <span className="text-amber-600 font-semibold">{pendingCount} Belum</span>
-            </div>
+          {hasChanges && draftStatus === "saved" && (
+            <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 gap-1.5 text-xs font-semibold py-1 px-2.5">
+              <CheckCircle2 className="size-3 text-emerald-500 shrink-0" />
+              Draft Tersimpan
+            </Badge>
           )}
         </div>
 
@@ -323,43 +260,8 @@ export function ParticipantNavigator({
             </AlertDialog>
           )}
 
-          {/* Unverif Button */}
-          {onUnverify &&
-            (originalStatus === "VERIFIED" || originalStatus === "REJECTED" || originalStatus === "REVERIFICATION") &&
-            session?.user &&
-            verifiedByUserId === session.user.id && (
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button
-                    type="button"
-                    disabled={isSaving || isPaused}
-                    size="sm"
-                    variant="outline"
-                    className="h-8 text-xs font-semibold px-3 shrink-0 gap-1.5 text-rose-600 hover:text-rose-700 hover:bg-rose-50 border-rose-200"
-                  >
-                    <RotateCcw className="h-3.5 w-3.5" />
-                    Unverif
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Konfirmasi Pembatalan Verifikasi</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      Apakah Anda yakin ingin membatalkan status verifikasi/penolakan data peserta ini? Data peserta ini akan dikembalikan ke status "Belum Diverifikasi".
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Batal</AlertDialogCancel>
-                    <AlertDialogAction onClick={onUnverify} className="bg-rose-600 text-white hover:bg-rose-700">
-                      Batalkan Verifikasi
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            )}
-
-          {/* Reject Button */}
-          {((originalStatus === null || originalStatus === undefined || originalStatus === "") ||
+          {/* Reject Button (Hanya muncul jika ada perubahan data) */}
+          {hasChanges && ((originalStatus === null || originalStatus === undefined || originalStatus === "") ||
             (session?.user && verifiedByUserId === session.user.id)) && (
               <Button
                 type="button"
@@ -373,8 +275,8 @@ export function ParticipantNavigator({
               </Button>
             )}
 
-          {/* Verify Button */}
-          {(originalStatus === null || originalStatus === undefined || originalStatus === "") && (
+          {/* Verify Button (Hanya muncul jika ada perubahan data) */}
+          {hasChanges && (originalStatus === null || originalStatus === undefined || originalStatus === "") && (
             <Button
               type="button"
               onClick={() => onSave?.("VERIFIED")}
@@ -393,8 +295,8 @@ export function ParticipantNavigator({
             </Button>
           )}
 
-          {/* Tombol Verifikasi Ulang */}
-          {(originalStatus === "VERIFIED" || originalStatus === "REJECTED" || originalStatus === "REVERIFICATION") &&
+          {/* Tombol Verifikasi Ulang (Hanya muncul jika ada perubahan data) */}
+          {hasChanges && (originalStatus === "VERIFIED" || originalStatus === "REJECTED" || originalStatus === "REVERIFICATION") &&
             session?.user && (
               <Button
                 type="button"
@@ -438,142 +340,97 @@ export function ParticipantNavigator({
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
-          {from === "fix-data" && nextFixEntry && (
-            <Button
-              type="button"
-              onClick={handleFixNext}
-              disabled={isSaving || isPaused}
-              size="sm"
-              variant="outline"
-              className="h-8 text-xs font-semibold px-3 shrink-0 gap-1.5 border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-700 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-400"
-            >
-              <Wrench className="h-3.5 w-3.5" />
-              <span>Perbaiki Berikutnya</span>
-            </Button>
-          )}
         </div>
       </div>
 
-      {/* Baris Bawah: Participant Label + Search Bar (verification) | Participant Label + Prev/Next (re-verification) */}
+      {/* Baris Bawah: Search Bar + Prev/Next Navigation */}
       <div className="flex items-center justify-between w-full gap-3">
-        {/* Sisi Kiri: Participant label or Search Bar */}
-        {isReVerification ? (
-          <div className="flex items-center gap-2 max-w-[65%] truncate">
-            {participantLabel && (
-              <span className="font-semibold text-xs text-foreground truncate">{participantLabel}</span>
-            )}
-          </div>
-        ) : (
-          <div className="relative flex-1" ref={dropdownRef}>
-            <div className="relative">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/70" />
-              <Input
-                placeholder="Search participant..."
-                value={searchVal}
-                onChange={(e) => {
-                  setSearchVal(e.target.value);
-                  setShowDropdown(true);
-                }}
-                onFocus={() => setShowDropdown(true)}
-                className="pl-8 pr-7 h-8 text-xs bg-background"
-              />
-              {isSearching && (
-                <Loader2 className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 animate-spin text-muted-foreground/80" />
-              )}
-            </div>
-
-            {/* Dropdown Results */}
-            {showDropdown && (searchVal.trim() !== "") && (
-              <div className="absolute top-full left-0 right-0 mt-1 max-h-60 overflow-y-auto border rounded-lg bg-popover text-popover-foreground shadow-lg z-50 divide-y">
-                {results.length > 0 ? (
-                  results.map((res) => {
-                    const match = getMatchedInfo(res.row, searchVal);
-                    return (
-                      <button
-                        key={res.globalIndex}
-                        onClick={() => selectParticipant(res.globalIndex)}
-                        className={cn(
-                          "flex flex-col w-full text-left p-2.5 hover:bg-accent hover:text-accent-foreground transition-colors",
-                          res.globalIndex === currentRowIndex && "bg-accent/50"
-                        )}
-                      >
-                        <div className="flex items-center justify-between gap-2 w-full">
-                          <span className="font-semibold text-xs truncate max-w-[70%]">
-                            {getDisplayName(res.row)}
-                          </span>
-                          <span className="text-[9px] font-bold text-muted-foreground/80 bg-muted px-1.5 py-0.5 rounded shrink-0">
-                            Row {res.globalIndex + 1}
-                          </span>
-                        </div>
-                        {match && (
-                          <span className="text-[10px] text-primary mt-1 block font-medium truncate max-w-full">
-                            Cocok: <span className="text-muted-foreground font-normal">{match.key}</span> = <span className="font-semibold">"{match.value}"</span>
-                          </span>
-                        )}
-                      </button>
-                    );
-                  })
-                ) : (
-                  <div className="p-3 text-xs text-center text-muted-foreground">
-                    {isSearching ? "Searching..." : "No results found"}
-                  </div>
-                )}
+        {/* Sisi Kiri: Search Bar */}
+        <div className="relative flex-1" ref={dropdownRef}>
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/70" />
+            <Input
+              placeholder="Search participant..."
+              value={searchVal}
+              onChange={(e) => {
+                setSearchVal(e.target.value);
+                setShowDropdown(true);
+              }}
+              onFocus={() => setShowDropdown(true)}
+              className="pl-8 pr-7 h-8 text-xs bg-background"
+            />
+            {isSearching && (
+              <div className="absolute right-2.5 top-1/2 -translate-y-1/2">
+                <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
               </div>
             )}
           </div>
-        )}
 
-        {/* Sisi Kanan: Nav Buttons & Indicator */}
-        <div className="flex items-center gap-1 shrink-0">
-          {isReVerification ? (
-            <>
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={onPrev}
-                disabled={prevDisabled}
-                className="h-8 w-8"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <span className="text-xs font-semibold min-w-[70px] text-center select-none text-muted-foreground">
-                Verifikasi Ulang
-              </span>
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={onNext}
-                disabled={nextDisabled}
-                className="h-8 w-8"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </>
-          ) : (
-            <>
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={handlePrev}
-                disabled={currentRowIndex === 0}
-                className="h-8 w-8"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <span className="text-xs font-semibold min-w-[70px] text-center select-none text-muted-foreground">
-                {totalRows > 0 ? `${currentRowIndex + 1} / ${totalRows}` : "0 / 0"}
-              </span>
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={handleNext}
-                disabled={currentRowIndex >= totalRows - 1}
-                className="h-8 w-8"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </>
+          {/* Search Dropdown */}
+          {showDropdown && searchVal.trim().length > 0 && (
+            <div className="absolute top-full left-0 right-0 mt-1 bg-popover text-popover-foreground rounded-md border shadow-md max-h-60 overflow-y-auto z-50 p-1">
+              {results.length === 0 ? (
+                <div className="p-2 text-xs text-muted-foreground text-center">
+                  {isSearching ? "Mencari..." : "Tidak ada peserta ditemukan"}
+                </div>
+              ) : (
+                results.map((res) => {
+                  const displayName = getDisplayName(res.row);
+                  const matchInfo = getMatchedInfo(res.row, searchVal);
+                  return (
+                    <button
+                      key={res.globalIndex}
+                      type="button"
+                      onClick={() => selectParticipant(res.globalIndex)}
+                      className={cn(
+                        "w-full text-left px-2.5 py-1.5 rounded-sm text-xs hover:bg-accent hover:text-accent-foreground flex flex-col transition-colors",
+                        res.globalIndex === currentRowIndex && "bg-accent/50 font-medium"
+                      )}
+                    >
+                      <div className="flex items-center justify-between w-full">
+                        <span className="truncate mr-2 font-medium">
+                          {displayName}
+                        </span>
+                        <span className="text-[10px] text-muted-foreground shrink-0 font-mono">
+                          #{res.globalIndex + 1}
+                        </span>
+                      </div>
+                      {matchInfo && (
+                        <span className="text-[10px] text-muted-foreground/80 mt-0.5 truncate">
+                          {matchInfo.key}: {matchInfo.value}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })
+              )}
+            </div>
           )}
+        </div>
+
+        {/* Sisi Kanan: Prev/Next Navigation */}
+        <div className="flex items-center gap-1.5 shrink-0">
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={handlePrev}
+            disabled={currentRowIndex === 0}
+            className="h-8 w-8"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <span className="text-xs font-semibold min-w-[70px] text-center select-none text-muted-foreground">
+            {totalRows > 0 ? `${currentRowIndex + 1} / ${totalRows}` : "0 / 0"}
+          </span>
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={handleNext}
+            disabled={currentRowIndex >= totalRows - 1}
+            className="h-8 w-8"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
         </div>
       </div>
 
