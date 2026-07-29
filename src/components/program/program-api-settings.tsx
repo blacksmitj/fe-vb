@@ -223,107 +223,140 @@ export function ProgramApiSettings({ programId }: { programId: string }) {
     return ua.slice(0, 25);
   };
 
-  // Generate dynamic Google Apps Script template based on Profile Builder fields
+  // Generate dynamic Google Apps Script template based on Profile Builder fields (Modular & Maintainable)
   const appScriptTemplate = React.useMemo(() => {
     const origin = typeof window !== "undefined" ? window.location.origin : "https://app.verifbuilder.com";
     const apiSecret = apiKeyData?.key || "PASTE_API_KEY_DISINI";
-
-    // Column Headers: ID Unique -> Profile Builder Fields -> Meta Status Verifikasi
-    const headersList = [
-      "ID Unique",
-      ...profileFields.map((f) => f.label),
-      "Status Verifikasi",
-      "Catatan Verifikasi",
-      "Diverifikasi Oleh",
-      "Waktu Verifikasi",
-    ];
-
-    const totalColumns = headersList.length;
-
-    // Helper to build field values mapping in script
-    const fieldMappings = profileFields.length > 0
-      ? profileFields
-          .map((f) => `        item.data[${JSON.stringify(f.label)}] || "-"`)
-          .join(",\n")
-      : `        item.data["Nama Peserta"] || item.data["Nama"] || "-"`;
+    const fieldLabels = profileFields.map((f) => f.label);
 
     return `/**
  * Script Google Apps Script untuk Import Data VerifBuilder ke Google Sheets
  * Di-generate otomatis sesuai dengan Field Profile Builder Program
  */
 
+// 1. KONFIGURASI UTAMA
+const CONFIG = {
+  API_URL: "${origin}/api/v1/export/participants",
+  API_KEY: "${apiSecret}",
+};
+
+// 2. DAFTAR FIELD PROFILE BUILDER (${fieldLabels.length} Field)
+const PROFILE_FIELDS = ${JSON.stringify(fieldLabels, null, 2)};
+
+// 3. DAFTAR HEADER KOLOM LENGKAP (Unique Key -> Profile Fields -> Meta Verifikasi)
+const HEADERS = [
+  "ID Unique",
+  ...PROFILE_FIELDS,
+  "Status Verifikasi",
+  "Catatan Verifikasi",
+  "Diverifikasi Oleh",
+  "Waktu Verifikasi"
+];
+
 /**
  * Menambahkan Menu Khusus di Google Sheets untuk Sinkronisasi Manual 1-Klik
  */
 function onOpen() {
-  var ui = SpreadsheetApp.getUi();
+  const ui = SpreadsheetApp.getUi();
   ui.createMenu('VerifBuilder')
     .addItem('⚡ Sinkronkan Data Sekarang', 'syncVerifBuilderData')
     .addToUi();
 }
 
+/**
+ * Fungsi Utama Sinkronisasi Data
+ */
 function syncVerifBuilderData() {
-  // Config
-  var API_URL = "${origin}/api/v1/export/participants";
-  var API_KEY = "${apiSecret}";
-
-  var options = {
-    "method": "GET",
-    "headers": {
-      "x-api-key": API_KEY,
-      "Content-Type": "application/json"
-    },
-    "muteHttpExceptions": true
-  };
-
   try {
-    var response = UrlFetchApp.fetch(API_URL, options);
-    var statusCode = response.getResponseCode();
-    var result = JSON.parse(response.getContentText());
-
-    if (statusCode !== 200 || !result.success) {
+    const result = fetchParticipants();
+    if (!result.success || !result.data) {
       Browser.msgBox("Error", "Gagal mengambil data: " + (result.message || "Unauthorized"), Browser.Buttons.OK);
       return;
     }
 
-    var participants = result.data;
-    var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+    const participants = result.data;
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
 
-    // Daftar Header Kolom (${totalColumns} kolom)
-    var headers = ${JSON.stringify(headersList)};
+    writeHeaders(sheet);
 
-    // Set Header di Baris 1 (Mulai Kolom B)
-    sheet.getRange(1, 2, 1, ${totalColumns}).setValues([headers]);
-    sheet.getRange(1, 2, 1, ${totalColumns}).setBackground("#1e293b").setFontColor("#ffffff").setFontWeight("bold");
-
-    if (!participants || participants.length === 0) {
+    if (participants.length === 0) {
       Browser.msgBox("Info", "Data peserta kosong.", Browser.Buttons.OK);
       return;
     }
 
-    // Pemetaan data per kolom
-    var rowsData = participants.map(function(item) {
-      return [
-        item.uniqueKey || "-",
-${fieldMappings},
-        item.evalStatus || "BELUM_DIVERIFIKASI",
-        item.evalDescription || "-",
-        item.evalByUserName || "-",
-        item.evalAt ? new Date(item.evalAt).toLocaleString("id-ID") : "-"
-      ];
-    });
+    const rowsData = buildRows(participants);
+    writeRows(sheet, rowsData);
 
-    // Clear data lama di kolom B dari baris 2
-    var lastRow = Math.max(sheet.getLastRow(), 2);
-    sheet.getRange(2, 2, lastRow, ${totalColumns}).clearContent();
-
-    // Tulis batch ke Sheet
-    sheet.getRange(2, 2, rowsData.length, ${totalColumns}).setValues(rowsData);
-
+    Logger.log("Berhasil menyinkronkan " + rowsData.length + " data peserta.");
     Browser.msgBox("Sukses", "Berhasil menyinkronkan " + rowsData.length + " data peserta!", Browser.Buttons.OK);
   } catch (e) {
+    Logger.log("Error syncVerifBuilderData: " + e.toString());
     Browser.msgBox("Error", "Terjadi kesalahan: " + e.toString(), Browser.Buttons.OK);
   }
+}
+
+/**
+ * Helper: Mengambil data dari API VerifBuilder
+ */
+function fetchParticipants() {
+  const options = {
+    method: "GET",
+    headers: {
+      "x-api-key": CONFIG.API_KEY,
+      "Content-Type": "application/json"
+    },
+    muteHttpExceptions: true
+  };
+  const response = UrlFetchApp.fetch(CONFIG.API_URL, options);
+  return JSON.parse(response.getContentText());
+}
+
+/**
+ * Helper: Menuliskan Header di Baris 1 (Mulai Kolom B)
+ */
+function writeHeaders(sheet) {
+  const colCount = HEADERS.length;
+  const headerRange = sheet.getRange(1, 2, 1, colCount);
+  headerRange.setValues([HEADERS]);
+  headerRange.setBackground("#1e293b").setFontColor("#ffffff").setFontWeight("bold");
+}
+
+/**
+ * Helper: Mengubah array participants menjadi matriks baris untuk Sheet
+ */
+function buildRows(participants) {
+  const tz = Session.getScriptTimeZone();
+  return participants.map(function(item) {
+    const row = [item.uniqueKey || "-"];
+
+    PROFILE_FIELDS.forEach(function(fieldLabel) {
+      row.push(item.data ? (item.data[fieldLabel] || "-") : "-");
+    });
+
+    row.push(item.evalStatus || "BELUM_DIVERIFIKASI");
+    row.push(item.evalDescription || "-");
+    row.push(item.evalByUserName || "-");
+    row.push(item.evalAt
+      ? Utilities.formatDate(new Date(item.evalAt), tz, "dd/MM/yyyy HH:mm:ss")
+      : "-"
+    );
+
+    return row;
+  });
+}
+
+/**
+ * Helper: Menuliskan baris data ke Sheet & membersihkan baris lama secara tepat
+ */
+function writeRows(sheet, rowsData) {
+  const colCount = HEADERS.length;
+  const lastRow = sheet.getLastRow();
+
+  if (lastRow > 1) {
+    sheet.getRange(2, 2, lastRow - 1, colCount).clearContent();
+  }
+
+  sheet.getRange(2, 2, rowsData.length, colCount).setValues(rowsData);
 }`;
   }, [apiKeyData, profileFields]);
 
@@ -753,7 +786,7 @@ ${fieldMappings},
                       Belum ada field di Profile Builder program ini.
                     </div>
                   ) : (
-                    <div className="rounded-md border overflow-x-auto">
+                    <div className="rounded-md border overflow-auto max-h-[420px]">
                       <Table>
                         <TableHeader>
                           <TableRow>
@@ -901,7 +934,7 @@ ${fieldMappings},
                       Belum ada riwayat penggunaan API.
                     </div>
                   ) : (
-                    <div className="rounded-md border overflow-x-auto">
+                    <div className="rounded-md border overflow-auto max-h-[420px]">
                       <Table>
                         <TableHeader>
                           <TableRow>
