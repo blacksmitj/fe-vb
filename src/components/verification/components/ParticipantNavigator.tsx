@@ -39,6 +39,7 @@ interface ParticipantNavigatorProps {
   isPaused?: boolean;
   verifiedByUserId?: string | null;
   draftStatus?: "idle" | "saving" | "saved";
+  isUsingLocalDraft?: boolean;
 }
 
 interface SearchMatch {
@@ -63,6 +64,7 @@ export function ParticipantNavigator({
   isPaused = false,
   verifiedByUserId = null,
   draftStatus = "idle",
+  isUsingLocalDraft = false,
 }: ParticipantNavigatorProps) {
   const { data: session } = useSession();
   const {
@@ -225,6 +227,13 @@ export function ParticipantNavigator({
               Draft Tersimpan
             </Badge>
           )}
+
+          {!hasChanges && isUsingLocalDraft && (
+            <Badge variant="outline" className="bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30 gap-1.5 text-xs font-semibold py-1 px-2.5">
+              <RotateCcw className="size-3 text-blue-500 shrink-0" />
+              Draft Loaded
+            </Badge>
+          )}
         </div>
 
         {/* Sisi Paling Kanan: Reset & Save */}
@@ -260,29 +269,29 @@ export function ParticipantNavigator({
             </AlertDialog>
           )}
 
-          {/* Reject Button (Hanya muncul jika ada perubahan data) */}
-          {hasChanges && ((originalStatus === null || originalStatus === undefined || originalStatus === "") ||
+          {/* Reject Button */}
+          {((originalStatus === null || originalStatus === undefined || originalStatus === "") ||
             (session?.user && verifiedByUserId === session.user.id)) && (
               <Button
                 type="button"
                 onClick={() => setShowRejectConfirm(true)}
-                disabled={isSaving || isPaused}
+                disabled={!hasChanges || isSaving || isPaused}
                 size="sm"
                 variant="destructive"
-                className="h-8 text-xs font-semibold px-4 shrink-0 bg-red-600 hover:bg-red-700 text-white"
+                className="h-8 text-xs font-semibold px-4 shrink-0 bg-red-600 hover:bg-red-700 text-white disabled:opacity-50"
               >
                 Reject
               </Button>
             )}
 
-          {/* Verify Button (Hanya muncul jika ada perubahan data) */}
-          {hasChanges && (originalStatus === null || originalStatus === undefined || originalStatus === "") && (
+          {/* Verify Button */}
+          {(originalStatus === null || originalStatus === undefined || originalStatus === "") && (
             <Button
               type="button"
               onClick={() => onSave?.("VERIFIED")}
-              disabled={isSaving || isPaused}
+              disabled={!hasChanges || isSaving || isPaused}
               size="sm"
-              className="h-8 text-xs font-semibold px-4 shrink-0 bg-emerald-600 hover:bg-emerald-700 text-white"
+              className="h-8 text-xs font-semibold px-4 shrink-0 bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50"
             >
               {isSaving ? (
                 <>
@@ -295,15 +304,15 @@ export function ParticipantNavigator({
             </Button>
           )}
 
-          {/* Tombol Verifikasi Ulang (Hanya muncul jika ada perubahan data) */}
-          {hasChanges && (originalStatus === "VERIFIED" || originalStatus === "REJECTED" || originalStatus === "REVERIFICATION") &&
+          {/* Tombol Verifikasi Ulang */}
+          {(originalStatus === "VERIFIED" || originalStatus === "REJECTED" || originalStatus === "REVERIFICATION") &&
             session?.user && (
               <Button
                 type="button"
                 onClick={() => onSave?.("REVERIFICATION")}
-                disabled={isSaving || isPaused}
+                disabled={!hasChanges || isSaving || isPaused}
                 size="sm"
-                className="h-8 text-xs font-semibold px-4 shrink-0 bg-amber-500 hover:bg-amber-600 text-white border-amber-600"
+                className="h-8 text-xs font-semibold px-4 shrink-0 bg-amber-500 hover:bg-amber-600 text-white border-amber-600 disabled:opacity-50"
               >
                 {isSaving ? (
                   <>

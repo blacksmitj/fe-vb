@@ -187,6 +187,12 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
           setEvaluationStatus(parsed.evaluationStatus || null);
           setApprovalDescription(parsed.approvalDescription || "");
           setIsUsingLocalDraft(true);
+          setDraftStatus("saved");
+          setDraftBaseline({
+            participant: parsed.participant,
+            evaluationStatus: parsed.evaluationStatus || null,
+            approvalDescription: parsed.approvalDescription || "",
+          });
         } catch (e) {
           console.error("Failed to parse local draft", e);
           setParticipant(data.participant);
@@ -194,6 +200,8 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
           setEvaluationStatus(data.participant._evaluationStatus || null);
           setApprovalDescription(data.participant._evaluationDescription || "");
           setIsUsingLocalDraft(false);
+          setDraftStatus("idle");
+          setDraftBaseline(null);
         }
       } else {
         setParticipant(data.participant);
@@ -201,6 +209,8 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
         setEvaluationStatus(data.participant._evaluationStatus || null);
         setApprovalDescription(data.participant._evaluationDescription || "");
         setIsUsingLocalDraft(false);
+        setDraftStatus("idle");
+        setDraftBaseline(null);
       }
     } else {
       setParticipant(null);
@@ -209,12 +219,17 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
       setEvaluationStatus(null);
       setApprovalDescription("");
       setIsUsingLocalDraft(false);
+      setDraftStatus("idle");
+      setDraftBaseline(null);
     }
   }, [participantQuery.data, participantQuery.isLoading, isParticipantQueryReady, id]);
 
-  // Auto-open first media attachment when participant data is loaded
+  // Auto-open first media attachment when participant data is loaded (keyed by participant.id)
+  const prevAutoOpenedParticipantIdRef = React.useRef<string | null>(null);
   React.useEffect(() => {
     if (!participant || sections.length === 0) return;
+    if (prevAutoOpenedParticipantIdRef.current === participant.id) return;
+    prevAutoOpenedParticipantIdRef.current = participant.id;
 
     for (const section of sections) {
       for (const field of section.fields) {
@@ -238,7 +253,7 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
         }
       }
     }
-  }, [participant, sections, openMediaViewer]);
+  }, [participant?.id, sections, openMediaViewer]);
 
   // Callback to update participant row locally after saving evaluation
   const handleParticipantUpdated = (updatedParticipant: Record<string, any>) => {
@@ -246,6 +261,8 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
     setOriginalParticipant(updatedParticipant);
     clearDraftFromLocalStorage(updatedParticipant.id);
     setIsUsingLocalDraft(false);
+    setDraftStatus("idle");
+    setDraftBaseline(null);
     refetchProgram();
   };
 
@@ -269,24 +286,36 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
     });
   };
 
-  // Check if form fields or store fields are dirty compared to original
+  // State to hold baseline values when a draft is loaded
+  const [draftBaseline, setDraftBaseline] = React.useState<{
+    participant: Record<string, any>;
+    evaluationStatus: string | null;
+    approvalDescription: string;
+  } | null>(null);
+
+  // Check if form fields or store fields are dirty compared to original / draft baseline
   const hasChanges = React.useMemo(() => {
     if (!participant || !originalParticipant) return false;
-    
+
+    // Baseline object: if draft was loaded and user hasn't edited further, compare to draft baseline
+    const baseParticipant = isUsingLocalDraft && draftBaseline ? draftBaseline.participant : originalParticipant;
+    const baseStatus = isUsingLocalDraft && draftBaseline ? draftBaseline.evaluationStatus : (originalParticipant._evaluationStatus || null);
+    const baseDesc = isUsingLocalDraft && draftBaseline ? draftBaseline.approvalDescription : (originalParticipant._evaluationDescription || "");
+
     // Compare non-internal fields in participant
     const fieldChanged = Object.keys(participant).some((key) => {
       if (key.startsWith("_") || key === "id" || key === "uniqueKey") return false;
-      return participant[key] !== originalParticipant[key];
+      return participant[key] !== baseParticipant[key];
     });
 
     if (fieldChanged) return true;
 
     // Compare evaluation status and description
-    const statusChanged = (evaluationStatus || null) !== (originalParticipant._evaluationStatus || null);
-    const descChanged = approvalDescription !== (originalParticipant._evaluationDescription || "");
+    const statusChanged = (evaluationStatus || null) !== baseStatus;
+    const descChanged = approvalDescription !== baseDesc;
 
     return statusChanged || descChanged;
-  }, [participant, originalParticipant, evaluationStatus, approvalDescription]);
+  }, [participant, originalParticipant, evaluationStatus, approvalDescription, isUsingLocalDraft, draftBaseline]);
 
 
   const [draftStatus, setDraftStatus] = React.useState<"idle" | "saving" | "saved">("idle");
@@ -294,7 +323,9 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
   // Autosave to localStorage when changes occur with live status UI feedback
   React.useEffect(() => {
     if (!hasChanges) {
-      setDraftStatus("idle");
+      if (!isUsingLocalDraft) {
+        setDraftStatus("idle");
+      }
       return;
     }
 
@@ -306,7 +337,7 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
     }, 5000);
 
     return () => clearTimeout(delayDebounceFn);
-  }, [hasChanges, saveDraftToLocalStorage]);
+  }, [hasChanges, isUsingLocalDraft, saveDraftToLocalStorage]);
 
 
   const handleReset = React.useCallback(() => {
@@ -316,6 +347,8 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
       setApprovalDescription(originalParticipant._evaluationDescription || "");
       clearDraftFromLocalStorage();
       setIsUsingLocalDraft(false);
+      setDraftStatus("idle");
+      setDraftBaseline(null);
     }
   }, [originalParticipant, setEvaluationStatus, setApprovalDescription, clearDraftFromLocalStorage]);
 
@@ -684,6 +717,7 @@ export default function VerificationPage({ params }: { params: Promise<{ id: str
                 isPaused={program?.status === "STOPPED"}
                 verifiedByUserId={originalParticipant?._verifiedByUserId}
                 draftStatus={draftStatus}
+                isUsingLocalDraft={isUsingLocalDraft}
               />
             </div>
 

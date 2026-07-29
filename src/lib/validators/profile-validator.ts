@@ -38,6 +38,17 @@ export function validateProfileFieldValue(
     return { isValid: true, error: null, warning: null };
   }
 
+  // 1.5 Cek Validasi Dropdown / Select (Nilai wajib ada dalam pilihan options)
+  if (((field.type as string) === "dropdown" || (field.type as string) === "select") && field.options && field.options.length > 0) {
+    const isMatch = field.options.some((opt) => opt.toLowerCase() === val.toLowerCase());
+    if (!isMatch) {
+      return {
+        isValid: false,
+        error: `${field.label} tidak valid / tidak ada dalam pilihan.`,
+      };
+    }
+  }
+
   // 2. Tentukan Rule Validasi (Murni dari pilihan eksplisit user atau tipe field bawaan)
   const effectiveRule: ValidationRule =
     field.validationRule ||

@@ -38,13 +38,10 @@ export function NavMain() {
   const { state } = useSidebar();
   const isCollapsed = state === "collapsed";
 
-  const isProgramsActive =
-    pathname.startsWith("/programs") ||
-    (pathname.startsWith("/builder") && !pathname.includes("builderId"));
+  const isProgramsActive = pathname.startsWith("/programs");
 
   const isProfileBuilderActive =
-    pathname.startsWith("/profile-builders") ||
-    (pathname.startsWith("/builder") && pathname.includes("builderId"));
+    pathname.startsWith("/profile-builders") || pathname.startsWith("/builder");
 
   const hasDraftNotification = draftsCount !== undefined && draftsCount > 0;
 

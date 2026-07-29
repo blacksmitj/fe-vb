@@ -63,8 +63,8 @@ export function toTitleCase(str: string): string {
       // Ubah kata biasa menjadi Title Case
       let processedWord = word.charAt(0).toUpperCase() + word.slice(1);
 
-      // Jika masuk daftar singkatan, pastikan diakhiri titik
-      if (ABBREVIATIONS.includes(cleanWord)) {
+      // Jika masuk daftar singkatan, pastikan diakhiri titik (kecuali jika kata berupa angka murni)
+      if (ABBREVIATIONS.includes(cleanWord) && !/^\d+$/.test(cleanWord)) {
         if (!processedWord.endsWith(".")) {
           processedWord = processedWord + ".";
         }
@@ -80,6 +80,9 @@ export function toTitleCase(str: string): string {
   // Pembersihan akhir untuk memastikan tidak ada titik ganda atau titik di kata Blok yang lolos
   result = result.replace(/\bBlok\.+/gi, "Blok");
   result = result.replace(/\.{2,}/g, ".");
+
+  // 7. Bersihkan titik yang menempel langsung setelah angka di pola "No. xx." -> "No. xx"
+  result = result.replace(/\b(No\.\s*[0-9]+)\./gi, "$1");
 
   // Rapikan spasi ganda
   result = result.replace(/\s{2,}/g, " ").trim();
@@ -177,8 +180,15 @@ export function validateStreetAddress(
 
   const parsed = parseAndFormatAddress(trimmed);
 
-  // Cek: Teks belum diformat / belum sesuai standar Magic Wand
-  if (!isFormatted && trimmed !== parsed.formattedAddress) {
+  // Cek apakah RT/RW jika tertulis di input awal belum 3 digit
+  const rtMatch = trimmed.match(/\bRT\.?\s*([0-9]+)/i);
+  const rwMatch = trimmed.match(/\bRW\.?\s*([0-9]+)/i);
+  const hasValidRtDigits = !rtMatch || rtMatch[1].length === 3;
+  const hasValidRwDigits = !rwMatch || rwMatch[1].length === 3;
+
+  // Cek: Teks belum diformat / belum sesuai standar Magic Wand (Kecuali jika full CAPITAL dan RT/RW sudah 3 digit)
+  const isFullUppercase = trimmed === trimmed.toUpperCase() && /[A-Z]/.test(trimmed);
+  if (!isFormatted && (!isFullUppercase || !hasValidRtDigits || !hasValidRwDigits) && trimmed !== parsed.formattedAddress) {
     errors.push("Format alamat belum sesuai standar. Klik tombol Magic Wand untuk memformat.");
   }
 

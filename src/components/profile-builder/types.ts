@@ -22,23 +22,26 @@ export type ValidationRule =
 
 export type MediaSubType = 'image' | 'video' | 'pdf' | 'link';
 
+export type DescriptionStyle = "default" | "alert" | "danger";
+
 export interface Field {
   id: string;
   type: FieldType;
   label: string;
   placeholder?: string;
   description?: string; // Optional helper text shown below the field input
+  descriptionStyle?: DescriptionStyle; // Style for description text (default, alert, danger)
   value?: string;
   locked?: boolean;
-  column?: 'left' | 'right';
+  column?: "left" | "right";
   isEditable?: boolean; // Toggle between editable and preview mode
   isRequired?: boolean; // Make this field mandatory during verification save
   validationRule?: ValidationRule; // Custom validation rule for NIK, WA, NPWP, NIB, Kode Pos, Tanggal Lahir
   // New customizable properties
-  dateMode?: 'date-only' | 'date-time';
-  dateLocale?: 'id' | 'en';
-  previewFontMode?: 'sans' | 'mono';
-  statusStyle?: 'success' | 'warning' | 'danger' | 'info' | 'default';
+  dateMode?: "date-only" | "date-time";
+  dateLocale?: "id" | "en";
+  previewFontMode?: "sans" | "mono";
+  statusStyle?: "success" | "warning" | "danger" | "info" | "default";
   pillsSeparator?: string;
   mediaSubType?: MediaSubType;
   options?: string[];

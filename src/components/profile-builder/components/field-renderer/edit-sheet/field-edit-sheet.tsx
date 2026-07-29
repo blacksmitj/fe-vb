@@ -41,6 +41,7 @@ export function FieldEditSheet({ field, isOpen, onOpenChange, onUpdateField }: F
   const [editIsRequired, setEditIsRequired] = useState(field.isRequired ?? false);
   const [editPlaceholder, setEditPlaceholder] = useState(field.placeholder || "");
   const [editDescription, setEditDescription] = useState(field.description || "");
+  const [editDescriptionStyle, setEditDescriptionStyle] = useState<"default" | "alert" | "danger">(field.descriptionStyle || "default");
   const [editDateMode, setEditDateMode] = useState<"date-only" | "date-time">(field.dateMode || "date-only");
   const [editDateLocale, setEditDateLocale] = useState<"id" | "en">(field.dateLocale || "id");
   const [editPreviewFontMode, setEditPreviewFontMode] = useState<"sans" | "mono">(field.previewFontMode || "sans");
@@ -62,6 +63,7 @@ export function FieldEditSheet({ field, isOpen, onOpenChange, onUpdateField }: F
       setEditIsRequired(field.isRequired ?? false);
       setEditPlaceholder(field.placeholder || "");
       setEditDescription(field.description || "");
+      setEditDescriptionStyle(field.descriptionStyle || "default");
       setEditDateMode(field.dateMode || "date-only");
       setEditDateLocale(field.dateLocale || "id");
       setEditPreviewFontMode(field.previewFontMode || "sans");
@@ -120,6 +122,7 @@ export function FieldEditSheet({ field, isOpen, onOpenChange, onUpdateField }: F
       isRequired: editIsRequired,
       placeholder: editPlaceholder,
       description: editDescription.trim() || undefined,
+      descriptionStyle: editDescriptionStyle,
       dateMode: editDateMode,
       dateLocale: editDateLocale,
       previewFontMode: editPreviewFontMode,
@@ -135,7 +138,16 @@ export function FieldEditSheet({ field, isOpen, onOpenChange, onUpdateField }: F
 
   return (
     <Sheet open={isOpen} onOpenChange={onOpenChange}>
-      <SheetContent className="sm:max-w-[480px] p-6 overflow-y-auto flex flex-col h-full">
+      <SheetContent
+        className="sm:max-w-[680px] p-6 overflow-y-auto flex flex-col h-full"
+        onPointerDownOutside={(e) => {
+          // Mencegah penutupan Sheet saat mengklik di luar area Sheet/saat menutup dropdown
+          e.preventDefault();
+        }}
+        onInteractOutside={(e) => {
+          e.preventDefault();
+        }}
+      >
         <form onSubmit={handleSave} className="flex flex-col h-full justify-between gap-6">
           <div>
             <SheetHeader className="p-0 pb-2">
@@ -257,6 +269,21 @@ export function FieldEditSheet({ field, isOpen, onOpenChange, onUpdateField }: F
                   onChange={(e) => setEditDescription(e.target.value)}
                   placeholder="e.g. Hint or helper text for this field"
                 />
+              </div>
+
+              {/* Description Display Style */}
+              <div className="grid gap-2">
+                <Label htmlFor="editDescriptionStyle">Tampilan Pesan Deskripsi</Label>
+                <Select value={editDescriptionStyle} onValueChange={(val) => setEditDescriptionStyle(val as any)}>
+                  <SelectTrigger id="editDescriptionStyle">
+                    <SelectValue placeholder="Pilih gaya pesan deskripsi" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="default">Default (Muted Text Biasa)</SelectItem>
+                    <SelectItem value="alert">Alert (Kuning / Peringatan)</SelectItem>
+                    <SelectItem value="danger">Danger (Merah / Bahaya)</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               {/* Placeholder (text/textarea/street-address/number/checkbox) */}

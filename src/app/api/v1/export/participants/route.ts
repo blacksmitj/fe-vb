@@ -44,6 +44,16 @@ export async function GET(request: Request) {
             uniqueKeyColumn: true,
             headers: true,
             status: true,
+            profileSchema: {
+              select: {
+                sections: true,
+              },
+            },
+            profileTemplate: {
+              select: {
+                sections: true,
+              },
+            },
           },
         },
       },
@@ -116,6 +126,31 @@ export async function GET(request: Request) {
       },
     });
 
+    // Resolve active sections (prioritize profileTemplate, fallback to profileSchema)
+    let sections: any[] = [];
+    if (keyRecord.program.profileTemplate && keyRecord.program.profileTemplate.sections) {
+      sections = keyRecord.program.profileTemplate.sections as any[];
+    } else if (keyRecord.program.profileSchema && keyRecord.program.profileSchema.sections) {
+      sections = keyRecord.program.profileSchema.sections as any[];
+    }
+
+    const fields: Array<{ label: string; type?: string; required?: boolean }> = [];
+    if (Array.isArray(sections)) {
+      sections.forEach((sec: any) => {
+        if (sec.fields && Array.isArray(sec.fields)) {
+          sec.fields.forEach((f: any) => {
+            if (f.label) {
+              fields.push({
+                label: f.label,
+                type: f.type || 'text',
+                required: !!f.required,
+              });
+            }
+          });
+        }
+      });
+    }
+
     return NextResponse.json({
       success: true,
       program: {
@@ -123,6 +158,7 @@ export async function GET(request: Request) {
         name: keyRecord.program.name,
         uniqueKeyColumn: keyRecord.program.uniqueKeyColumn,
         headers: keyRecord.program.headers,
+        fields,
       },
       total: participants.length,
       data: participants,

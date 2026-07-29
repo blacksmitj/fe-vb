@@ -20,14 +20,17 @@ import {
   ClockIcon,
   HistoryIcon,
   BarChart3Icon,
+  FileTextIcon,
+  BracesIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { safeParseDate } from "@/lib/utils";
-import { useProgramApiKey } from "@/hooks/use-programs";
+import { useProgramApiKey, useProgramSchema } from "@/hooks/use-programs";
 import { useQueryClient } from "@tanstack/react-query";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -73,6 +76,29 @@ export function ProgramApiSettings({ programId }: { programId: string }) {
   const { data: rawApiKeyData, isLoading, refetch } = useProgramApiKey(programId);
   const apiKeyData: ApiKeyData | null = rawApiKeyData?.hasKey ? rawApiKeyData.apiKey : null;
 
+  // Fetch Program Profile Schema to get fields dynamically
+  const { data: schemaData } = useProgramSchema(programId);
+
+  const profileFields = React.useMemo(() => {
+    if (!schemaData?.sections || !Array.isArray(schemaData.sections)) return [];
+    const fields: Array<{ label: string; type: string; required?: boolean; sectionTitle?: string }> = [];
+    schemaData.sections.forEach((sec: any) => {
+      if (sec.fields && Array.isArray(sec.fields)) {
+        sec.fields.forEach((f: any) => {
+          if (f.label && typeof f.label === "string") {
+            fields.push({
+              label: f.label.trim(),
+              type: f.type || "text",
+              required: !!f.required,
+              sectionTitle: sec.title || "Umum",
+            });
+          }
+        });
+      }
+    });
+    return fields;
+  }, [schemaData]);
+
   const [isGenerating, setIsGenerating] = React.useState(false);
   const [isTogglingStatus, setIsTogglingStatus] = React.useState(false);
   const [isDeleting, setIsDeleting] = React.useState(false);
@@ -80,6 +106,7 @@ export function ProgramApiSettings({ programId }: { programId: string }) {
   const [showKey, setShowKey] = React.useState(false);
   const [copied, setCopied] = React.useState(false);
   const [copiedScript, setCopiedScript] = React.useState(false);
+  const [copiedPayload, setCopiedPayload] = React.useState(false);
 
   const fetchApiKey = React.useCallback(async (showToast = false) => {
     const res = await refetch();
@@ -196,13 +223,38 @@ export function ProgramApiSettings({ programId }: { programId: string }) {
     return ua.slice(0, 25);
   };
 
-  const appScriptTemplate = `/**
+  // Generate dynamic Google Apps Script template based on Profile Builder fields
+  const appScriptTemplate = React.useMemo(() => {
+    const origin = typeof window !== "undefined" ? window.location.origin : "https://app.verifbuilder.com";
+    const apiSecret = apiKeyData?.key || "PASTE_API_KEY_DISINI";
+
+    // Column Headers: ID Unique -> Profile Builder Fields -> Meta Status Verifikasi
+    const headersList = [
+      "ID Unique",
+      ...profileFields.map((f) => f.label),
+      "Status Verifikasi",
+      "Catatan Verifikasi",
+      "Diverifikasi Oleh",
+      "Waktu Verifikasi",
+    ];
+
+    const totalColumns = headersList.length;
+
+    // Helper to build field values mapping in script
+    const fieldMappings = profileFields.length > 0
+      ? profileFields
+          .map((f) => `        item.data[${JSON.stringify(f.label)}] || "-"`)
+          .join(",\n")
+      : `        item.data["Nama Peserta"] || item.data["Nama"] || "-"`;
+
+    return `/**
  * Script Google Apps Script untuk Import Data VerifBuilder ke Google Sheets
+ * Di-generate otomatis sesuai dengan Field Profile Builder Program
  */
 function syncVerifBuilderData() {
   // Config
-  var API_URL = "${typeof window !== 'undefined' ? window.location.origin : 'https://app.verifbuilder.com'}/api/v1/export/participants";
-  var API_KEY = "${apiKeyData?.key || 'PASTE_API_KEY_DISINI'}";
+  var API_URL = "${origin}/api/v1/export/participants";
+  var API_KEY = "${apiSecret}";
 
   var options = {
     "method": "GET",
@@ -226,11 +278,12 @@ function syncVerifBuilderData() {
     var participants = result.data;
     var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
 
+    // Daftar Header Kolom (${totalColumns} kolom)
+    var headers = ${JSON.stringify(headersList)};
+
     // Set Header di Baris 1 (Mulai Kolom B)
-    sheet.getRange("B1:F1").setValues([
-      ["ID Unique", "Nama Peserta", "Status Verifikasi", "Catatan Verifikasi", "Verifikator"]
-    ]);
-    sheet.getRange("B1:F1").setBackground("#1e293b").setFontColor("#ffffff").setFontWeight("bold");
+    sheet.getRange(1, 2, 1, ${totalColumns}).setValues([headers]);
+    sheet.getRange(1, 2, 1, ${totalColumns}).setBackground("#1e293b").setFontColor("#ffffff").setFontWeight("bold");
 
     if (!participants || participants.length === 0) {
       Browser.msgBox("Info", "Data peserta kosong.", Browser.Buttons.OK);
@@ -240,26 +293,76 @@ function syncVerifBuilderData() {
     // Pemetaan data per kolom
     var rowsData = participants.map(function(item) {
       return [
-        item.uniqueKey || "-",                               
-        item.data["Nama Peserta"] || item.data["Nama"] || "-", 
-        item.evalStatus || "BELUM_DIVERIFIKASI",             
-        item.evalDescription || "-",                          
-        item.evalByUserName || "-"                            
+        item.uniqueKey || "-",
+${fieldMappings},
+        item.evalStatus || "BELUM_DIVERIFIKASI",
+        item.evalDescription || "-",
+        item.evalByUserName || "-",
+        item.evalAt ? new Date(item.evalAt).toLocaleString("id-ID") : "-"
       ];
     });
 
-    // Clear data lama di kolom B:F dari baris 2
+    // Clear data lama di kolom B dari baris 2
     var lastRow = Math.max(sheet.getLastRow(), 2);
-    sheet.getRange(2, 2, lastRow, 5).clearContent();
+    sheet.getRange(2, 2, lastRow, ${totalColumns}).clearContent();
 
     // Tulis batch ke Sheet
-    sheet.getRange(2, 2, rowsData.length, 5).setValues(rowsData);
+    sheet.getRange(2, 2, rowsData.length, ${totalColumns}).setValues(rowsData);
 
     Browser.msgBox("Sukses", "Berhasil menyinkronkan " + rowsData.length + " data peserta!", Browser.Buttons.OK);
   } catch (e) {
     Browser.msgBox("Error", "Terjadi kesalahan: " + e.toString(), Browser.Buttons.OK);
   }
 }`;
+  }, [apiKeyData, profileFields]);
+
+  // Sample JSON payload returned by API
+  const samplePayloadJson = React.useMemo(() => {
+    const sampleDataObj: Record<string, any> = {};
+    if (profileFields.length > 0) {
+      profileFields.forEach((f) => {
+        if (f.type === "date") sampleDataObj[f.label] = "2026-07-29";
+        else if (f.type === "number") sampleDataObj[f.label] = "12345";
+        else if (f.type === "select") sampleDataObj[f.label] = "Pilihan 1";
+        else sampleDataObj[f.label] = `Contoh ${f.label}`;
+      });
+    } else {
+      sampleDataObj["Nama Peserta"] = "Budi Santoso";
+      sampleDataObj["Email"] = "budi@example.com";
+    }
+
+    return JSON.stringify(
+      {
+        success: true,
+        program: {
+          id: programId,
+          name: "Nama Program",
+          uniqueKeyColumn: "NIK / ID",
+          fields: profileFields.map((f) => ({
+            label: f.label,
+            type: f.type,
+            required: f.required,
+          })),
+        },
+        total: 1,
+        data: [
+          {
+            id: "part_cls123abc",
+            rowIndex: 2,
+            uniqueKey: "3201019876540001",
+            data: sampleDataObj,
+            evalStatus: "VERIFIED",
+            evalDescription: "Dokumen lengkap dan valid",
+            evalByUserName: "Admin Verifikator",
+            evalAt: "2026-07-29T10:00:00.000Z",
+            importedAt: "2026-07-29T08:00:00.000Z",
+          },
+        ],
+      },
+      null,
+      2
+    );
+  }, [programId, profileFields]);
 
   if (isLoading) {
     return (
@@ -500,7 +603,7 @@ function syncVerifBuilderData() {
                     Template Google Apps Script
                   </CardTitle>
                   <CardDescription className="text-xs">
-                    Tempel di <strong>Extensions &gt; Apps Script</strong> pada Google Sheet.
+                    Terhubung otomatis dengan {profileFields.length} field dari Profile Builder program ini.
                   </CardDescription>
                 </div>
                 <Button
@@ -508,7 +611,7 @@ function syncVerifBuilderData() {
                   size="sm"
                   onClick={() => copyToClipboard(appScriptTemplate, setCopiedScript)}
                   disabled={!apiKeyData}
-                  className="h-8 text-xs"
+                  className="h-8 text-xs shrink-0"
                 >
                   {copiedScript ? (
                     <>
@@ -525,97 +628,265 @@ function syncVerifBuilderData() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="relative rounded-md border bg-muted/60 p-3 font-mono text-[11px] text-foreground overflow-x-auto max-h-72">
+              <div className="relative rounded-md border bg-muted/60 p-3 font-mono text-[11px] text-foreground overflow-x-auto max-h-80">
                 <pre>{appScriptTemplate}</pre>
               </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Kolom Kanan: Tabel Audit Log Akses API (lg:col-span-7) */}
+        {/* Kolom Kanan: Tabbed Interface (Audit Logs, Profile Builder Fields, & API Payload) */}
         <div className="lg:col-span-7 space-y-6">
-          {apiKeyData ? (
-            <Card className="h-full">
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
+          <Card className="h-full">
+            <Tabs defaultValue="fields" className="w-full">
+              <CardHeader className="pb-3 border-b">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div className="space-y-1">
-                    <CardTitle className="flex items-center gap-2 text-base">
-                      <HistoryIcon className="h-4 w-4 text-primary" />
-                      Tabel Audit Log Akses API
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <FileTextIcon className="h-4 w-4 text-primary" />
+                      Dokumentasi Field & Akses API
                     </CardTitle>
                     <CardDescription className="text-xs">
-                      Riwayat pemanggilan API terbaru oleh Google Apps Script / Client lain.
+                      Referensi field Profile Builder, sampel JSON response API, dan Audit Log.
                     </CardDescription>
                   </div>
-                  <Button variant="outline" size="sm" onClick={() => fetchApiKey(true)} className="h-8 text-xs">
-                    <RefreshCwIcon className="mr-1.5 h-3.5 w-3.5" />
-                    Refresh Log
-                  </Button>
+
+                  <TabsList className="grid grid-cols-3 w-full sm:w-auto h-8">
+                    <TabsTrigger value="fields" className="text-xs px-2.5">
+                      <FileTextIcon className="h-3.5 w-3.5 mr-1.5" />
+                      Field Schema
+                    </TabsTrigger>
+                    <TabsTrigger value="payload" className="text-xs px-2.5">
+                      <BracesIcon className="h-3.5 w-3.5 mr-1.5" />
+                      JSON Payload
+                    </TabsTrigger>
+                    <TabsTrigger value="logs" className="text-xs px-2.5">
+                      <HistoryIcon className="h-3.5 w-3.5 mr-1.5" />
+                      Audit Logs
+                    </TabsTrigger>
+                  </TabsList>
                 </div>
               </CardHeader>
-              <CardContent>
-                {!apiKeyData.logs || apiKeyData.logs.length === 0 ? (
-                  <div className="py-12 text-center text-xs text-muted-foreground border border-dashed rounded-md">
-                    Belum ada riwayat penggunaan API.
+
+              <CardContent className="pt-4">
+                {/* TAB 1: SKEMA FIELD PROFILE BUILDER */}
+                <TabsContent value="fields" className="space-y-4 m-0 focus-visible:outline-none">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs text-muted-foreground">
+                      Menampilkan <strong>{profileFields.length} field</strong> yang dapat diakses via API (`item.data["&lt;Nama Field&gt;"]`).
+                    </p>
+                    <Badge variant="outline" className="text-[11px]">
+                      Profile Builder Active
+                    </Badge>
                   </div>
-                ) : (
-                  <div className="rounded-md border overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="text-xs">Waktu Akses</TableHead>
-                          <TableHead className="text-xs">Status</TableHead>
-                          <TableHead className="text-xs">Client</TableHead>
-                          <TableHead className="text-xs">IP Address</TableHead>
-                          <TableHead className="text-xs">Keterangan</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {apiKeyData.logs.map((log) => (
-                          <TableRow key={log.id}>
-                            <TableCell className="font-mono text-[11px] whitespace-nowrap">
-                              {formatTime(log.createdAt)}
+
+                  {profileFields.length === 0 ? (
+                    <div className="py-12 text-center text-xs text-muted-foreground border border-dashed rounded-md">
+                      Belum ada field di Profile Builder program ini.
+                    </div>
+                  ) : (
+                    <div className="rounded-md border overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="text-xs">Nama Field (Label)</TableHead>
+                            <TableHead className="text-xs">Akses Key JSON (`data[...]`)</TableHead>
+                            <TableHead className="text-xs">Tipe Data</TableHead>
+                            <TableHead className="text-xs">Wajib/Opsional</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {/* Field Unique Key bawaan */}
+                          <TableRow className="bg-muted/30">
+                            <TableCell className="font-medium text-xs">
+                              ID Unique (Unique Key)
+                              <span className="block text-[10px] text-muted-foreground">Key utama identitas</span>
                             </TableCell>
+                            <TableCell className="font-mono text-[11px] text-primary">
+                              item.uniqueKey
+                            </TableCell>
+                            <TableCell className="text-xs">string</TableCell>
                             <TableCell>
-                              {log.status === 200 ? (
-                                <Badge className="bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] px-1.5 py-0">
-                                  200 OK
-                                </Badge>
-                              ) : log.status === 403 ? (
-                                <Badge className="bg-amber-500 hover:bg-amber-600 text-white text-[10px] px-1.5 py-0">
-                                  403 Paused
-                                </Badge>
-                              ) : (
-                                <Badge variant="destructive" className="text-[10px] px-1.5 py-0">
-                                  {log.status}
-                                </Badge>
-                              )}
-                            </TableCell>
-                            <TableCell className="font-medium text-xs whitespace-nowrap">
-                              <span className="flex items-center gap-1">
-                                <GlobeIcon className="h-3 w-3 text-muted-foreground" />
-                                {parseUserAgent(log.userAgent)}
-                              </span>
-                            </TableCell>
-                            <TableCell className="font-mono text-[11px] text-muted-foreground whitespace-nowrap">
-                              {log.ipAddress || "-"}
-                            </TableCell>
-                            <TableCell className="text-xs text-muted-foreground">
-                              {log.message || "-"}
+                              <Badge variant="default" className="text-[10px] px-1.5 py-0 bg-emerald-600">
+                                Wajib
+                              </Badge>
                             </TableCell>
                           </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
+
+                          {/* Profile Builder fields */}
+                          {profileFields.map((f, idx) => (
+                            <TableRow key={idx}>
+                              <TableCell className="font-medium text-xs">
+                                {f.label}
+                                {f.sectionTitle && (
+                                  <span className="block text-[10px] text-muted-foreground">
+                                    Section: {f.sectionTitle}
+                                  </span>
+                                )}
+                              </TableCell>
+                              <TableCell className="font-mono text-[11px] text-primary">
+                                item.data["{f.label}"]
+                              </TableCell>
+                              <TableCell className="text-xs capitalize font-mono text-[11px]">
+                                {f.type}
+                              </TableCell>
+                              <TableCell>
+                                {f.required ? (
+                                  <Badge variant="default" className="text-[10px] px-1.5 py-0 bg-emerald-600">
+                                    Wajib
+                                  </Badge>
+                                ) : (
+                                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-muted-foreground">
+                                    Opsional
+                                  </Badge>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+
+                          {/* Metadata Status Verifikasi */}
+                          <TableRow className="bg-muted/20">
+                            <TableCell className="font-medium text-xs">Status Verifikasi</TableCell>
+                            <TableCell className="font-mono text-[11px] text-muted-foreground">
+                              item.evalStatus
+                            </TableCell>
+                            <TableCell className="text-xs font-mono text-[11px]">string (ENUM)</TableCell>
+                            <TableCell>
+                              <Badge variant="secondary" className="text-[10px] px-1.5 py-0">System Meta</Badge>
+                            </TableCell>
+                          </TableRow>
+                          <TableRow className="bg-muted/20">
+                            <TableCell className="font-medium text-xs">Catatan Verifikasi</TableCell>
+                            <TableCell className="font-mono text-[11px] text-muted-foreground">
+                              item.evalDescription
+                            </TableCell>
+                            <TableCell className="text-xs font-mono text-[11px]">string</TableCell>
+                            <TableCell>
+                              <Badge variant="secondary" className="text-[10px] px-1.5 py-0">System Meta</Badge>
+                            </TableCell>
+                          </TableRow>
+                          <TableRow className="bg-muted/20">
+                            <TableCell className="font-medium text-xs">Diverifikasi Oleh</TableCell>
+                            <TableCell className="font-mono text-[11px] text-muted-foreground">
+                              item.evalByUserName
+                            </TableCell>
+                            <TableCell className="text-xs font-mono text-[11px]">string</TableCell>
+                            <TableCell>
+                              <Badge variant="secondary" className="text-[10px] px-1.5 py-0">System Meta</Badge>
+                            </TableCell>
+                          </TableRow>
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+                </TabsContent>
+
+                {/* TAB 2: JSON PAYLOAD PREVIEW */}
+                <TabsContent value="payload" className="space-y-4 m-0 focus-visible:outline-none">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs text-muted-foreground">
+                      Contoh struktur JSON Response dari `GET /api/v1/export/participants`.
+                    </p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => copyToClipboard(samplePayloadJson, setCopiedPayload)}
+                      className="h-7 text-xs"
+                    >
+                      {copiedPayload ? (
+                        <>
+                          <CheckIcon className="mr-1.5 h-3 w-3 text-emerald-600" />
+                          Tersalin!
+                        </>
+                      ) : (
+                        <>
+                          <CopyIcon className="mr-1.5 h-3 w-3" />
+                          Salin JSON
+                        </>
+                      )}
+                    </Button>
                   </div>
-                )}
+
+                  <div className="relative rounded-md border bg-muted/60 p-3 font-mono text-[11px] text-foreground overflow-x-auto max-h-96">
+                    <pre>{samplePayloadJson}</pre>
+                  </div>
+                </TabsContent>
+
+                {/* TAB 3: AUDIT LOGS */}
+                <TabsContent value="logs" className="space-y-4 m-0 focus-visible:outline-none">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs text-muted-foreground">
+                      Riwayat akses API terbaru oleh Google Apps Script atau client external.
+                    </p>
+                    <Button variant="outline" size="sm" onClick={() => fetchApiKey(true)} className="h-7 text-xs">
+                      <RefreshCwIcon className="mr-1.5 h-3 w-3" />
+                      Refresh Log
+                    </Button>
+                  </div>
+
+                  {!apiKeyData ? (
+                    <div className="py-12 text-center text-xs text-muted-foreground border border-dashed rounded-md">
+                      Buat API Key terlebih dahulu untuk melihat Audit Log.
+                    </div>
+                  ) : !apiKeyData.logs || apiKeyData.logs.length === 0 ? (
+                    <div className="py-12 text-center text-xs text-muted-foreground border border-dashed rounded-md">
+                      Belum ada riwayat penggunaan API.
+                    </div>
+                  ) : (
+                    <div className="rounded-md border overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="text-xs">Waktu Akses</TableHead>
+                            <TableHead className="text-xs">Status</TableHead>
+                            <TableHead className="text-xs">Client</TableHead>
+                            <TableHead className="text-xs">IP Address</TableHead>
+                            <TableHead className="text-xs">Keterangan</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {apiKeyData.logs.map((log) => (
+                            <TableRow key={log.id}>
+                              <TableCell className="font-mono text-[11px] whitespace-nowrap">
+                                {formatTime(log.createdAt)}
+                              </TableCell>
+                              <TableCell>
+                                {log.status === 200 ? (
+                                  <Badge className="bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] px-1.5 py-0">
+                                    200 OK
+                                  </Badge>
+                                ) : log.status === 403 ? (
+                                  <Badge className="bg-amber-500 hover:bg-amber-600 text-white text-[10px] px-1.5 py-0">
+                                    403 Paused
+                                  </Badge>
+                                ) : (
+                                  <Badge variant="destructive" className="text-[10px] px-1.5 py-0">
+                                    {log.status}
+                                  </Badge>
+                                )}
+                              </TableCell>
+                              <TableCell className="font-medium text-xs whitespace-nowrap">
+                                <span className="flex items-center gap-1">
+                                  <GlobeIcon className="h-3 w-3 text-muted-foreground" />
+                                  {parseUserAgent(log.userAgent)}
+                                </span>
+                              </TableCell>
+                              <TableCell className="font-mono text-[11px] text-muted-foreground whitespace-nowrap">
+                                {log.ipAddress || "-"}
+                              </TableCell>
+                              <TableCell className="text-xs text-muted-foreground">
+                                {log.message || "-"}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+                </TabsContent>
               </CardContent>
-            </Card>
-          ) : (
-            <Card className="h-full flex items-center justify-center p-8 text-center text-xs text-muted-foreground border-dashed">
-              Buat API Key terlebih dahulu untuk melihat Tabel Audit Log Akses API.
-            </Card>
-          )}
+            </Tabs>
+          </Card>
         </div>
       </div>
     </div>

@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import DatePicker from "@/components/date-picker";
 import { Field as ShadcnField, FieldLabel, FieldDescription, FieldError } from "@/components/ui/field";
-import { Calendar, FileText, Image as ImageIcon, Video, Tag, Bookmark, Hash, ArrowUpRight, Eye, Play, Globe, X, Edit3, Link as LinkIcon, Clipboard, ExternalLink, AlertTriangle } from "lucide-react";
+import { Calendar, FileText, Image as ImageIcon, Video, Tag, Bookmark, Hash, ArrowUpRight, Eye, Play, Globe, X, Edit3, Link as LinkIcon, Clipboard, ExternalLink, AlertTriangle, AlertCircle } from "lucide-react";
 import { safeParseDate } from "@/lib/utils/format-date";
 import { StreetAddressInput } from "@/components/ui/street-address-input";
 import { validateProfileFieldValue } from "@/lib/validators/profile-validator";
@@ -233,11 +233,6 @@ function SearchableCombobox({ value, options, optionColors, placeholder, onValue
           </ComboboxList>
         </ComboboxContent>
       </Combobox>
-      {isInvalid && (
-        <p className="text-xs font-medium text-destructive mt-1.5 flex items-center gap-1">
-          <span>Nilai tidak valid / tidak ada dalam pilihan</span>
-        </p>
-      )}
     </div>
   );
 }
@@ -774,6 +769,40 @@ const FieldStatusMessage = React.memo(function FieldStatusMessage({
   return null;
 });
 
+const CustomFieldDescription = React.memo(function CustomFieldDescription({
+  field,
+}: {
+  field: Field;
+}) {
+  if (!field.description) return null;
+
+  const style = field.descriptionStyle || "default";
+
+  if (style === "danger") {
+    return (
+      <div className="mt-1.5 pl-2 py-1.5 pr-2.5 font-medium text-xs flex items-center gap-1.5 text-rose-700 dark:text-rose-400 bg-rose-500/10 border border-rose-500/20 rounded-lg">
+        <AlertCircle className="h-3.5 w-3.5 shrink-0 text-rose-500" />
+        <span>{field.description}</span>
+      </div>
+    );
+  }
+
+  if (style === "alert") {
+    return (
+      <div className="mt-1.5 pl-2 py-1.5 pr-2.5 font-medium text-xs flex items-center gap-1.5 text-amber-700 dark:text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-lg">
+        <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-500" />
+        <span>{field.description}</span>
+      </div>
+    );
+  }
+
+  return (
+    <FieldDescription className="text-xs italic text-muted-foreground/80 mt-1 pl-0.5 leading-relaxed">
+      {field.description}
+    </FieldDescription>
+  );
+});
+
 interface EvaluationFormProps {
   sections: Section[];
   participant: Record<string, any>;
@@ -860,11 +889,7 @@ export function EvaluationForm({ sections, participant, onFieldChange, errors }:
                           handleOpenEditMediaModal={handleOpenEditMediaModal}
                         />
                         <FieldStatusMessage fieldValidationStatus={status} />
-                        {field.description && (
-                          <FieldDescription className="text-xs italic text-muted-foreground/80 mt-1 pl-0.5 leading-relaxed">
-                            {field.description}
-                          </FieldDescription>
-                        )}
+                        <CustomFieldDescription field={field} />
                       </ShadcnField>
                     );
                   })}
@@ -890,11 +915,7 @@ export function EvaluationForm({ sections, participant, onFieldChange, errors }:
                           handleOpenEditMediaModal={handleOpenEditMediaModal}
                         />
                         <FieldStatusMessage fieldValidationStatus={status} />
-                        {field.description && (
-                          <FieldDescription className="text-xs italic text-muted-foreground/80 mt-1 pl-0.5 leading-relaxed">
-                            {field.description}
-                          </FieldDescription>
-                        )}
+                        <CustomFieldDescription field={field} />
                       </ShadcnField>
                     );
                   })}
@@ -919,11 +940,7 @@ export function EvaluationForm({ sections, participant, onFieldChange, errors }:
                       handleOpenEditMediaModal={handleOpenEditMediaModal}
                     />
                     <FieldStatusMessage fieldValidationStatus={status} />
-                    {field.description && (
-                      <FieldDescription className="text-xs italic text-muted-foreground/80 mt-1 pl-0.5 leading-relaxed">
-                        {field.description}
-                      </FieldDescription>
-                    )}
+                    <CustomFieldDescription field={field} />
                   </ShadcnField>
                 );
               })}
