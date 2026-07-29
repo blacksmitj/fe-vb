@@ -251,6 +251,17 @@ export function ProgramApiSettings({ programId }: { programId: string }) {
  * Script Google Apps Script untuk Import Data VerifBuilder ke Google Sheets
  * Di-generate otomatis sesuai dengan Field Profile Builder Program
  */
+
+/**
+ * Menambahkan Menu Khusus di Google Sheets untuk Sinkronisasi Manual 1-Klik
+ */
+function onOpen() {
+  var ui = SpreadsheetApp.getUi();
+  ui.createMenu('VerifBuilder')
+    .addItem('⚡ Sinkronkan Data Sekarang', 'syncVerifBuilderData')
+    .addToUi();
+}
+
 function syncVerifBuilderData() {
   // Config
   var API_URL = "${origin}/api/v1/export/participants";
@@ -630,6 +641,63 @@ ${fieldMappings},
             <CardContent>
               <div className="relative rounded-md border bg-muted/60 p-3 font-mono text-[11px] text-foreground overflow-x-auto max-h-80">
                 <pre>{appScriptTemplate}</pre>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Card Panduan Penggunaan & Time Trigger */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <ClockIcon className="h-4 w-4 text-primary" />
+                Panduan Pemasangan & Time Trigger
+              </CardTitle>
+              <CardDescription className="text-xs">
+                Petunjuk langkah demi langkah memasang skrip, sinkronisasi manual, dan otomatisasi berkala.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4 text-xs">
+              {/* Langkah 1: Pemasangan Skrip */}
+              <div className="space-y-1.5 border-l-2 border-primary/50 pl-3">
+                <h5 className="font-semibold text-foreground flex items-center gap-1.5">
+                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary/10 text-[10px] font-bold text-primary">1</span>
+                  Pemasangan Skrip ke Google Sheets
+                </h5>
+                <ol className="list-decimal list-inside space-y-1 text-muted-foreground text-[11px] leading-relaxed">
+                  <li>Buka Google Sheets milik Anda.</li>
+                  <li>Klik menu <strong>Extensions (Ekstensi) &gt; Apps Script</strong>.</li>
+                  <li>Hapus semua kode bawaan, lalu <strong>Paste (Tempel)</strong> kode skrip di atas.</li>
+                  <li>Klik ikon 💾 <strong>Save (Simpan)</strong>.</li>
+                </ol>
+              </div>
+
+              {/* Langkah 2: Sinkronisasi Manual 1-Klik */}
+              <div className="space-y-1.5 border-l-2 border-emerald-500/50 pl-3">
+                <h5 className="font-semibold text-foreground flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
+                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500/10 text-[10px] font-bold text-emerald-600">2</span>
+                  Tombol Sinkronkan Manual (1-Klik di Google Sheets)
+                </h5>
+                <ul className="list-disc list-inside space-y-1 text-muted-foreground text-[11px] leading-relaxed">
+                  <li>Jalankan fungsi <code className="font-mono bg-muted px-1 rounded">onOpen</code> satu kali atau <strong>Refresh/Reload</strong> halaman Google Sheets.</li>
+                  <li>Menu baru <strong>VerifBuilder</strong> akan muncul di bilah atas Google Sheet.</li>
+                  <li>Klik menu <strong>VerifBuilder &gt; ⚡ Sinkronkan Data Sekarang</strong> untuk menarik data peserta terbaru kapan saja.</li>
+                </ul>
+              </div>
+
+              {/* Langkah 3: Time Trigger Otomatis Berkala */}
+              <div className="space-y-1.5 border-l-2 border-amber-500/50 pl-3">
+                <h5 className="font-semibold text-foreground flex items-center gap-1.5 text-amber-600 dark:text-amber-400">
+                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-amber-500/10 text-[10px] font-bold text-amber-600">3</span>
+                  Time Trigger (Sinkronisasi Otomatis Berkala)
+                </h5>
+                <ol className="list-decimal list-inside space-y-1 text-muted-foreground text-[11px] leading-relaxed">
+                  <li>Di halaman Apps Script, klik ikon ⏰ <strong>Triggers (Pemicu)</strong> di sidebar kiri.</li>
+                  <li>Klik <strong>+ Add Trigger (+ Tambah Pemicu)</strong> di kanan bawah.</li>
+                  <li>Set <em>Choose function</em>: <code className="font-mono bg-muted px-1 rounded">syncVerifBuilderData</code>.</li>
+                  <li>Set <em>Event source</em>: <strong>Time-driven (Berdasarkan waktu)</strong>.</li>
+                  <li>Set <em>Type of trigger</em>: <strong>Minutes timer (Pemicu menit)</strong> (misal: Setiap 5 menit / 15 menit).</li>
+                  <li>Klik <strong>Save (Simpan)</strong> & setujui otorisasi akun Google.</li>
+                </ol>
               </div>
             </CardContent>
           </Card>
