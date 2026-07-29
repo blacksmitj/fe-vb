@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { safeParseDate } from '@/lib/utils';
 
 function getClientIp(request: Request): string {
   const forwarded = request.headers.get('x-forwarded-for');
@@ -134,7 +135,9 @@ export async function GET(request: Request) {
       sections = keyRecord.program.profileSchema.sections as any[];
     }
 
-    const fields: Array<{ label: string; type?: string; required?: boolean }> = [];
+    const fields: Array<{ label: string; type?: string; required?: boolean; dateMode?: string }> = [];
+    const dateFieldsMap = new Map<string, string>();
+
     if (Array.isArray(sections)) {
       sections.forEach((sec: any) => {
         if (sec.fields && Array.isArray(sec.fields)) {
@@ -144,12 +147,53 @@ export async function GET(request: Request) {
                 label: f.label,
                 type: f.type || 'text',
                 required: !!f.required,
+                dateMode: f.dateMode,
               });
+              if (f.type === 'date') {
+                dateFieldsMap.set(f.label, f.dateMode || 'date-only');
+              }
             }
           });
         }
       });
     }
+
+    // Automatically format date fields in participant data to clean ID-ID date string
+    const formattedParticipants = participants.map((p) => {
+      const pData = (p.data as Record<string, any>) || {};
+      if (dateFieldsMap.size === 0) return p;
+
+      const newPData: Record<string, any> = { ...pData };
+      dateFieldsMap.forEach((dateMode, label) => {
+        const val = pData[label];
+        if (val !== undefined && val !== null && val !== '') {
+          const dateObj = safeParseDate(val);
+          if (dateObj) {
+            const isTime = dateMode === 'date-time';
+            const options: Intl.DateTimeFormatOptions = {
+              day: '2-digit',
+              month: '2-digit',
+              year: 'numeric',
+              timeZone: 'Asia/Jakarta',
+            };
+            if (isTime) {
+              options.hour = '2-digit';
+              options.minute = '2-digit';
+            }
+            let formattedDate = dateObj.toLocaleDateString('id-ID', options);
+            if (isTime) {
+              formattedDate += ' WIB';
+            }
+            newPData[label] = formattedDate;
+          }
+        }
+      });
+
+      return {
+        ...p,
+        data: newPData,
+      };
+    });
 
     return NextResponse.json({
       success: true,
@@ -160,8 +204,8 @@ export async function GET(request: Request) {
         headers: keyRecord.program.headers,
         fields,
       },
-      total: participants.length,
-      data: participants,
+      total: formattedParticipants.length,
+      data: formattedParticipants,
     });
   } catch (error) {
     console.error('Error exporting participants via API:', error);
