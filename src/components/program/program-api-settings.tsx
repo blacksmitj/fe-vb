@@ -22,13 +22,16 @@ import {
   BarChart3Icon,
   FileTextIcon,
   BracesIcon,
+  LockIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { safeParseDate } from "@/lib/utils";
 import { useProgramApiKey, useProgramSchema } from "@/hooks/use-programs";
+import { generateAppsScriptTemplate } from "@/lib/apps-script-generator";
 import { useQueryClient } from "@tanstack/react-query";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -99,6 +102,7 @@ export function ProgramApiSettings({ programId }: { programId: string }) {
     return fields;
   }, [schemaData]);
 
+  const [enableProtection, setEnableProtection] = React.useState(false);
   const [isGenerating, setIsGenerating] = React.useState(false);
   const [isTogglingStatus, setIsTogglingStatus] = React.useState(false);
   const [isDeleting, setIsDeleting] = React.useState(false);
@@ -223,142 +227,19 @@ export function ProgramApiSettings({ programId }: { programId: string }) {
     return ua.slice(0, 25);
   };
 
-  // Generate dynamic Google Apps Script template based on Profile Builder fields (Modular & Maintainable)
+  // Generate dynamic Google Apps Script template based on Profile Builder fields via external helper
   const appScriptTemplate = React.useMemo(() => {
     const origin = typeof window !== "undefined" ? window.location.origin : "https://app.verifbuilder.com";
-    const apiSecret = apiKeyData?.key || "PASTE_API_KEY_DISINI";
+    const apiKey = apiKeyData?.key || "PASTE_API_KEY_DISINI";
     const fieldLabels = profileFields.map((f) => f.label);
 
-    return `/**
- * Script Google Apps Script untuk Import Data VerifBuilder ke Google Sheets
- * Di-generate otomatis sesuai dengan Field Profile Builder Program
- */
-
-// 1. KONFIGURASI UTAMA
-const CONFIG = {
-  API_URL: "${origin}/api/v1/export/participants",
-  API_KEY: "${apiSecret}",
-};
-
-// 2. DAFTAR FIELD PROFILE BUILDER (${fieldLabels.length} Field)
-const PROFILE_FIELDS = ${JSON.stringify(fieldLabels, null, 2)};
-
-// 3. DAFTAR HEADER KOLOM LENGKAP (Unique Key -> Profile Fields -> Meta Verifikasi)
-const HEADERS = [
-  "ID Unique",
-  ...PROFILE_FIELDS,
-  "Status Verifikasi",
-  "Catatan Verifikasi",
-  "Diverifikasi Oleh",
-  "Waktu Verifikasi"
-];
-
-/**
- * Menambahkan Menu Khusus di Google Sheets untuk Sinkronisasi Manual 1-Klik
- */
-function onOpen() {
-  const ui = SpreadsheetApp.getUi();
-  ui.createMenu('VerifBuilder')
-    .addItem('⚡ Sinkronkan Data Sekarang', 'syncVerifBuilderData')
-    .addToUi();
-}
-
-/**
- * Fungsi Utama Sinkronisasi Data
- */
-function syncVerifBuilderData() {
-  try {
-    const result = fetchParticipants();
-    if (!result.success || !result.data) {
-      Browser.msgBox("Error", "Gagal mengambil data: " + (result.message || "Unauthorized"), Browser.Buttons.OK);
-      return;
-    }
-
-    const participants = result.data;
-    const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
-
-    writeHeaders(sheet);
-
-    if (participants.length === 0) {
-      Browser.msgBox("Info", "Data peserta kosong.", Browser.Buttons.OK);
-      return;
-    }
-
-    const rowsData = buildRows(participants);
-    writeRows(sheet, rowsData);
-
-    Logger.log("Berhasil menyinkronkan " + rowsData.length + " data peserta.");
-    Browser.msgBox("Sukses", "Berhasil menyinkronkan " + rowsData.length + " data peserta!", Browser.Buttons.OK);
-  } catch (e) {
-    Logger.log("Error syncVerifBuilderData: " + e.toString());
-    Browser.msgBox("Error", "Terjadi kesalahan: " + e.toString(), Browser.Buttons.OK);
-  }
-}
-
-/**
- * Helper: Mengambil data dari API VerifBuilder
- */
-function fetchParticipants() {
-  const options = {
-    method: "GET",
-    headers: {
-      "x-api-key": CONFIG.API_KEY,
-      "Content-Type": "application/json"
-    },
-    muteHttpExceptions: true
-  };
-  const response = UrlFetchApp.fetch(CONFIG.API_URL, options);
-  return JSON.parse(response.getContentText());
-}
-
-/**
- * Helper: Menuliskan Header di Baris 1 (Mulai Kolom B)
- */
-function writeHeaders(sheet) {
-  const colCount = HEADERS.length;
-  const headerRange = sheet.getRange(1, 2, 1, colCount);
-  headerRange.setValues([HEADERS]);
-  headerRange.setBackground("#1e293b").setFontColor("#ffffff").setFontWeight("bold");
-}
-
-/**
- * Helper: Mengubah array participants menjadi matriks baris untuk Sheet
- */
-function buildRows(participants) {
-  const tz = Session.getScriptTimeZone();
-  return participants.map(function(item) {
-    const row = [item.uniqueKey || "-"];
-
-    PROFILE_FIELDS.forEach(function(fieldLabel) {
-      row.push(item.data ? (item.data[fieldLabel] || "-") : "-");
+    return generateAppsScriptTemplate({
+      origin,
+      apiKey,
+      profileFields: fieldLabels,
+      enableProtection,
     });
-
-    row.push(item.evalStatus || "BELUM_DIVERIFIKASI");
-    row.push(item.evalDescription || "-");
-    row.push(item.evalByUserName || "-");
-    row.push(item.evalAt
-      ? Utilities.formatDate(new Date(item.evalAt), tz, "dd/MM/yyyy HH:mm:ss")
-      : "-"
-    );
-
-    return row;
-  });
-}
-
-/**
- * Helper: Menuliskan baris data ke Sheet & membersihkan baris lama secara tepat
- */
-function writeRows(sheet, rowsData) {
-  const colCount = HEADERS.length;
-  const lastRow = sheet.getLastRow();
-
-  if (lastRow > 1) {
-    sheet.getRange(2, 2, lastRow - 1, colCount).clearContent();
-  }
-
-  sheet.getRange(2, 2, rowsData.length, colCount).setValues(rowsData);
-}`;
-  }, [apiKeyData, profileFields]);
+  }, [apiKeyData, profileFields, enableProtection]);
 
   // Sample JSON payload returned by API
   const samplePayloadJson = React.useMemo(() => {
@@ -671,7 +552,25 @@ function writeRows(sheet, rowsData) {
                 </Button>
               </div>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-3">
+              {/* Toggle Switch Range Protection */}
+              <div className="flex items-center justify-between p-2.5 rounded-md border bg-background/50">
+                <div className="flex items-center gap-2">
+                  <LockIcon className="h-4 w-4 text-amber-500 shrink-0" />
+                  <div>
+                    <p className="text-xs font-medium leading-none">Kunci Sel Data API (Range Protection)</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">
+                      Kunci kolom data API agar tidak dapat diubah oleh kolaborator lain
+                    </p>
+                  </div>
+                </div>
+                <Switch
+                  checked={enableProtection}
+                  onCheckedChange={setEnableProtection}
+                  disabled={!apiKeyData}
+                />
+              </div>
+
               <div className="relative rounded-md border bg-muted/60 p-3 font-mono text-[11px] text-foreground overflow-x-auto max-h-80">
                 <pre>{appScriptTemplate}</pre>
               </div>
